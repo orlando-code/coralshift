@@ -7,16 +7,6 @@ There has been considerable innovation and progress in coral reef conservation, 
 This three-month research project will aim to answer the how, when, and why this migration will occur by creating a predictive model of reef presence using oceanographic, land use, and coastal topographic data.
 
 ### Contributing
-
-# Thanks for your interest in contributing!
-
-This project contributes towards my current Master of Research degree, as part of my 1+3 course with the [AI4ER CDT](https://ai4er-cdt.esc.cam.ac.uk/). As such, there isn't an opportunity to contribute directly. However, it is likely that my future PhD will be in an highly-related area.
-
-If this research interests you – if you have any questions, suggestions, or comments – please do get in touch! My website and contacts can be accessed [here](https://orlando-code.github.io/). I am always happy to learn from others, or hear about potential future collaborations.
-
-**Happy reading!**
-
-
 This project forms an assessed component of the Master of Research certificate as part of the Artificial Intelligence for the study of Environmental Risks ([AI4ER]((https://ai4er-cdt.esc.cam.ac.uk/)) CDT at the University of Cambridge. There is therefore no direct opportunity for collaboration. If this research interests you – if you have any questions, suggestions, or comments – please do get in touch. My website and contacts can be accessed [here](https://orlando-code.github.io/). I am always happy to learn from others, or hear about potential future collaborations.
 
 ### License
