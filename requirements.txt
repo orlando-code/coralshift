@@ -1,0 +1,13 @@
+cartopy
+ipython
+geoopandas
+geopy
+matplotlib
+numpy
+pandas
+# shapely
+tqdm
+seaborn
+scikit-learn
+scipy
+xarray
