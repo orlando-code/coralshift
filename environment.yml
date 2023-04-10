@@ -1,0 +1,16 @@
+cartopy
+dask
+ipython
+geopandas	# not currently happy when installing whole file
+geopy
+h5netcdf
+matplotlib
+numpy
+pandas
+pathlib
+shapely
+tqdm
+seaborn
+scikit-learn
+scipy
+xarray
