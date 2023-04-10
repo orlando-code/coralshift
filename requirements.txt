@@ -1,7 +1,7 @@
 cartopy
 dask
 ipython
-geoopandas	# not currently happy when installing whole file
+geopandas	# not currently happy when installing whole file
 geopy
 h5netcdf
 matplotlib
