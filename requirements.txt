@@ -1,11 +1,14 @@
 cartopy
+dask
 ipython
-geoopandas
+geoopandas	# not currently happy when installing whole file
 geopy
+h5netcdf
 matplotlib
 numpy
 pandas
-# shapely
+pathlib
+shapely
 tqdm
 seaborn
 scikit-learn
