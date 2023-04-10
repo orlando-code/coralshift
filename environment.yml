@@ -1,0 +1,19 @@
+name: coralshift
+
+dependencies:
+- cartopy
+- dask
+- ipython
+- geopandas
+- geopy
+- h5netcdf
+- matplotlib
+- numpy
+- pandas
+- pathlib
+- shapely
+- tqdm
+- seaborn
+- scikit-learn
+- scipy
+- xarray
