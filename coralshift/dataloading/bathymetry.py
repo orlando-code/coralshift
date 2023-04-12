@@ -5,7 +5,8 @@ from coralshift.utils import file_ops
 
 
 def download_etopo_data(download_dest_dir: Path | str, resolution: str | int, loading_bar: bool = True) -> None:
-    """Download bathymetry data from the NOAA ETOPO Global Relief Model dataset.
+    """Download bathymetry data from the NOAA ETOPO Global Relief Model dataset. This may be overspecific and links
+    could change. Currently stored at: https://www.ncei.noaa.gov/products/etopo-global-relief-model
 
     Parameters
     ----------
