@@ -35,6 +35,33 @@ def download_url(url, output_path, loading_bar: bool = True) -> None:
         urllib.request.urlretrieve(url, filename=output_path, reporthook=t.update_to)
 
 
+def check_exists_download_url(filepath: Path | str, url: str, loading_bar: bool = True) -> None:
+    """Download a file from a URL to a given filepath, with the option to display a loading bar.
+
+    Parameters
+    ----------
+        filepath (Path | str): future path at which the downloaded file will be stored
+        url (str): URL from which to download the file
+        loading_bar (bool, optional): Whether to display a loading bar to show download progress. Defaults to True.
+
+    Returns
+    -------
+        None
+    """
+
+    # if not downloaded
+    if not Path(filepath).is_file():
+        # download with loading bar
+        if loading_bar:
+            download_url(url, str(filepath))
+        # download without loading bar for some reason...
+        else:
+            urllib.request.urlretrieve(url, filename=filepath)
+    # if already downloaded
+    else:
+        print(f'Already exists: {filepath}')
+
+
 def get_n_last_subparts_path(path: Path | str, n: int) -> Path:
     """Returns 'n' last parts of a path. E.g. /first/second/third/fourth with n = 3 will return second/third/fourth"""
     return Path(*Path(path).parts[-n:])
