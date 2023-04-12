@@ -135,4 +135,4 @@ def return_list_filepaths(files_dir: Path | str, suffix: str) -> list[Path]:
     -------
         list[Path]: list of file paths in the directory with the specified suffix.
     """
-    return list(Path(files_dir).glob(pad_suffix(suffix)))
+    return list(Path(files_dir).glob('*' + pad_suffix(suffix)))
