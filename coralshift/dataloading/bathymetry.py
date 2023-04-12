@@ -55,7 +55,8 @@ def fetch_links_from_url(page_url: str, suffix: str = None) -> list[str]:
     reqs = requests.get(page_url)
     soup = BeautifulSoup(reqs.text, 'html.parser')
     link_segments = soup.find_all("a")
-    links = [link.get("href") for link in link_segments]
+    # extract link strings, excluding None values
+    links = [link.get("href") for link in link_segments if link.get("href") is not None]
 
     if suffix:
         links = [link for link in links if link.endswith(file_ops.pad_suffix(suffix))]
@@ -95,9 +96,7 @@ def download_etopo_data(
 
 
 def download_30m_gbr_bathymetry(download_dest_dir: Path | str, areas: list[str]) -> None:
-    """Download bathymetry data for the Great Barrier Reef (GBR) region in TIFF format from AWS S3 bucket. This is VERY
-    hacky: but couldn't figure out how to scrape links from buttons: there seems to be no html which differentiates one
-    button from another... TODO: use selenium to interact with page. Not a priority.
+    """Download bathymetry data for the Great Barrier Reef (GBR) region in TIFF format from AWS S3 bucket.
     Dataset DOI: 10.4225/25/5a207b36022d2
 
     Parameters
@@ -110,19 +109,11 @@ def download_30m_gbr_bathymetry(download_dest_dir: Path | str, areas: list[str])
     -------
         None
     """
-    # page_url = "https://researchdata.edu.au/high-resolution-depth-30-m/1278835"
+    page_url = "https://researchdata.edu.au/high-resolution-depth-30-m/1278835"
+    data_links = fetch_links_from_url(page_url, ".tif")
 
-    # for link in fetch_links_from_url(page_url):
-    data_urls = ["https://ausseabed-public-warehouse-bathymetry.s3.ap-southeast-2.amazonaws.com/L3/0b9ad3f3-7ade-40a7-ae70-f7c6c0f3ae2e/Great_Barrier_Reef_A_2020_30m_MSL_cog.tif", # noqa
-        "https://ausseabed-public-warehouse-bathymetry.s3.ap-southeast-2.amazonaws.com/L3/4a6e7365-d7b1-45f9-a576-2be8ff8cd755/Great_Barrier_Reef_B_2020_30m_MSL_cog.tif", # noqa
-        "https://ausseabed-public-warehouse-bathymetry.s3.ap-southeast-2.amazonaws.com/L3/3b171f8d-9248-4aeb-8b32-0737babba3c2/Great_Barrier_Reef_C_2020_30m_MSL_cog.tif", # noqa
-        "https://ausseabed-public-warehouse-bathymetry.s3.ap-southeast-2.amazonaws.com/L3/7168f130-f903-4f2b-948b-78508aad8020/Great_Barrier_Reef_D_2020_30m_MSL_cog.tif"] # noqa
-
-    for area_url in list(data_urls):
+    for area_url in list(data_links):
         area_filename = file_ops.get_n_last_subparts_path(area_url, 1)
-        # area_filename = f"Great_Barrier_Reef_{alpha.upper()}_2020_30m_MSL_cog.tif"
-        # area_url = '/'.join((start_data_url, area_filename))
-
         filepath = Path(download_dest_dir, area_filename)
-        # check whether file already downloaded
+        # check whether file already downloaded: if not, download
         file_ops.check_exists_download_url(filepath, area_url)
