@@ -102,6 +102,37 @@ def load_merge_nc_files(nc_dir: Path | str):
     Returns
     -------
         xr.Dataset: merged xarray Dataset object containing the data from all netCDF files."""
-    files = Path(nc_dir).glob("*.nc")
+    files = return_list_filepaths(nc_dir, ".nc")
     # combine nc files by coordinates
     return xa.open_mfdataset(files)
+
+
+def pad_suffix(suffix: str) -> str:
+    """Pads the given file suffix with a leading period if necessary.
+
+    Parameters
+    ----------
+        suffix (str): file suffix to pad.
+
+    Returns
+    -------
+        str: The padded file suffix.
+    """
+    if "." not in suffix:
+        suffix = "." + suffix
+    return suffix
+
+
+def return_list_filepaths(files_dir: Path | str, suffix: str) -> list[Path]:
+    """Return a list of file paths in the specified directory that have the given suffix.
+
+    Parameters
+    ----------
+        files_dir (Path | str): directory in which to search for files.
+        suffix (str): file suffix to look for.
+
+    Returns
+    -------
+        list[Path]: list of file paths in the directory with the specified suffix.
+    """
+    return list(Path(files_dir).glob(pad_suffix(suffix)))
