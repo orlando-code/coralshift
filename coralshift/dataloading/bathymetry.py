@@ -95,7 +95,7 @@ def download_etopo_data(
         file_ops.check_exists_download_url(download_dest_path, url, loading_bar)
 
 
-def download_30m_gbr_bathymetry(download_dest_dir: Path | str, areas: list[str]) -> None:
+def download_30m_gbr_bathymetry(download_dest_dir: Path | str, areas: list[str] = ["A", "B", "C", "D"]) -> None:
     """Download bathymetry data for the Great Barrier Reef (GBR) region in TIFF format from AWS S3 bucket.
     Dataset DOI: 10.4225/25/5a207b36022d2
 
@@ -103,7 +103,8 @@ def download_30m_gbr_bathymetry(download_dest_dir: Path | str, areas: list[str])
     ----------
         download_dest_dir (Path | str): Path to the directory where the downloaded files should be saved.
         areas (list[str]): A list of strings indicating the areas to be downloaded. The possible values are
-            ['A', 'B', 'C', 'D'], corresponding to four different parts of the GBR region.
+            ['A', 'B', 'C', 'D'], corresponding to four different parts of the GBR region. Defaults to download all
+            these areas.
 
     Returns
     -------
