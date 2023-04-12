@@ -80,8 +80,6 @@ def check_path_suffix(path: Path | str, comparison: str) -> bool:
     -------
     bool: True if file path extension is equal to comparison, False otherwise"""
     p = Path(path)
-    if not p.is_file():
-        raise ValueError(f"{path} is not a file path.")
 
     # pad with leading "."
     if "." not in comparison:
