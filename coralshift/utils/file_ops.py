@@ -1,12 +1,15 @@
 from pathlib import Path
+from tqdm import tqdm
+import urllib
+
 
 def guarantee_existence(path: str) -> Path:
     """Checks if string is an existing path, else creates it
-    
+
     Parameter
     ---------
     path : str
-    
+
     Returns
     -------
     Path
@@ -18,7 +21,7 @@ def guarantee_existence(path: str) -> Path:
     return path_obj.resolve()
 
 
-class DownloadProgressBar(tqdm) -> None:
+class DownloadProgressBar(tqdm):
     def update_to(self, b=1, bsize=1, tsize=None):
         if tsize is not None:
             self.total = tsize
