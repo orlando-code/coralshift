@@ -1,6 +1,7 @@
 from pathlib import Path
 from tqdm import tqdm
 import urllib
+import xarray as xa
 
 
 def guarantee_existence(path: str) -> Path:
@@ -89,3 +90,18 @@ def check_path_suffix(path: Path | str, comparison: str) -> bool:
         return True
     else:
         return False
+
+
+def load_merge_nc_files(nc_dir: Path | str):
+    """Load and merge all netCDF files in a directory.
+
+    Parameters
+    ----------
+        nc_dir (Path | str): directory containing the netCDF files to be merged.
+
+    Returns
+    -------
+        xr.Dataset: merged xarray Dataset object containing the data from all netCDF files."""
+    files = Path(nc_dir).glob("*.nc")
+    # combine nc files by coordinates
+    return xa.open_mfdataset(files)
