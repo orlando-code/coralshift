@@ -1,8 +1,14 @@
 # macOS files
 .DS_Store
+
 # large data files
 *.nc
 *.tif
 *.jpg
+
 # supplementary information
 *.pdf
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
