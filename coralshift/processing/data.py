@@ -27,6 +27,36 @@ def upsample_xarray(xa_array: xa.DataArray, factors: dict) -> xa.DataArray:
     return existing_xa_array
 
 
+def process_xa_array(
+    xa_array: xa.DataArray, coords_to_drop: list[str], coords_to_rename: dict = {"x": "latitude", "y": "longitude"},
+        verbose: bool = True) -> xa.DataArray:
+    """Process the given xarray DataArray by dropping and renaming specified coordinates.
+
+    Parameters
+    ----------
+        xa_array (xa.DataArray): xarray DataArray to be processed.
+        coords_to_drop (list[str]): list of coordinates to be dropped from the DataArray.
+        coords_to_rename (dict, optional): dictionary of coordinates to be renamed in the DataArray.
+            Defaults to {"x": "latitude", "y": "longitude"}.
+        verbose (bool, optional): if True, print information about the remaining coordinates in the DataArray.
+            Defaults to True.
+
+    Returns
+    -------
+        xa.DataArray: The processed xarray DataArray.
+    """
+    # drop specified coordinates
+    xa_array = xa_array.drop_vars(coords_to_drop)
+    # rename specified coordinates
+    xa_array = xa_array.rename(coords_to_rename)
+
+    if verbose:
+        # show info about remaining coords
+        print(xa_array.coords)
+
+    return xa_array
+
+
 def open_tifs_to_dict(tif_paths: list[Path] | list[str]) -> dict:
     """Given a list of file paths to GeoTIFF files, open each file and create a dictionary where each key is the
     filename of the GeoTIFF file (without its directory path or extension) and each value is the contents of the file as
