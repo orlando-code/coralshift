@@ -103,7 +103,7 @@ def tifs_to_xa_array_dict(tif_paths: list[Path] | list[str]) -> dict:
     return xa_array_dict
 
 
-def return_min_of_coord(xa_array: xa.DataArray, coord: str):
+def return_min_of_coord(xa_array: xa.DataArray, coord: str) -> float:
     """Returns the minimum value of the specified coordinate field in the given xarray DataArray.
 
     Parameters
@@ -118,7 +118,7 @@ def return_min_of_coord(xa_array: xa.DataArray, coord: str):
     return float(xa_array[coord].min().values)
 
 
-def return_max_of_coord(xa_array: xa.DataArray, coord: str):
+def return_max_of_coord(xa_array: xa.DataArray, coord: str) -> float:
     """Returns the maximum value of the specified coordinate field in the given xarray DataArray.
 
     Parameters
@@ -131,3 +131,18 @@ def return_max_of_coord(xa_array: xa.DataArray, coord: str):
         float: The maximum value of the specified coordinate field as a float.
     """
     return float(xa_array[coord].max().values)
+
+
+def min_max_of_coords(xa_array: xa.DataArray, coord: str) -> tuple[float, float]:
+    """Returns the minimum and maximum values of the specified coordinate field in the given xarray DataArray.
+
+    Parameters
+    ----------
+        xa_array (xa.DataArray): xarray DataArray to search for the minimum and maximum values of the coordinate field.
+        coord (str): name of the coordinate field to find the minimum and maximum values of.
+
+    Returns
+    -------
+        tuple[float, float]: tuple containing minimum and maximum values of the specified coordinate field as floats.
+    """
+    return return_min_of_coord(xa_array, coord), return_max_of_coord(xa_array, coord)
