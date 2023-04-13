@@ -1,5 +1,5 @@
 import xarray as xa
-import rioxarray as rxr
+import rioxarray as rio
 # import numpy as np
 from pathlib import Path
 from coralshift.utils import file_ops
@@ -99,7 +99,7 @@ def tifs_to_xa_array_dict(tif_paths: list[Path] | list[str]) -> dict:
     xa_array_dict = {}
     for tif in tif_paths:
         filename = str(file_ops.get_n_last_subparts_path(tif, 1))
-        tif_array = rxr.open_rasterio(tif)
+        tif_array = rio.open_rasterio(tif)
         xa_array_dict[filename] = tif_array
 
     return xa_array_dict
