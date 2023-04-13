@@ -57,7 +57,29 @@ def process_xa_array(
     return xa_array
 
 
-def open_tifs_to_dict(tif_paths: list[Path] | list[str]) -> dict:
+def process_xa_arrays_in_dict(
+    xa_array_dict: dict, coords_to_drop: list[str],
+        coords_to_rename: dict = {"x": "latitude", "y": "longitude"}) -> dict:
+    """Process multiple xarray DataArrays stored in a dictionary by dropping and renaming specified coordinates.
+
+    Parameters
+    ----------
+        xa_array_dict (dict): A dictionary of xarray DataArrays to be processed: keys = filename, values = xa.DataArray.
+        coords_to_drop (list[str]): A list of coordinate fields to be dropped from each DataArray.
+        coords_to_rename (dict): A dictionary of coordinate fields to be renamed in each DataArray.
+
+    Returns
+    -------
+        dict: A dictionary containing the processed xarray DataArrays.
+    """
+    processed_dict = {}
+    for name, xa_array in xa_array_dict.items():
+        processed_dict[name] = process_xa_array(xa_array, coords_to_drop, coords_to_rename, verbose=False)
+
+    return processed_dict
+
+
+def tifs_to_xa_array_dict(tif_paths: list[Path] | list[str]) -> dict:
     """Given a list of file paths to GeoTIFF files, open each file and create a dictionary where each key is the
     filename of the GeoTIFF file (without its directory path or extension) and each value is the contents of the file as
     a np.ndarray array.
@@ -72,10 +94,10 @@ def open_tifs_to_dict(tif_paths: list[Path] | list[str]) -> dict:
         A dictionary where each key is the filename of a GeoTIFF file and each value is the contents of the file as a
         np.ndarray.
     """
-    tifs_dict = {}
+    xa_array_dict = {}
     for tif in tif_paths:
         filename = str(file_ops.get_n_last_subparts_path(tif, 1))
         tif_array = rxr.open_rasterio(tif)
-        tifs_dict[filename] = tif_array
+        xa_array_dict[filename] = tif_array
 
-    return tifs_dict
+    return xa_array_dict
