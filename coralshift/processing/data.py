@@ -1,6 +1,6 @@
 import xarray as xa
 import rioxarray as rxr
-import numpy as np
+# import numpy as np
 from pathlib import Path
 from coralshift.utils import file_ops
 
@@ -20,10 +20,12 @@ def upsample_xarray(xa_array: xa.DataArray, factors: dict) -> xa.DataArray:
             along each dimension and then taking the mean of the resulting blocks.
     """
     coarse_array = xa_array.coarsen(dim=factors, boundary="pad").mean()
-    resized_coarse_array = xa.DataArray(np.resize(coarse_array, xa_array.shape), coords=xa_array.coords)
+    # # resizing like this removes any advantage of upsampling in the first place...
+    # resized_coarse_array = xa.DataArray(np.resize(coarse_array, xa_array.shape), coords=xa_array.coords)
 
     existing_xa_array = xa_array.copy(deep=True)
-    existing_xa_array.data = resized_coarse_array.data
+    # existing_xa_array.data = resized_coarse_array.data
+    existing_xa_array.data = coarse_array.data
     return existing_xa_array
 
 
