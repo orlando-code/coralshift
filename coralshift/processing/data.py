@@ -28,7 +28,7 @@ def upsample_xarray(xa_array: xa.DataArray, factors: dict) -> xa.DataArray:
 
 
 def process_xa_array(
-    xa_array: xa.DataArray, coords_to_drop: list[str], coords_to_rename: dict = {"x": "latitude", "y": "longitude"},
+    xa_array: xa.DataArray, coords_to_drop: list[str], coords_to_rename: dict = {"x": "longitude", "y": "latitude"},
         verbose: bool = True) -> xa.DataArray:
     """Process the given xarray DataArray by dropping and renaming specified coordinates.
 
@@ -37,7 +37,7 @@ def process_xa_array(
         xa_array (xa.DataArray): xarray DataArray to be processed.
         coords_to_drop (list[str]): list of coordinates to be dropped from the DataArray.
         coords_to_rename (dict, optional): dictionary of coordinates to be renamed in the DataArray.
-            Defaults to {"x": "latitude", "y": "longitude"}.
+            Defaults to {"x": "longitude", "y": "latitude"}.
         verbose (bool, optional): if True, print information about the remaining coordinates in the DataArray.
             Defaults to True.
 
@@ -59,7 +59,7 @@ def process_xa_array(
 
 def process_xa_arrays_in_dict(
     xa_array_dict: dict, coords_to_drop: list[str],
-        coords_to_rename: dict = {"x": "latitude", "y": "longitude"}) -> dict:
+        coords_to_rename: dict = {"x": "longitude", "y": "latitude"}) -> dict:
     """Process multiple xarray DataArrays stored in a dictionary by dropping and renaming specified coordinates.
 
     Parameters
