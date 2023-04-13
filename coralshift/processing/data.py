@@ -101,3 +101,33 @@ def tifs_to_xa_array_dict(tif_paths: list[Path] | list[str]) -> dict:
         xa_array_dict[filename] = tif_array
 
     return xa_array_dict
+
+
+def return_min_of_coord(xa_array: xa.DataArray, coord: str):
+    """Returns the minimum value of the specified coordinate field in the given xarray DataArray.
+
+    Parameters
+    ----------
+        xa_array (xa.DataArray): The xarray DataArray to search for the minimum value of the coordinate field.
+        coord (str): The name of the coordinate field to find the minimum value of.
+
+    Returns
+    -------
+        float: The minimum value of the specified coordinate field as a float.
+    """
+    return float(xa_array[coord].min().values)
+
+
+def return_max_of_coord(xa_array: xa.DataArray, coord: str):
+    """Returns the maximum value of the specified coordinate field in the given xarray DataArray.
+
+    Parameters
+    ----------
+        xa_array (xa.DataArray): The xarray DataArray to search for the maximum value of the coordinate field.
+        coord (str): The name of the coordinate field to find the maximum value of.
+
+    Returns
+    -------
+        float: The maximum value of the specified coordinate field as a float.
+    """
+    return float(xa_array[coord].max().values)
