@@ -4,7 +4,7 @@ authors:
   - family-names: Timmerman
     given-names: Orlando
     orcid: https://orcid.org/0009-0008-6204-4689
-title: "My Research Software"
+title: "Coralshift: A multimodal machine learning and super-resolution tool for understanding coral reef distributions"
 version: 0.1.0
 doi: 
 date-released: 2023-04-01
