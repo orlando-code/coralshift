@@ -12,3 +12,10 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+
+# VisualStudioCode
+.vscode/*/**
+
+### VisualStudioCode Patch ###
+# Ignore all local history of files
+**/.history
