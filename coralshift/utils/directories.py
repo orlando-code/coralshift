@@ -7,6 +7,11 @@ from pathlib import Path
 #     return guarantee_existence(get_coralshift_dir(), 'data')
 
 
+def get_drive_dir(volume_name: str) -> Path:
+    """~/Volumes/volume_name"""
+    return Path("/Volumes" / volume_name)
+
+
 def get_datasets_dir() -> Path:
     """./data/datasets"""
     return guarantee_existence(get_coralshift_dir() / 'datasets')
