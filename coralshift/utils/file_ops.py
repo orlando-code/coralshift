@@ -30,14 +30,17 @@ class DownloadProgressBar(tqdm):
 
 
 def download_url(url, output_path, loading_bar: bool = True) -> None:
-    print('\n')
-    with DownloadProgressBar(unit='B', unit_scale=True,
-                             miniters=1, desc=url.split('/')[-1]) as t:
+    print("\n")
+    with DownloadProgressBar(
+        unit="B", unit_scale=True, miniters=1, desc=url.split("/")[-1]
+    ) as t:
         urllib.request.urlretrieve(url, filename=output_path, reporthook=t.update_to)
-    print(f'Download to {output_path} complete.')
+    print(f"Download to {output_path} complete.")
 
 
-def check_exists_download_url(filepath: Path | str, url: str, loading_bar: bool = True) -> None:
+def check_exists_download_url(
+    filepath: Path | str, url: str, loading_bar: bool = True
+) -> None:
     """Download a file from a URL to a given filepath, with the option to display a loading bar.
 
     Parameters
@@ -61,7 +64,7 @@ def check_exists_download_url(filepath: Path | str, url: str, loading_bar: bool 
             urllib.request.urlretrieve(url, filename=filepath)
     # if already downloaded
     else:
-        print(f'Already exists: {filepath}')
+        print(f"Already exists: {filepath}")
 
 
 def get_n_last_subparts_path(path: Path | str, n: int) -> Path:
@@ -102,7 +105,8 @@ def load_merge_nc_files(nc_dir: Path | str):
 
     Returns
     -------
-        xr.Dataset: merged xarray Dataset object containing the data from all netCDF files."""
+        xr.Dataset: merged xarray Dataset object containing the data from all netCDF files.
+    """
     files = return_list_filepaths(nc_dir, ".nc")
     # combine nc files by coordinates
     return xa.open_mfdataset(files)
@@ -124,6 +128,17 @@ def pad_suffix(suffix: str) -> str:
     return suffix
 
 
+def remove_suffix(filename: str) -> str:
+    start = filename.split(".")[:-1]
+
+    if len(start) > 1:
+        raise ValueError(
+            f"{filename} appears to not be a valid filname (more than one '.')"
+        )
+
+    return start[0]
+
+
 def return_list_filepaths(files_dir: Path | str, suffix: str) -> list[Path]:
     """Return a list of file paths in the specified directory that have the given suffix.
 
@@ -136,4 +151,4 @@ def return_list_filepaths(files_dir: Path | str, suffix: str) -> list[Path]:
     -------
         list[Path]: list of file paths in the directory with the specified suffix.
     """
-    return list(Path(files_dir).glob('*' + pad_suffix(suffix)))
+    return list(Path(files_dir).glob("*" + pad_suffix(suffix)))
