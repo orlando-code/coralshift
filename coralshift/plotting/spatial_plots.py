@@ -3,6 +3,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 import xarray as xa
 import cartopy.crs as ccrs
+import numpy as np
 
 
 def format_spatial_plot(image: xa.DataArray, fig: Figure, ax: Axes, title: str) -> None:
@@ -55,3 +56,38 @@ def plot_DEM(
     format_spatial_plot(im, fig, ax, title)
 
     return fig, ax, im
+
+
+def plot_array_hist(
+    array: tuple[xa.DataArray, np.ndarray],
+    xlabel: str,
+    ylabel: str,
+    title: str,
+    n_bins: int = 100,
+) -> tuple[Figure, Axes]:
+    """Plot a histogram of values in the input array.
+
+    Parameters
+    ----------
+        array (tuple[xa.DataArray, np.ndarray]): tuple containing the input data as either a DataArray or numpy array.
+        xlabel (str): label for the x-axis of the plot.
+        ylabel (str): label for the y-axis of the plot.
+        title (str): title of the plot.
+        n_bins (int): number of bins to use in the histogram (default 100).
+
+    Returns:
+        A tuple containing the Figure and Axes objects of the plot.
+    """
+    fig, ax = plt.subplots()
+
+    if not type(array) == np.ndarray:
+        # if not np array, should be DataArray: so try fetching values. Index first dimension since 1xmxn array
+        array = array.values[0]
+
+    counts, bins = np.histogram(array, n_bins)
+    ax.bar(bins[:-1], counts, width=np.diff(bins), align="edge")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+
+    return fig, ax
