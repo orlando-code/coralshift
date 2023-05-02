@@ -53,7 +53,7 @@ def fetch_links_from_url(page_url: str, suffix: str = None) -> list[str]:
         list[str]: A list of links from the webpage.
     """
     reqs = requests.get(page_url)
-    soup = BeautifulSoup(reqs.text, 'html.parser')
+    soup = BeautifulSoup(reqs.text, "html.parser")
     link_segments = soup.find_all("a")
     # extract link strings, excluding None values
     links = [link.get("href") for link in link_segments if link.get("href") is not None]
@@ -65,8 +65,11 @@ def fetch_links_from_url(page_url: str, suffix: str = None) -> list[str]:
 
 
 def download_etopo_data(
-        download_dest_dir: Path | str, resolution: str | int = 15, file_extension: str = ".nc",
-        loading_bar: bool = True) -> None:
+    download_dest_dir: Path | str,
+    resolution: str | int = 15,
+    file_extension: str = ".nc",
+    loading_bar: bool = True,
+) -> None:
     """
     Downloads ETOPO data files from the NOAA website and saves them to the specified directory.
 
@@ -82,7 +85,7 @@ def download_etopo_data(
         None
     """
     file_server_url = "https://www.ngdc.noaa.gov/thredds/fileServer/global/"
-    page_url = f"https://www.ngdc.noaa.gov/thredds/catalog/global/ETOPO2022/{resolution}s/{resolution}s_geoid_netcdf/catalog.html" # noqa
+    page_url = f"https://www.ngdc.noaa.gov/thredds/catalog/global/ETOPO2022/{resolution}s/{resolution}s_geoid_netcdf/catalog.html"  # noqa
 
     for link in fetch_links_from_url(page_url, file_extension):
         # file url involves multiple levels
@@ -95,7 +98,9 @@ def download_etopo_data(
         file_ops.check_exists_download_url(download_dest_path, url, loading_bar)
 
 
-def download_30m_gbr_bathymetry(download_dest_dir: Path | str, areas: list[str] = ["A", "B", "C", "D"]) -> None:
+def download_30m_gbr_bathymetry(
+    download_dest_dir: Path | str, areas: list[str] = ["A", "B", "C", "D"]
+) -> None:
     """Download bathymetry data for the Great Barrier Reef (GBR) region in TIFF format from AWS S3 bucket.
     Dataset DOI: 10.4225/25/5a207b36022d2
 
