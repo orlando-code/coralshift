@@ -163,59 +163,6 @@ def min_max_of_coords(xa_array: xa.DataArray, coord: str) -> tuple[float, float]
     return return_min_of_coord(xa_array, coord), return_max_of_coord(xa_array, coord)
 
 
-def reduce_xa_array(
-    array: xa.DataArray, resolution: float = 0.01, shape: tuple = None
-) -> xa.DataArray:
-    """Reduce the resolution of an xarray DataArray by reprojecting it onto a lower resolution and/or differently-sized
-    grid
-
-    Parameters
-    ----------
-        array (xa.DataArray): input DataArray.
-        resolution (float): new resolution of the output DataArray, in the units of the input DataArray's CRS.
-            Default is 0.01.
-        shape (tuple): new shape of the output DataArray, if resolution not specified. Specified as a tuple of
-            (height, width).
-
-    Returns
-    -------
-        xa.DataArray: The output DataArray, at lower resolution or a new shape.
-    """
-    if not shape:
-        reduced_array = array.rio.reproject(array.rio.crs, resolution)
-    else:
-        reduced_array = array.rio.reproject(array.rio.crs, shape=shape)
-
-    return reduced_array
-
-
-def reduce_dict_of_xa_arrays(
-    xa_dict: dict, resolution: float = 0.01, shape: tuple = None
-) -> dict:
-    """Reduce the resolution for each array in a a dictionary of xarray DataArrays.
-
-    Parameters
-    ----------
-        xa_dict (xa.DataArray): dictionary of xa.DataArrays. Keys are array names, values are arrays.
-        resolution (float): new resolution of the output DataArray, in the units of the input DataArray's CRS.
-            Default is 0.01.
-        shape (tuple): new shape of the output DataArray, if resolution not specified. Specified as a tuple of
-            (height, width).
-
-    Returns
-    -------
-        xa.DataArray: dictionary with keys as array_name_reduced, values reduced arrays.
-    """
-    reduced_dict = {}
-    for name, array in tqdm(xa_dict.items()):
-        reduced_name = file_ops.remove_suffix(name) + "_reduced"
-        reduced_array = reduce_xa_array(array, resolution, shape)
-
-        reduced_dict[reduced_name] = reduced_array
-
-    return reduced_dict
-
-
 def return_pixels_closest_to_value(
     array: np.ndarray,
     central_value: float,
@@ -287,3 +234,56 @@ def return_distance_closest_to_value(
     return return_pixels_closest_to_value(
         array, central_value, tolerance, buffer_pixels, bathymetry_only
     )
+
+
+def reduce_xa_array(
+    xa_array: xa.DataArray, resolution: float = 0.01, shape: tuple = None
+) -> xa.DataArray:
+    """Reduces the resolution of a DataArray using rioxarray's 'reproject' functionality
+
+    Parameters
+    ----------
+    xa_array (xa.DataArray): Input DataArray to reduce.
+    resolution (float, optional): Output resolution of the reduced DataArray, in the same units as the input.
+        Defaults to 0.01.
+    shape (tuple, optional): Shape of the output DataArray as (height, width). If specified, overrides the resolution
+        parameter.
+
+    Returns
+    -------
+    xa.DataArray: The reduced DataArray
+    """
+
+    if not shape:
+        reduced_array = xa_array.rio.reproject(xa_array.rio.crs, resolution=resolution)
+    else:
+        reduced_array = xa_array.rio.reproject(xa_array.rio.crs, shape=shape)
+
+    return reduced_array
+
+
+def reduce_dict_of_xa_arrays(
+    xa_dict: dict, resolution: float = 0.01, shape: tuple = None
+) -> dict:
+    """Reduces the resolution of each DataArray in a dictionary and returns the reduced dictionary.
+
+    Parameters
+    ----------
+    xa_dict (dict): Dictionary containing the input DataArrays.
+    resolution (float, optional): Output resolution of the reduced DataArrays, in the same units as the input. Defaults
+        to 0.01.
+    shape (tuple, optional): Shape of the output DataArrays as (height, width). If specified, overrides the resolution
+        parameter.
+
+    Returns
+    -------
+    dict: Dictionary containing the reduced DataArrays, with the keys modified by adding "_reduced" to the original key
+    names.
+    """
+    reduced_dict = {}
+    for name, array in tqdm(xa_dict.items()):
+        reduced_name = file_ops.remove_suffix(name) + "_reduced"
+        reduced_array = reduce_xa_array(array, resolution, shape)
+        reduced_dict[reduced_name] = reduced_array
+
+    return reduced_dict
