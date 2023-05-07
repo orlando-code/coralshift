@@ -152,3 +152,53 @@ def return_list_filepaths(files_dir: Path | str, suffix: str) -> list[Path]:
         list[Path]: list of file paths in the directory with the specified suffix.
     """
     return list(Path(files_dir).glob("*" + pad_suffix(suffix)))
+
+
+def read_nc_path(nc_file_path: Path | str, engine: str = "h5netcdf") -> xa.DataArray:
+    """Reads single netcdf filepath and opens dataset.
+
+    Parameters
+    ----------
+    nc_file_path (Path | str): path to nc file
+    engine (str): specify engine with which to open file. Defaults to "h5netcdf". This isn't compatibile with all files.
+        Try engine="netcdf4" if having trouble reading.
+    Returns
+    -------
+    xa.DataArray
+    """
+    return xa.open_dataset(nc_file_path, engine=engine)
+
+
+def dict_of_ncs_from_dir(
+    dir_path: Path | str, crs: float = "epsg:4326", engine: str = "h5netcdf"
+) -> dict:
+    """Reads multiple netcdf files in a directory and returns a dictionary of DataArrays.
+
+    Parameters
+    ----------
+    dir_path (Path | str): Path to directory containing netCDF files.
+    engine (str, optional): Engine to use to read netCDF files. Defaults to "h5netcdf".
+
+    Returns
+    -------
+    dict
+        Dictionary containing the DataArrays, keyed by the file names without the .nc extension.
+
+    TODO: Could also make into a more generic function which reads in different file types in correct way. Haven't done
+    this for now since will all be read in different ways
+    """
+    # generate list of all ".nc" format files in directory
+    nc_files_list = return_list_filepaths(dir_path, ".nc")
+
+    nc_arrays_dict = {}
+    for nc_path in tqdm(nc_files_list):
+        # fetch "name.extension" of file from path
+        path_end = get_n_last_subparts_path(nc_path, 1)
+        # fetch name of file
+        nc_filename = remove_suffix(str(path_end))
+        # read file and assign crs
+        nc_array = read_nc_path(nc_path, engine).rio.write_crs(crs)
+
+        nc_arrays_dict[nc_filename] = nc_array
+
+    return nc_arrays_dict
