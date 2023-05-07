@@ -287,3 +287,37 @@ def reduce_dict_of_xa_arrays(
         reduced_dict[reduced_name] = reduced_array
 
     return reduced_dict
+
+
+def xarray_coord_limits(xa_array: xa.Dataset, dim: str) -> tuple[float]:
+    """Compute the minimum and maximum values for a coordinate dimension of an xarray dataset.
+
+    Parameters
+    ----------
+        xa_array (xa.Dataset): input xarray dataset.
+        dim (str): coordinate name.
+
+    Returns:
+        tuple[float]: minimum and maximum values of the coordinate
+
+    """
+    min, max = float(xa_array[dim].min()), float(xa_array[dim].max())
+    return (min, max)
+
+
+def dict_xarray_coord_limits(xa_array: xa.Dataset) -> dict:
+    """Compute the minimum and maximum values for each coordinate dimension of an xarray dataset and assign to a dict
+
+    Parameters
+    ----------
+        xa_array (xa.Dataset): input xarray dataset.
+
+    Returns:
+        dict: dict object where keys are the names of the cooordinate and values are a tuple of the minimum and maximum
+        values of the input xarray dataset.
+    """
+    lims_dict = {}
+    for dim in xa_array.dims:
+        lims_dict[dim] = xarray_coord_limits(xa_array, dim)
+
+    return lims_dict
