@@ -404,6 +404,7 @@ def xa_array_from_raster(
     lon_bounds: tuple[float],
     resolution: float = 0.01,
     crs_tag: str = "epsg:4326",
+    name: str = "unnamed",
 ) -> xa.DataArray:
     """Creates an xarray DataArray from a raster numpy array.
 
@@ -428,7 +429,7 @@ def xa_array_from_raster(
     )
     coords_dict = {"latitude": lats, "longitude": lons}
 
-    array = xa.DataArray(raster, coords_dict, name="limited reef extent")
+    array = xa.DataArray(raster, coords_dict, name=name)
     array.rio.write_crs(crs_tag, inplace=True)
 
     return array
