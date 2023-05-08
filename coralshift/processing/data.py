@@ -518,3 +518,30 @@ def check_nc_exists_generate_raster(
     else:
         print(f"{filename} already exists in {dir_path}. No files written.")
     return xa.open_dataset(filepath)
+
+
+def distance_to_degree(
+    distance: float, approx_lat: float = -18, approx_lon: float = 145
+) -> float:
+    """Converts a distance in meters to the corresponding distance in degrees, given an approximate location on Earth.
+
+    Parameters
+    ----------
+    distance (float): The distance in meters.
+    approx_lat (float, optional): The approximate latitude of the location in degrees. Defaults to -18.0.
+    approx_lon (float, optional): The approximate longitude of the location in degrees. Defaults to 145.0.
+
+    Returns
+    -------
+    float: The corresponding distance in degrees.
+    """
+    # calculate the coordinates 'distance' meters to the southwest (chosen to give measure of both lat and lon)
+    (lat_deg, lon_deg) = haversine.inverse_haversine(
+        (approx_lat, approx_lon),
+        distance,
+        haversine.Direction.SOUTHWEST,
+        unit=haversine.Unit.METERS,
+    )
+    delta_lat, delta_lon = abs(lat_deg - approx_lat), abs(lon_deg - approx_lon)
+    # return hypotenuse (encapsulates difference in both lat and lon)
+    return np.hypot(delta_lat, delta_lon)
