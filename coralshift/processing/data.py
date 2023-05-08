@@ -3,6 +3,7 @@ import rioxarray as rio
 import numpy as np
 import rasterio
 import pandas as pd
+import haversine
 
 from rasterio import features
 from tqdm import tqdm
