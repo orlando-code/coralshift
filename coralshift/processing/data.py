@@ -433,3 +433,88 @@ def xa_array_from_raster(
     array.rio.write_crs(crs_tag, inplace=True)
 
     return array
+
+
+def generate_raster_xa(
+    xa_ds: xa.Dataset,
+    resolution=1 / 12,
+    class_col="class_val",
+    xa_name: str = "",
+    all_touched=True,
+    filepath: Path | str = None,
+) -> xa.Dataset:
+    """Generate a raster from an xarray Dataset using rasterio and save it to disk as a netCDF file.
+
+    Parameters
+    ----------
+    xa_ds (xarray.Dataset): The xarray Dataset containing the data to rasterize.
+    resolution (float, optional): The resolution (in units of the input data) to use for the raster, by default 1/12.
+    class_col (str, optional) The name of the column in `xa_ds` containing the class labels, by default "class_val".
+    xa_name (str, optional): The name to use for the output xarray DataArray, by default an empty string.
+    all_touched (bool, optional):  Whether to rasterize all pixels touched by the geometry or only those whose center is
+        within the geometry, by default True.
+    filepath (Path or str, optional): The path where the generated raster should be saved as a netCDF file, by default
+        None.
+
+    Returns
+    -------
+    xarray.Dataset: The xarray Dataset containing the generated raster.
+    """
+    # generate raster array
+    raster_values, (xmin, ymin, xmax, ymax) = rasterize_shapely_df(
+        xa_ds, class_col=class_col, resolution=resolution, all_touched=all_touched
+    )
+    raster_xa = xa_array_from_raster(
+        raster_values, (ymin, ymax), (xmin, xmax), resolution=1 / 12, xa_name=xa_name
+    )
+
+    filepath = file_ops.add_suffix_if_necessary(filepath, ".nc")
+    # if a path provided, save raster to that location
+    if filepath:
+        filepath = file_ops.add_suffix_if_necessary(filepath, ".nc")
+        raster_xa.to_netcdf(filepath)
+        print(f"{filepath} created.")
+
+    return raster_xa
+
+
+def check_nc_exists_generate_raster(
+    dir_path: Path | str,
+    filename: str,
+    xa_ds: xa.Dataset = None,
+    resolution: float = None,
+    class_col: str = None,
+    xa_name: str = None,
+    all_touched: bool = None,
+):
+    """Check if a raster file with the given filename already exists in the directory. If not, generate the raster file
+    using the given xarray dataset, and save it to the directory with the given filename.
+
+    Parameters
+    ----------
+    dir_path (Path | str): The directory path where the raster file should be saved.
+    filename (str): The name of the raster file to be saved.
+    xa_ds (xa.Dataset): The xarray dataset to be converted to a raster file.
+    resolution (float): The resolution of the raster file to be generated.
+    class_col (str): The column name in the xarray dataset that contains the classification data.
+    xa_name (str): The name of the xarray dataset to be used in the raster file.
+    all_touched (bool): If True, all pixels touched by geometries will be burned in. If False (default), only pixels
+        whose center is within the polygon or that are selected by Bresenham's line algorithm will be burned in.
+
+    Returns
+    -------
+    None
+        If the raster file already exists, print a message indicating that the file exists and no files were written.
+        If the raster file does not exist, generates the raster file and saves it to the directory with the given
+        filename.
+        Either way, returns raster
+    """
+    filepath = file_ops.add_suffix_if_necessary(Path(dir_path) / filename, ".nc")
+    if not file_ops.check_file_exists(dir_path, filename, ".nc"):
+        raster_xa = generate_raster_xa(
+            xa_ds, resolution, class_col, xa_name, all_touched, filepath
+        )
+        return raster_xa
+    else:
+        print(f"{filename} already exists in {dir_path}. No files written.")
+    return xa.open_dataset(filepath)
