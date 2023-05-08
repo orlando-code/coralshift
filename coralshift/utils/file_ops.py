@@ -238,14 +238,17 @@ def check_pkl_else_read_gpkg(files_dir: Path | str, filename: str) -> pd.DataFra
     filename = remove_suffix(filename)
     pkl_path = Path(Path(files_dir), filename).with_suffix(".pkl")
     if pkl_path.is_file():
-        file_out = pd.read_pickle(pkl_path)
+        df_out = pd.read_pickle(pkl_path)
         print(f"{filename} read from {filename}.pkl")
-        return file_out
+        return df_out
 
     gpkg_path = Path(Path(files_dir), filename).with_suffix(".gpkg")
     if gpkg_path.is_file():
-        file_out = load_gpkg(gpkg_path)
-        print(f"{filename} read from {filename}.gpkg")
-        return file_out
+        df_out = load_gpkg(gpkg_path)
+        print(
+            f"{filename} read from {filename}.gpkg. {filename}.pkl created in same directory."
+        )
+        df_out.to_pickle(pkl_path)
+        return df_out
 
     raise FileNotFoundError(f"{filename}.pkl/gpkg not found in {files_dir}")
