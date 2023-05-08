@@ -1,12 +1,12 @@
 import xarray as xa
 import rioxarray as rio
 import numpy as np
+import rasterio
+import pandas as pd
 
-# import rasterio as rio
+from rasterio import features
 from tqdm import tqdm
 from scipy.ndimage import binary_dilation
-
-# import numpy as np
 from pathlib import Path
 from coralshift.utils import file_ops
 
@@ -322,3 +322,113 @@ def dict_xarray_coord_limits(xa_array: xa.Dataset) -> dict:
         lims_dict[dim] = xarray_coord_limits(xa_array, dim)
 
     return lims_dict
+
+
+def rasterize_shapely_df(
+    df: pd.DataFrame,
+    class_col: str,
+    shapes_col: str = "geometry",
+    resolution: float = 1,
+    all_touched: bool = True,
+) -> np.ndarray:
+    """Rasterizes a pandas DataFrame containing Shapely geometries.
+
+    Parameters
+    ----------
+    df (pd.DataFrame): The input pandas DataFrame.
+    class_col (str): The name of the column in `df` with the classes.
+    shapes_col (str, optional): The name of the column in `df` with the Shapely geometries. Default is "geometry".
+    resolution (float, optional) The resolution of the output raster. Default is 1.
+    all_touched (bool, optional): Whether to consider all pixels touched by geometries or just their centroids. Default
+        is True.
+
+    Returns
+    -------
+    np.ndarray: A numpy array with the rasterized data.
+    """
+    # create empty raster grid
+    xmin, ymin, xmax, ymax = df.total_bounds  # takes ages with large dfs
+    width = int(np.ceil((xmax - xmin) / resolution))
+    height = int(np.ceil((ymax - ymin) / resolution))
+    # affine transform (handles projection)
+    transform = rasterio.Affine(resolution, 0, xmin, 0, -resolution, ymax)
+    raster = np.zeros((height, width))
+
+    for _, row in tqdm(df.iterrows(), total=len(df)):
+        class_value = row[class_col]
+        shapes = [
+            (row[shapes_col], 1)
+        ]  # the second value (1) represents the value to assign to the raster cell
+        rasterized = features.rasterize(
+            shapes=shapes,
+            out_shape=(height, width),
+            transform=transform,
+            fill=0,
+            all_touched=True,
+            merge_alg=rasterio.enums.MergeAlg.replace,
+        )
+        raster[rasterized == 1] = int(class_value)
+
+    return raster, (xmin, ymin, xmax, ymax)
+
+
+def generate_lat_lon_arrays(
+    lat_bounds: tuple[float], lon_bounds: tuple[float], resolution
+) -> tuple[np.ndarray]:
+    """Generates latitude and longitude arrays based on input bounds and resolution.
+
+    Parameters
+    ----------
+    lat_bounds (tuple[float]): A tuple with the latitude bounds (bottom, top).
+    lon_bounds (tuple[float]): A tuple with the longitude bounds (left, right).
+    resolution (float): The resolution of the output arrays.
+
+    Returns
+    -------
+    tuple[np.ndarray]: A tuple with the latitude and longitude arrays.
+    """
+    # xarray requires first coordinate in vertical direction to be the topmost
+    if lat_bounds[0] < lat_bounds[1]:
+        lats_list = np.arange(lat_bounds[1], lat_bounds[0], -resolution)
+    else:
+        lats_list = np.arange(lat_bounds[0], lat_bounds[1], resolution)
+
+    lons_list = np.arange(lon_bounds[0], lon_bounds[1], resolution)
+
+    return lats_list, lons_list
+
+
+def xa_array_from_raster(
+    raster: np.ndarray,
+    lat_bounds: tuple[float],
+    lon_bounds: tuple[float],
+    resolution: float = 0.01,
+    crs_tag: str = "epsg:4326",
+) -> xa.DataArray:
+    """Creates an xarray DataArray from a raster numpy array.
+
+    Parameters
+    ----------
+    raster (np.ndarray): A numpy array with the raster data.
+    lat_bounds (tuple[float]): A tuple with the latitude bounds (bottom, top).
+    lon_bounds (tuple[float]): A tuple with the longitude bounds (left, right).
+    resolution (float, optional): The resolution of the output arrays. Default is 0.01.
+    crs_tag (str, optional): The coordinate reference system (CRS) tag for the output array. Default is "epsg:4326".
+
+    Returns
+    -------
+    xa.DataArray: An xarray DataArray with the raster data.
+    """
+
+    """Provide latitude and longitudes as (bottom_lat, top_lat) and (left_lon, right_lon) respectively. Will want to
+    plot as if viewed on flat globe"""
+    # todo automate calculation of resolution
+    lats, lons = generate_lat_lon_arrays(
+        (lat_bounds[0], lat_bounds[1]), (lon_bounds[0], lon_bounds[1]), resolution
+    )
+    coords_dict = {"latitude": lats, "longitude": lons}
+
+    array = xa.DataArray(raster, coords_dict, name="limited reef extent")
+    array.rio.write_crs(crs_tag, inplace=True)
+
+    return array
