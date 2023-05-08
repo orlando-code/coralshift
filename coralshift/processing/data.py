@@ -571,3 +571,32 @@ def filter_strings(
     filtered_strings = [s for s in str_list if s not in exclude]
     # Return filtered strings
     return filtered_strings
+
+
+def xa_ds_to_3d_numpy(
+    xa_ds: xa.Dataset,
+    exclude_vars: list[str] = ["latitude", "longitude", "depth", "time"],
+) -> np.ndarray:
+    """Convert an xarray dataset to a 3D numpy array.
+
+    Parameters
+    ----------
+    xa_ds (xarray.Dataset): The xarray dataset to convert.
+    exclude_vars (list[str], optional): A list of variable names to exclude from the conversion.
+        Default is ["latitude", "longitude", "depth", "time"].
+
+    Returns
+    -------
+    np.ndarray: The converted 3D numpy array.
+    """
+    # stack the dataset
+    ds_stacked = xa_ds.stack(location=("latitude", "longitude"))
+
+    array_list = []
+    variables_to_read = filter_strings(list(xa_ds.variables), exclude_vars)
+    for var in tqdm(variables_to_read):
+        vals = ds_stacked[var].values
+        array_list.append(vals)
+
+    # move location to first column. New shape: grid_cell_val x var x time
+    return np.moveaxis(np.array(array_list), 2, 0)
