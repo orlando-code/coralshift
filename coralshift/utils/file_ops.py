@@ -5,6 +5,8 @@ import xarray as xa
 import pandas as pd
 import geopandas as gpd
 
+from coralshift.processing import data
+
 
 def guarantee_existence(path: str) -> Path:
     """Checks if string is an existing path, else creates it
@@ -253,3 +255,51 @@ def check_pkl_else_read_gpkg(files_dir: Path | str, filename: str) -> pd.DataFra
         return df_out
 
     raise FileNotFoundError(f"{filename}.pkl/gpkg not found in {files_dir}")
+
+
+def read_write_nc_file(
+    files_dir: Path | str,
+    filename: str,
+    raster_array: xa.Dataset = None,
+    ymin: float = None,
+    ymax: float = None,
+    xmin: float = None,
+    xmax: float = None,
+    resolution: float = None,
+    name: str = None,
+) -> xa.Dataset:
+    """Read or write a NetCDF file with xarray, based on whether it already exists in the specified directory.
+    If the file exists, read it and return its contents as an xarray dataset.
+    If it doesn't exist, create it by converting a provided raster array to an xarray dataset, and save it to the
+    specified directory.
+
+    Parameters
+    ----------
+    files_dir (str | Path): The directory where the file should be read from or written to.
+    filename (str): The name of the file, without the ".nc" extension.
+    raster_array (xarray.Dataset, optional) A raster dataset to be converted to an xarray dataset and saved as the new
+        NetCDF file. If not provided, the function assumes that the file already exists and simply reads it.
+    y_bounds (tuple(float)): The upper and lower bounds of the y-axis range of the dataset.
+    x_bounds (tuple(float)): The leftmost and rightmost bounds of the x-axis range of the dataset.
+    resolution (float): The resolution of the dataset in units of meters.
+    name (str): The name of the dataset.
+
+    Returns
+    -------
+    xarray.Dataset: The contents of the NetCDF file as an xarray dataset.
+    TODO: this function probably does too-separate jobs
+    """
+    filepath = Path(Path(files_dir), filename).with_suffix(".nc")
+    # if file exists, read
+    if filepath.is_file():
+        return xa.open_dataset(filepath)
+
+    # if file doesn't exist, make it from raster input
+    if not filepath.is_file():
+        print(f"{filename} not found in {files_dir}.")
+        # if raster_array provided
+        if raster_array:
+            rasterized_ds = data.xa_array_from_raster(
+                raster_array, (ymin, ymax), (xmin, xmax), resolution, name
+            )
+            return rasterized_ds
