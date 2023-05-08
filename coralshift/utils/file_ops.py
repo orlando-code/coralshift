@@ -129,14 +129,17 @@ def pad_suffix(suffix: str) -> str:
 
 
 def remove_suffix(filename: str) -> str:
-    start = filename.split(".")[:-1]
+    """Remove the suffix from a filename or path"""
+    split_list = filename.split(".")
 
-    if len(start) > 1:
+    if len(split_list) > 1:
         raise ValueError(
             f"{filename} appears to not be a valid filname (more than one '.')"
         )
+    if len(split_list) == 1:
+        return filename
 
-    return start[0]
+    return split_list[:-1][0]
 
 
 def return_list_filepaths(files_dir: Path | str, suffix: str) -> list[Path]:
