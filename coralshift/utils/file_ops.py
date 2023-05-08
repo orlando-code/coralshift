@@ -26,6 +26,25 @@ def guarantee_existence(path: str) -> Path:
     return path_obj.resolve()
 
 
+def check_file_exists(dir_path: Path | str, filename: str, suffix: str = None) -> bool:
+    """Check if a file with the specified filename and optional suffix exists in the given directory.
+
+    Parameters
+    ----------
+    dir_path (Path | str): Path to the directory where the file should be located.
+    filename (str): Name of the file to check for.
+    suffix (str, optional) Optional suffix for the filename, by default None.
+
+    Returns
+    -------
+    bool: True if the file exists, False otherwise.
+    """
+    filepath = Path(dir_path) / filename
+    if suffix:
+        filepath = filepath.with_suffix(pad_suffix(suffix))
+    return filepath.is_file()
+
+
 class DownloadProgressBar(tqdm):
     def update_to(self, b=1, bsize=1, tsize=None):
         if tsize is not None:
