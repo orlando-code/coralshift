@@ -132,7 +132,7 @@ def remove_suffix(filename: str) -> str:
     """Remove the suffix from a filename or path"""
     split_list = filename.split(".")
 
-    if len(split_list) > 1:
+    if len(split_list) > 2:
         raise ValueError(
             f"{filename} appears to not be a valid filname (more than one '.')"
         )
