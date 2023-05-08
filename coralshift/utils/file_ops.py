@@ -2,6 +2,7 @@ from pathlib import Path
 from tqdm import tqdm
 import urllib
 import xarray as xa
+import geopandas as gpd
 
 
 def guarantee_existence(path: str) -> Path:
@@ -200,3 +201,18 @@ def dict_of_ncs_from_dir(
         nc_arrays_dict[nc_filename] = nc_array
 
     return nc_arrays_dict
+
+
+def load_gpkg(filepath):
+    """Load a large gpkg file into a memory-efficient geopandas.GeoDataFrame object.
+
+    Parameters
+    ----------
+        filepath (str): The filepath of the gpkg file.
+
+    Returns
+    -------
+        geopandas.GeoDataFrame: A GeoDataFrame object containing the data from the gpkg file.
+    """
+    gdf = gpd.read_file(filepath, driver="GPKG")
+    return gdf
