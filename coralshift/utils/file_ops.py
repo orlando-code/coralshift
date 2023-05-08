@@ -2,6 +2,7 @@ from pathlib import Path
 from tqdm import tqdm
 import urllib
 import xarray as xa
+import pandas as pd
 import geopandas as gpd
 
 
@@ -219,3 +220,32 @@ def load_gpkg(filepath):
     """
     gdf = gpd.read_file(filepath, driver="GPKG")
     return gdf
+
+
+def check_pkl_else_read_gpkg(files_dir: Path | str, filename: str) -> pd.DataFrame:
+    """Load pickled pandas DataFrame if available, else load a geopackage file as a DataFrame. If neither file found,
+    raisea FileNotFoundError
+
+    Parameters
+    ----------
+    files_dir (Path | str): path to directory containing files
+    filename (str): name of path
+
+    Returns
+    -------
+    pd.DataFrame: and completion message detailing which file format was read
+    """
+    filename = remove_suffix(filename)
+    pkl_path = Path(Path(files_dir), filename).with_suffix(".pkl")
+    if pkl_path.is_file():
+        file_out = pd.read_pickle(pkl_path)
+        print(f"{filename} read from {filename}.pkl")
+        return file_out
+
+    gpkg_path = Path(Path(files_dir), filename).with_suffix(".gpkg")
+    if gpkg_path.is_file():
+        file_out = load_gpkg(gpkg_path)
+        print(f"{filename} read from {filename}.gpkg")
+        return file_out
+
+    raise FileNotFoundError(f"{filename}.pkl/gpkg not found in {files_dir}")
