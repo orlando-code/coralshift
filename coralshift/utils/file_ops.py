@@ -9,7 +9,7 @@ def guarantee_existence(path: str) -> Path:
 
     Parameter
     ---------
-    path : str
+    path (str)
 
     Returns
     -------
@@ -53,13 +53,12 @@ def check_exists_download_url(
     -------
         None
     """
-
     # if not downloaded
     if not Path(filepath).is_file():
         # download with loading bar
         if loading_bar:
             download_url(url, str(filepath))
-        # download without loading bar for some reason...
+        # choose to download without loading bar
         else:
             urllib.request.urlretrieve(url, filename=filepath)
     # if already downloaded
@@ -163,7 +162,7 @@ def read_nc_path(nc_file_path: Path | str, engine: str = "h5netcdf") -> xa.DataA
     engine (str): specify engine with which to open file. Defaults to "h5netcdf". This isn't compatibile with all files.
         Try engine="netcdf4" if having trouble reading.
     Returns
-    -------
+    ---
     xa.DataArray
     """
     return xa.open_dataset(nc_file_path, engine=engine)
@@ -198,7 +197,6 @@ def dict_of_ncs_from_dir(
         nc_filename = remove_suffix(str(path_end))
         # read file and assign crs
         nc_array = read_nc_path(nc_path, engine).rio.write_crs(crs)
-
         nc_arrays_dict[nc_filename] = nc_array
 
     return nc_arrays_dict
