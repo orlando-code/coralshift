@@ -302,4 +302,34 @@ def read_write_nc_file(
             rasterized_ds = data.xa_array_from_raster(
                 raster_array, (ymin, ymax), (xmin, xmax), resolution, name
             )
+            rasterized_ds.to_netcdf(filepath)
             return rasterized_ds
+
+
+def add_suffix_if_necessary(filepath: Path | str, suffix_to_add: str) -> Path:
+    """Add a suffix to a file path if it doesn't already have it.
+
+    Parameters
+    ----------
+    filepath (Path | str): the file path to check.
+    suffix_to_add (str): the suffix to add if necessary.
+
+    Returns
+    -------
+    Path: the modified file path with the correct suffix.
+
+    Raises
+    ------
+    ValueError: if the file path already has a suffix that conflicts with the suffix_to_add.
+    """
+    filepath = Path(filepath)
+    # if correct suffix, leave as is
+    if filepath.suffix == pad_suffix(suffix_to_add):
+        return Path(filepath)
+    # if no suffix
+    if filepath.suffix == "":
+        return filepath.with_suffix(pad_suffix(suffix_to_add))
+    else:
+        raise ValueError(
+            f"{filepath} terminates in a conflicting suffix to suffix_to_add: {suffix_to_add}."
+        )
