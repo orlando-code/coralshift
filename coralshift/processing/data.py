@@ -484,6 +484,7 @@ def check_nc_exists_generate_raster(
     filename: str,
     xa_ds: xa.Dataset = None,
     resolution: float = None,
+    horizontal_distance: float = None,
     class_col: str = None,
     xa_name: str = None,
     all_touched: bool = None,
@@ -511,6 +512,10 @@ def check_nc_exists_generate_raster(
         Either way, returns raster
     """
     filepath = file_ops.add_suffix_if_necessary(Path(dir_path) / filename, ".nc")
+    # if specifying resolution as horizontal distance rather than degrees lat/lon, calculate approximate degrees
+    if horizontal_distance:
+        resolution = distance_to_degree(horizontal_distance)
+
     if not file_ops.check_file_exists(dir_path, filename, ".nc"):
         raster_xa = generate_raster_xa(
             xa_ds, resolution, class_col, xa_name, all_touched, filepath
