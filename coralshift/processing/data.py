@@ -239,7 +239,8 @@ def return_distance_closest_to_value(
 def reduce_xa_array(
     xa_array: xa.DataArray, resolution: float = 0.01, shape: tuple = None
 ) -> xa.DataArray:
-    """Reduces the resolution of a DataArray using rioxarray's 'reproject' functionality
+    """Reduces the resolution of a DataArray using rioxarray's 'reproject' functionality: reprojecting it onto a lower
+    resolution and/or differently-sized grid
 
     Parameters
     ----------
@@ -277,7 +278,7 @@ def reduce_dict_of_xa_arrays(
 
     Returns
     -------
-    dict: Dictionary containing the reduced DataArrays, with the keys modified by adding "_reduced" to the original key
+    dict: Dictionary containing the reduced DataArrays with corresponding keys as array_name_reduced
     names.
     """
     reduced_dict = {}
