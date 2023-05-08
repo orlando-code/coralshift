@@ -551,3 +551,23 @@ def distance_to_degree(
     delta_lat, delta_lon = abs(lat_deg - approx_lat), abs(lon_deg - approx_lon)
     # return hypotenuse (encapsulates difference in both lat and lon)
     return np.hypot(delta_lat, delta_lon)
+
+
+def filter_strings(
+    str_list: list[str], exclude: list[str] = ["latitude", "longitude", "depth", "time"]
+):
+    """Filters a list of strings to exclude those contained in a second list of excluded strings.
+
+    Parameters
+    ----------
+    str_list (list[str]): A list of strings to filter.
+    exclude (list[str], optional): A list of strings to exclude. Defaults to ["latitude", "longitude", "depth", "time"].
+
+    Returns
+    -------
+    list[str]: A list of the filtered strings.
+    """
+    # Filter strings using list comprehension
+    filtered_strings = [s for s in str_list if s not in exclude]
+    # Return filtered strings
+    return filtered_strings
