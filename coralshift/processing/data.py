@@ -40,6 +40,8 @@ def process_xa_array(
     xa_array: xa.DataArray,
     coords_to_drop: list[str],
     coords_to_rename: dict = {"x": "longitude", "y": "latitude"},
+    resolution: float = None,
+    shape: tuple[int] = None,
     verbose: bool = True,
 ) -> xa.DataArray:
     """Process the given xarray DataArray by dropping and renaming specified coordinates.
@@ -50,6 +52,10 @@ def process_xa_array(
         coords_to_drop (list[str]): list of coordinates to be dropped from the DataArray.
         coords_to_rename (dict, optional): dictionary of coordinates to be renamed in the DataArray.
             Defaults to {"x": "longitude", "y": "latitude"}.
+        resolution (float, optional): Output resolution of the reduced DataArray, in the same units as the input.
+            Defaults to None.
+        shape (tuple, optional): Shape of the output DataArray as (height, width). If specified, overrides the
+            resolution parameter. Defaults to None.
         verbose (bool, optional): if True, print information about the remaining coordinates in the DataArray.
             Defaults to True.
 
@@ -62,6 +68,8 @@ def process_xa_array(
     # rename specified coordinates
     xa_array = xa_array.rename(coords_to_rename)
 
+    if resolution or shape:
+        reduce_xa_array(xa_array, resolution=resolution, shape=shape)
     if verbose:
         # show info about remaining coords
         print(xa_array.coords)
@@ -73,6 +81,8 @@ def process_xa_arrays_in_dict(
     xa_array_dict: dict,
     coords_to_drop: list[str],
     coords_to_rename: dict = {"x": "longitude", "y": "latitude"},
+    resolution: float = None,
+    shape: tuple[int] = None,
 ) -> dict:
     """Process multiple xarray DataArrays stored in a dictionary by dropping and renaming specified coordinates.
 
@@ -87,9 +97,12 @@ def process_xa_arrays_in_dict(
         dict: A dictionary containing the processed xarray DataArrays.
     """
     processed_dict = {}
-    for name, xa_array in xa_array_dict.items():
+    print(
+        f"Processing xa_arrays in dictionary. Dropping {coords_to_drop}, renaming {coords_to_rename.keys()}."
+    )
+    for name, xa_array in tqdm(xa_array_dict.items()):
         processed_dict[name] = process_xa_array(
-            xa_array, coords_to_drop, coords_to_rename, verbose=False
+            xa_array, coords_to_drop, coords_to_rename, resolution, shape, verbose=False
         )
 
     return processed_dict
@@ -114,7 +127,7 @@ def tifs_to_xa_array_dict(tif_paths: list[Path] | list[str]) -> dict:
     for tif in tif_paths:
         filename = str(file_ops.get_n_last_subparts_path(tif, 1))
         tif_array = rio.open_rasterio(tif)
-        xa_array_dict[filename] = tif_array
+        xa_array_dict[filename] = tif_array.rename(filename)
 
     return xa_array_dict
 
@@ -238,7 +251,7 @@ def return_distance_closest_to_value(
 
 
 def reduce_xa_array(
-    xa_array: xa.DataArray, resolution: float = 0.01, shape: tuple = None
+    xa_array: xa.DataArray, resolution: float = 1 / 12, shape: tuple = None
 ) -> xa.DataArray:
     """Reduces the resolution of a DataArray using rioxarray's 'reproject' functionality: reprojecting it onto a lower
     resolution and/or differently-sized grid
@@ -247,7 +260,7 @@ def reduce_xa_array(
     ----------
     xa_array (xa.DataArray): Input DataArray to reduce.
     resolution (float, optional): Output resolution of the reduced DataArray, in the same units as the input.
-        Defaults to 0.01.
+        Defaults to 1/12.
     shape (tuple, optional): Shape of the output DataArray as (height, width). If specified, overrides the resolution
         parameter.
 
@@ -265,7 +278,7 @@ def reduce_xa_array(
 
 
 def reduce_dict_of_xa_arrays(
-    xa_dict: dict, resolution: float = 0.01, shape: tuple = None
+    xa_dict: dict, resolution: float = 1 / 12, shape: tuple[int, int] = None
 ) -> dict:
     """Reduces the resolution of each DataArray in a dictionary and returns the reduced dictionary.
 
@@ -273,18 +286,21 @@ def reduce_dict_of_xa_arrays(
     ----------
     xa_dict (dict): Dictionary containing the input DataArrays.
     resolution (float, optional): Output resolution of the reduced DataArrays, in the same units as the input. Defaults
-        to 0.01.
+        to 1/12.
     shape (tuple, optional): Shape of the output DataArrays as (height, width). If specified, overrides the resolution
         parameter.
 
     Returns
     -------
-    dict: Dictionary containing the reduced DataArrays with corresponding keys as array_name_reduced
-    names.
+    dict: Dictionary containing the reduced DataArrays with corresponding keys as array_name_reduced names.
+    TODO: add in check to ensure that upsampling rather than downsampling?
     """
     reduced_dict = {}
+    print(f"Upsampling {xa_dict.keys()} from dictionary to {resolution}{shape}.")
     for name, array in tqdm(xa_dict.items()):
-        reduced_name = file_ops.remove_suffix(name) + "_reduced"
+        reduced_name = "_".join(
+            (file_ops.remove_suffix(name), "reduced", "{0:.3g}".format(resolution))
+        )
         reduced_array = reduce_xa_array(array, resolution, shape)
         reduced_dict[reduced_name] = reduced_array
 
@@ -355,6 +371,7 @@ def rasterize_shapely_df(
     transform = rasterio.Affine(resolution, 0, xmin, 0, -resolution, ymax)
     raster = np.zeros((height, width))
 
+    print("Rasterizing pandas DataFrame")
     for _, row in tqdm(df.iterrows(), total=len(df)):
         class_value = row[class_col]
         shapes = [
@@ -403,9 +420,9 @@ def xa_array_from_raster(
     raster: np.ndarray,
     lat_bounds: tuple[float],
     lon_bounds: tuple[float],
-    resolution: float = 0.01,
+    resolution: float = 1 / 12,
     crs_tag: str = "epsg:4326",
-    name: str = "unnamed",
+    xa_name: str = "unnamed",
 ) -> xa.DataArray:
     """Creates an xarray DataArray from a raster numpy array.
 
@@ -414,7 +431,7 @@ def xa_array_from_raster(
     raster (np.ndarray): A numpy array with the raster data.
     lat_bounds (tuple[float]): A tuple with the latitude bounds (bottom, top).
     lon_bounds (tuple[float]): A tuple with the longitude bounds (left, right).
-    resolution (float, optional): The resolution of the output arrays. Default is 0.01.
+    resolution (float, optional): The resolution of the output arrays. Default is 1/12.
     crs_tag (str, optional): The coordinate reference system (CRS) tag for the output array. Default is "epsg:4326".
 
     Returns
@@ -430,7 +447,7 @@ def xa_array_from_raster(
     )
     coords_dict = {"latitude": lats, "longitude": lons}
 
-    array = xa.DataArray(raster, coords_dict, name=name)
+    array = xa.DataArray(raster, coords_dict, name=xa_name)
     array.rio.write_crs(crs_tag, inplace=True)
 
     return array
@@ -479,7 +496,7 @@ def generate_raster_xa(
     return raster_xa
 
 
-def check_nc_exists_generate_raster(
+def check_nc_exists_generate_raster_xa(
     dir_path: Path | str,
     filename: str,
     xa_ds: xa.Dataset = None,
@@ -523,7 +540,7 @@ def check_nc_exists_generate_raster(
         return raster_xa
     else:
         print(f"{filename} already exists in {dir_path}. No files written.")
-    return xa.open_dataset(filepath)
+        return xa.open_dataset(filepath)
 
 
 def distance_to_degree(
