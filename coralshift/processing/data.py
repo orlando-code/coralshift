@@ -52,7 +52,7 @@ def process_xa_array(
         coords_to_drop (list[str]): list of coordinates to be dropped from the DataArray.
         coords_to_rename (dict, optional): dictionary of coordinates to be renamed in the DataArray.
             Defaults to {"x": "longitude", "y": "latitude"}.
-        resolution (float, optional): Output resolution of the reduced DataArray, in the same units as the input.
+        resolution (float, optional): Output resolution of the upsampled DataArray, in the same units as the input.
             Defaults to None.
         shape (tuple, optional): Shape of the output DataArray as (height, width). If specified, overrides the
             resolution parameter. Defaults to None.
@@ -69,7 +69,7 @@ def process_xa_array(
     xa_array = xa_array.rename(coords_to_rename)
 
     if resolution or shape:
-        reduce_xa_array(xa_array, resolution=resolution, shape=shape)
+        upsample_xa_array(xa_array, resolution=resolution, shape=shape)
     if verbose:
         # show info about remaining coords
         print(xa_array.coords)
@@ -250,61 +250,63 @@ def return_distance_closest_to_value(
     )
 
 
-def reduce_xa_array(
+def upsample_xa_array(
     xa_array: xa.DataArray, resolution: float = 1 / 12, shape: tuple = None
 ) -> xa.DataArray:
-    """Reduces the resolution of a DataArray using rioxarray's 'reproject' functionality: reprojecting it onto a lower
+    """Upsamples the resolution of a DataArray using rioxarray's 'reproject' functionality: reprojecting it onto a lower
     resolution and/or differently-sized grid
 
     Parameters
     ----------
-    xa_array (xa.DataArray): Input DataArray to reduce.
-    resolution (float, optional): Output resolution of the reduced DataArray, in the same units as the input.
+    xa_array (xa.DataArray): Input DataArray to upsample.
+    resolution (float, optional): Output resolution of the upsampled DataArray, in the same units as the input.
         Defaults to 1/12.
     shape (tuple, optional): Shape of the output DataArray as (height, width). If specified, overrides the resolution
         parameter.
 
     Returns
     -------
-    xa.DataArray: The reduced DataArray
+    xa.DataArray: The upsampled DataArray
     """
 
     if not shape:
-        reduced_array = xa_array.rio.reproject(xa_array.rio.crs, resolution=resolution)
+        upsampled_array = xa_array.rio.reproject(
+            xa_array.rio.crs, resolution=resolution
+        )
     else:
-        reduced_array = xa_array.rio.reproject(xa_array.rio.crs, shape=shape)
+        upsampled_array = xa_array.rio.reproject(xa_array.rio.crs, shape=shape)
 
-    return reduced_array
+    return upsampled_array
 
 
-def reduce_dict_of_xa_arrays(
+def upsample_dict_of_xa_arrays(
     xa_dict: dict, resolution: float = 1 / 12, shape: tuple[int, int] = None
 ) -> dict:
-    """Reduces the resolution of each DataArray in a dictionary and returns the reduced dictionary.
+    """Upsamples the resolution of each DataArray in a dictionary and returns the upsampled dictionary.
 
     Parameters
     ----------
     xa_dict (dict): Dictionary containing the input DataArrays.
-    resolution (float, optional): Output resolution of the reduced DataArrays, in the same units as the input. Defaults
-        to 1/12.
+    resolution (float, optional): Output resolution of the upsampled DataArrays, in the same units as the input.
+        Defaults to 1/12.
     shape (tuple, optional): Shape of the output DataArrays as (height, width). If specified, overrides the resolution
         parameter.
 
     Returns
     -------
-    dict: Dictionary containing the reduced DataArrays with corresponding keys as array_name_reduced names.
+    dict: Dictionary containing the upsampled DataArrays with corresponding keys as array_name_upsampled names.
     TODO: add in check to ensure that upsampling rather than downsampling?
     """
-    reduced_dict = {}
+    upsampled_dict = {}
     print(f"Upsampling {xa_dict.keys()} from dictionary to {resolution}{shape}.")
     for name, array in tqdm(xa_dict.items()):
-        reduced_name = "_".join(
-            (file_ops.remove_suffix(name), "reduced", "{0:.3g}".format(resolution))
+        upsampled_name = "_".join(
+            (file_ops.remove_suffix(name), "upsampled", "{0:.3g}".format(resolution))
         )
-        reduced_array = reduce_xa_array(array, resolution, shape)
-        reduced_dict[reduced_name] = reduced_array
+        upsampled_array = upsample_xa_array(array, resolution, shape)
+        upsampled_dict[upsampled_name] = upsampled_array
 
-    return reduced_dict
+    return upsampled_dict
 
 
 def xarray_coord_limits(xa_array: xa.Dataset, dim: str) -> tuple[float]:
