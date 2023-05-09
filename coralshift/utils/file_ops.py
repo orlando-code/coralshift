@@ -53,13 +53,26 @@ def check_file_exists(
 
 
 def prune_file_list_on_existence(file_list: list[Path | str]) -> list:
-    for potential_file_path in file_list:
-        # if doesn't exist, remove from list
-        if not check_file_exists(filepath=Path(potential_file_path)):
-            print(f"{potential_file_path} not found. Removed it from list.")
-            file_list.remove(potential_file_path)
+    """Given a list of file paths, remove any paths that do not exist on disk.
 
-    return file_list
+    Parameters
+    ----------
+        file_list (List[Path | str]): A list of file paths.
+
+    Returns
+    -------
+        List[Path | str]: A list of file paths that exist on disk.
+    """
+    # filter out files that do not exist on disk
+    existing_files = [p for p in file_list if Path(p).exists()]
+
+    # identify and remove non-existent files from the original list
+    removed_files = set(file_list) - set(existing_files)
+    for removed_file in removed_files:
+        file_list.remove(removed_file)
+        print(f"{removed_file} not found. Removed it from list.")
+
+    return existing_files
 
 
 class DownloadProgressBar(tqdm):
