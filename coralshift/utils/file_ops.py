@@ -26,7 +26,12 @@ def guarantee_existence(path: str) -> Path:
     return path_obj.resolve()
 
 
-def check_file_exists(dir_path: Path | str, filename: str, suffix: str = None) -> bool:
+def check_file_exists(
+    filepath: Path | str = None,
+    dir_path: Path | str = None,
+    filename: str = None,
+    suffix: str = None,
+) -> bool:
     """Check if a file with the specified filename and optional suffix exists in the given directory.
 
     Parameters
@@ -39,10 +44,22 @@ def check_file_exists(dir_path: Path | str, filename: str, suffix: str = None) -
     -------
     bool: True if the file exists, False otherwise.
     """
-    filepath = Path(dir_path) / filename
+    # if filepath argument not provided, try to create
+    if not filepath:
+        filepath = Path(dir_path) / filename
     if suffix:
         filepath = filepath.with_suffix(pad_suffix(suffix))
     return filepath.is_file()
+
+
+def prune_file_list_on_existence(file_list: list[Path | str]) -> list:
+    for potential_file_path in file_list:
+        # if doesn't exist, remove from list
+        if not check_file_exists(filepath=Path(potential_file_path)):
+            print(f"{potential_file_path} not found. Removed it from list.")
+            file_list.remove(potential_file_path)
+
+    return file_list
 
 
 class DownloadProgressBar(tqdm):
