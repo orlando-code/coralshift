@@ -619,3 +619,40 @@ def xa_ds_to_3d_numpy(
 
     # move location to first column. New shape: grid_cell_val x var x time
     return np.moveaxis(np.array(array_list), 2, 0)
+
+
+def check_array_empty(array: xa.DataArray) -> bool:
+    """Check if all values in an xarray DataArray are empty (i.e., all values are null/NaN).
+
+    Parameters
+    ----------
+    array (xa.DataArray): xarray DataArray to be checked
+    Returns
+    -------
+    bool: True if all values are 0/NaN; False otherwise
+    """
+    vals = array.values
+    # replace nans with zeros
+    vals[np.isnan(vals)] = 0
+    # return True if any non-zero elements; False otherwise
+    if np.sum(vals) == 0:
+        return True
+    else:
+        return False
+
+
+def return_non_empty_vars(xa_array: xa.Dataset) -> list[str]:
+    """Return a list of variable names in the given xarray dataset that have non-empty values.
+
+    Args:
+        xa_array (xr.Dataset): The xarray dataset to check for non-empty variables.
+
+    Returns:
+        List[str]: A list of variable names with non-empty values.
+    """
+    non_empty_vars = []
+    for var_name in xa_array.data_vars:
+        if not check_array_empty(xa_array[var_name]):
+            non_empty_vars.append(var_name)
+
+    return non_empty_vars
