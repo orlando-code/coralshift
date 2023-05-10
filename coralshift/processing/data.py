@@ -535,13 +535,15 @@ def check_nc_exists_generate_raster_xa(
     if horizontal_distance:
         resolution = distance_to_degree(horizontal_distance)
 
-    if not file_ops.check_file_exists(dir_path, filename, ".nc"):
+    if not file_ops.check_file_exists(
+        dir_path=dir_path, filename=filename, suffix=".nc"
+    ):
         raster_xa = generate_raster_xa(
             xa_ds, resolution, class_col, xa_name, all_touched, filepath
         )
         return raster_xa
     else:
-        print(f"{filename} already exists in {dir_path}. No files written.")
+        print(f"{filename} already exists in {dir_path}. No new files written.")
         return xa.open_dataset(filepath)
 
 
