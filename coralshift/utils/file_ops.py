@@ -45,10 +45,12 @@ def check_file_exists(
     bool: True if the file exists, False otherwise.
     """
     # if filepath argument not provided, try to create
-    if not filepath:
+    if filepath:
+        filepath = Path(dir_path) / filename
+    else:
         filepath = Path(dir_path) / filename
     if suffix:
-        filepath = filepath.with_suffix(pad_suffix(suffix))
+        filepath = Path(filepath).with_suffix(pad_suffix(suffix))
     return filepath.is_file()
 
 
