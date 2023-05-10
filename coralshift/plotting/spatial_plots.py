@@ -3,6 +3,9 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 import xarray as xa
 import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+import cartopy.mpl.ticker as cticker
+
 import numpy as np
 
 from coralshift.processing import data
@@ -95,7 +98,9 @@ def plot_array_hist(
     return fig, ax
 
 
-def plot_vars_at_time(xa_ds: xa.Dataset, time: str = "2020-12-16T12:00:00"):
+def plot_vars_at_time(
+    xa_ds: xa.Dataset, time: str = "2020-12-16T12:00:00", variable_dict: dict = None
+):
     """Plots the values of all non-empty variables in the given xarray Dataset at a specified time.
 
     Parameters
@@ -106,21 +111,45 @@ def plot_vars_at_time(xa_ds: xa.Dataset, time: str = "2020-12-16T12:00:00"):
     """
     non_empty_vars = data.return_non_empty_vars(xa_ds)
     blank_list = list(set(list(xa_ds.data_vars)) - set(non_empty_vars))
-    print(
-        f"The following variables returned empty arrays, and so are not plotted: {blank_list}"
-    )
+    if len(blank_list) > 0:
+        print(
+            f"The following variables returned empty arrays, and so are not plotted: {blank_list}"
+        )
 
     num_plots = len(non_empty_vars)
     fig, axes = plt.subplots(
-        nrows=num_plots, sharex=False, sharey=True, figsize=(10, num_plots * 6)
+        nrows=num_plots,
+        sharex=False,
+        sharey=True,
+        figsize=(10, num_plots * 6),
+        subplot_kw={"projection": ccrs.PlateCarree()},
     )
+
+    # fetch latitude and longitude bounds
+    coord_lims_dict = data.dict_xarray_coord_limits(xa_ds)
+    lat_lims, lon_lims = coord_lims_dict["latitude"], coord_lims_dict["longitude"]
 
     for i, (var_name, var) in enumerate(xa_ds[non_empty_vars].items()):
         var.sel(time=time).plot(ax=axes[i])
+        if variable_dict:
+            var_name = variable_dict[var_name]
         axes[i].set_title(var_name)
         axes[i].set_xlabel("")
         axes[i].set_ylabel("")
         axes[i].set_aspect("equal")
-        # axes[i].add_feature(cfeature.COASTLINE)
-        # axes[i].coastlines('50m')
+        axes[i].add_feature(cfeature.COASTLINE, color="r")
+
+        # Longitude labels
+        axes[i].set_xticks(
+            np.arange(lon_lims[0], lon_lims[1], 5), crs=ccrs.PlateCarree()
+        )
+        lon_formatter = cticker.LongitudeFormatter()
+        axes[i].xaxis.set_major_formatter(lon_formatter)
+
+        # Latitude labels
+        axes[i].set_yticks(
+            np.arange(lat_lims[0], lat_lims[1], 5), crs=ccrs.PlateCarree()
+        )
+        lat_formatter = cticker.LatitudeFormatter()
+        axes[i].yaxis.set_major_formatter(lat_formatter)
     plt.suptitle(f"Time: {time}")
