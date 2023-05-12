@@ -677,3 +677,21 @@ def date_from_dt(datetime: str) -> str:
         Output: '2023-05-11'
     """
     return str(pd.to_datetime(datetime).date())
+
+
+def resample_dataarray(xa_da: xa.DataArray, start_end_freq: tuple[str]) -> xa.DataArray:
+    """Resample a dataarray's time coordinate to a new frequency and date range
+
+    TODO: fix this. Weird non-use of time_index, and makes up new values rather than selecting those closest
+    """
+    start_date, end_date, freq = start_end_freq
+    # Convert time coordinate to pandas DatetimeIndex
+    # time_index = pd.DatetimeIndex(xa_da.time.values)
+    # Create a new DatetimeIndex with the desired frequency and date range (will fetch closest value if not exact)
+    new_index = pd.date_range(start=start_date, end=end_date, freq=freq)
+    # Resample the dataarray's time coordinate to the new frequency
+    # resampled_da = xa_da.reindex(time=new_index).ffill(dim='time')
+    resampled_da = xa_da.reindex(time=new_index)
+
+    # problem with not matching what's already there
+    return resampled_da, freq
