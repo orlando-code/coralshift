@@ -658,3 +658,22 @@ def return_non_empty_vars(xa_array: xa.Dataset) -> list[str]:
             non_empty_vars.append(var_name)
 
     return non_empty_vars
+
+
+def date_from_dt(datetime: str) -> str:
+    """Converts a datetime string to a string with just the date.
+
+    Parameters
+    ----------
+    datetime (str): string representing the datetime.
+
+    Returns
+    -------
+    str: A string representing the date extracted from the input datetime string.
+
+    Example
+    -------
+        date_from_dt('2023-05-11 14:25:00')
+        Output: '2023-05-11'
+    """
+    return str(pd.to_datetime(datetime).date())
