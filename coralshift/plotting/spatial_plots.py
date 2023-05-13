@@ -6,10 +6,11 @@ from pathlib import Path
 import xarray as xa
 import cartopy.crs as ccrs
 
-# import cartopy.feature as cfeature
-# import cartopy.mpl.ticker as cticker
+import cartopy.feature as cfeature
+import cartopy.mpl.ticker as cticker
 
 import numpy as np
+from tqdm import tqdm
 
 from coralshift.processing import data
 from coralshift.utils import file_ops
@@ -44,7 +45,7 @@ def plot_DEM(
     cmap="BrBG",
     landmask: bool = True,
 ) -> tuple[Figure, Axes]:
-    """TODO: docstring"""
+    """TODO: docstring; generalise to all spatial plots"""
     # TODO: add option to plot satellite imagery for land instead of DEM
     map_proj = ccrs.PlateCarree()
     fig = plt.figure(figsize=(10, 10))
@@ -117,6 +118,95 @@ def duration_to_interval(num_frames: int, duration: int = 5000) -> int:
     return duration / num_frames
 
 
+def generate_like_variable_timeseries_gifs(
+    xa_ds: xa.Dataset,
+    variables: list[str] = None,
+    start_end_freq: tuple[str, str, str] = None,
+    variable_dict: dict = None,
+    interval: int = 500,
+    duration: int = None,
+    repeat_delay: int = 5000,
+    dest_dir_path: Path | str = None,
+) -> dict:
+    """Wrapper for generate_variable_timeseries_gif allowing generation of a set of similar gifs for each specified
+    variable in an xarray Dataset
+
+    Parameters
+    ----------
+    xa_das (xr.Dataset): The xarray Dataset array containing variables to animate.
+    variables (list[str], optional): Choice of variables to animate. Defaults to None (all variablees animated).
+    start_end_freq (tuple of str, optional) A tuple containing the start date, end date, and frequency to index the
+        "time" coordinate. If not provided, the whole time coordinate will be used.
+    variable_dict (dict, optional): A dictionary with keys as the original variable names and values as the names to be
+        displayed in the plot. If not provided, the original variable name will be used.
+    interval (int, optional): The delay between frames in milliseconds.
+    duration (int, optional): The duration of the GIF in milliseconds. If provided, the frame interval will be
+        calculated automatically based on the number of frames and the duration.
+    repeat_delay (int, optional): The delay before the animation repeats in milliseconds.
+    dest_dir_path (Union[pathlib.Path, str], optional): The directory to save the output GIF. If not provided, the
+        current working directory will be used.
+
+    Returns
+    -------
+    list[animation.FuncAnimation]: list containing the animation objects.
+    """
+    # if no specific variables specified, animate all available
+    if not variables:
+        variables = list(xa_ds.data_vars)
+
+    ani_dict = {}
+    for var in tqdm(variables):
+        ani = generate_variable_timeseries_gif(
+            xa_ds[var],
+            start_end_freq=start_end_freq,
+            variable_dict=variable_dict,
+            interval=interval,
+            duration=duration,
+            repeat_delay=repeat_delay,
+            dest_dir_path=dest_dir_path,
+        )
+        ani_dict[var] = ani
+
+    return ani_dict
+
+
+def format_xa_array_spatial_plot(
+    ax: Axes, xa_da: xa.DataArray, coastlines: bool = True
+) -> tuple[Axes, tuple[float], tuple[float]]:
+    """Formats a Matplotlib axes object for a spatial plot of an xarray DataArray.
+
+    Parameters:
+    ax (Axes): The Matplotlib axes object to format.
+    xa_da (xr.DataArray): The xarray DataArray to plot.
+    coastlines (bool): Whether to include coastlines on the plot. Defaults to True.
+
+    Returns:
+    Tuple[Axes, Tuple[float, float], Tuple[float, float]]: A tuple containing:
+        - The formatted Matplotlib axes object.
+        - A tuple of the minimum and maximum latitude values for the plot.
+    """
+    # determine minimum and maximum coordinates
+    coord_lims_dict = data.dict_xarray_coord_limits(xa_da)
+    lat_lims, lon_lims = coord_lims_dict["latitude"], coord_lims_dict["longitude"]
+
+    # set longitude labels
+    ax.set_xticks(np.arange(lon_lims[0], lon_lims[1], 5), crs=ccrs.PlateCarree())
+    lon_formatter = cticker.LongitudeFormatter()
+    ax.xaxis.set_major_formatter(lon_formatter)
+
+    # set latitude labels
+    ax.set_yticks(np.arange(lat_lims[0], lat_lims[1], 5), crs=ccrs.PlateCarree())
+    lat_formatter = cticker.LatitudeFormatter()
+    ax.yaxis.set_major_formatter(lat_formatter)
+
+    if coastlines:
+        ax.add_feature(cfeature.COASTLINE, edgecolor="r", linewidth=0.5)
+    ax.set_extent([lon_lims[0], lon_lims[1], lat_lims[0], lat_lims[1]])
+    ax.set_aspect("equal")
+
+    return ax, lat_lims, lon_lims
+
+
 def generate_variable_timeseries_gif(
     xa_da: xa.DataArray,
     start_end_freq: tuple[str, str, str] = None,
@@ -130,7 +220,7 @@ def generate_variable_timeseries_gif(
 
     Parameters
     ----------
-    xa_da (xr.DataArray): The xarray data array containing the variable to animate.
+    xa_da (xr.DataArray): The xarray DataArray containing the variable to animate.
     start_end_freq (tuple of str, optional) A tuple containing the start date, end date, and frequency to index the
         "time" coordinate. If not provided, the whole time coordinate will be used.
     variable_dict (dict, optional): A dictionary with keys as the original variable names and values as the names to be
@@ -146,16 +236,32 @@ def generate_variable_timeseries_gif(
     -------
     animation.FuncAnimation: The animation object.
 
-    TODO: plot formatting (coastlines and lat/lons). The issue at the moment is using imshow to plot. May be a way to
-    just use the xa.plot() function on the axes
-    More pressingly, fix the time resampling function
+    TODO: Fix the time resampling function; add single colorbar
     """
-    arrays = xa_da.values
     variable_name = xa_da.name
+    if variable_dict:
+        variable_name = variable_dict[variable_name]
+
+    def update(i, variable_name=variable_name) -> None:
+        """Updates a Matplotlib plot with a new frame.
+
+        Parameters
+        ----------
+        i (int): The index of the frame to display.
+        variable_name (str): The name of the variable being plotted.
+
+        Returns
+        -------
+        None
+        """
+        timestamp = data.date_from_dt(xa_da.time[i].values)
+        ax.set_title(f"{variable_name}\n{timestamp}")
+        xa_da.isel(time=i).plot(ax=ax, add_colorbar=False, cmap="viridis")
 
     if start_end_freq:
         # temporally resample DataArray
         xa_da, freq = data.resample_dataarray(xa_da, start_end_freq)
+
     # generate gif_name
     (start, end) = (
         data.date_from_dt(xa_da.time.min().values),
@@ -163,41 +269,10 @@ def generate_variable_timeseries_gif(
     )
     gif_name = f"{variable_name}_{start}_{end}"
 
-    # fetch latitude and longitude bounds
-    # coord_lims_dict = data.dict_xarray_coord_limits(xa_da)
-    # lat_lims, lon_lims = coord_lims_dict["latitude"], coord_lims_dict["longitude"]
-
-    fig, ax = plt.subplots(
-        # subplot_kw={"projection": ccrs.PlateCarree()}
-    )
-
-    def update(i, variable_name=variable_name):
-        ax.imshow(arrays[i], origin="lower", cmap="viridis")
-
-        timestamp = data.date_from_dt(xa_da.time[i].values)
-        if variable_dict:
-            variable_name = variable_dict[variable_name]
-        ax.set_title(f"{variable_name}\n{timestamp}")
-        ax.axis("off")
-        ax.set_aspect("equal")
-
-        # # Longitude labels
-        # ax.set_xticks(
-        #     np.arange(lon_lims[0], lon_lims[1], 5), crs=ccrs.PlateCarree()
-        # )
-        # lon_formatter = cticker.LongitudeFormatter()
-        # ax.xaxis.set_major_formatter(lon_formatter)
-
-        # # Latitude labels
-        # ax.set_yticks(
-        #     np.arange(lat_lims[0], lat_lims[1], 5), crs=ccrs.PlateCarree()
-        # )
-        # lat_formatter = cticker.LatitudeFormatter()
-        # ax.yaxis.set_major_formatter(lat_formatter)
-
-        # ax.add_feature(cfeature.COASTLINE, color="r")
-
+    fig, ax = plt.subplots(subplot_kw={"projection": ccrs.PlateCarree()})
+    ax = format_xa_array_spatial_plot(ax, xa_da)
     fig.tight_layout()
+
     # if duration_specified
     if duration:
         interval = duration_to_interval(num_frames=xa_da.time.size, duration=duration)
@@ -219,8 +294,8 @@ def generate_variable_timeseries_gif(
             Path().absolute() / "gif_directory"
         )
     save_path = (dest_dir_path / gif_name).with_suffix(".gif")
-
     ani.save(str(save_path), writer=writergif)
+
     print(
         f"""Gif for {variable_name} between {start} and {end} written to {save_path}.
         \nInterval: {interval}, repeat_delay: {repeat_delay}."""
