@@ -270,7 +270,7 @@ def generate_variable_timeseries_gif(
     gif_name = f"{variable_name}_{start}_{end}"
 
     fig, ax = plt.subplots(subplot_kw={"projection": ccrs.PlateCarree()})
-    ax = format_xa_array_spatial_plot(ax, xa_da)
+    ax, _, _ = format_xa_array_spatial_plot(ax, xa_da)
     fig.tight_layout()
 
     # if duration_specified
