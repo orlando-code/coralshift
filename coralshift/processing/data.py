@@ -695,3 +695,26 @@ def resample_dataarray(xa_da: xa.DataArray, start_end_freq: tuple[str]) -> xa.Da
 
     # problem with not matching what's already there
     return resampled_da, freq
+
+
+def get_variable_values(xa_ds: xa.Dataset, var_name: str) -> list:
+    """Returns a list of ndarrays containing the values of the given variable
+    for each timestep in the 'time' coordinate of the xarray Dataset.
+
+    Parameters
+    ----------
+    xa_ds : xa.Dataset
+        The xarray Dataset to extract the variable from.
+    var_name : str
+        The name of the variable to extract.
+
+    Returns
+    -------
+    list
+        A list of ndarrays containing the values of the variable for each
+        timestep in the 'time' coordinate.
+    """
+    values_list = []
+    for time in xa_ds.time:
+        values_list.append(xa_ds[var_name].sel(time=time).values)
+    return values_list
