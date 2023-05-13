@@ -171,8 +171,8 @@ def generate_like_variable_timeseries_gifs(
 
 
 def format_xa_array_spatial_plot(
-    ax: Axes, xa_da: xa.DataArray, coastlines: bool = True
-) -> tuple[Axes, tuple[float], tuple[float]]:
+    ax: Axes, xa_da: xa.DataArray, variable_dict: dict = None, coastlines: bool = True
+) -> tuple[Axes, str, tuple[float], tuple[float]]:
     """Formats a Matplotlib axes object for a spatial plot of an xarray DataArray.
 
     Parameters:
@@ -185,6 +185,12 @@ def format_xa_array_spatial_plot(
         - The formatted Matplotlib axes object.
         - A tuple of the minimum and maximum latitude values for the plot.
     """
+    # set title
+    variable_name = xa_da.name
+    if variable_dict:
+        variable_name = variable_dict[variable_name]
+    ax.set_title(variable_name)
+
     # determine minimum and maximum coordinates
     coord_lims_dict = data.dict_xarray_coord_limits(xa_da)
     lat_lims, lon_lims = coord_lims_dict["latitude"], coord_lims_dict["longitude"]
@@ -204,7 +210,7 @@ def format_xa_array_spatial_plot(
     ax.set_extent([lon_lims[0], lon_lims[1], lat_lims[0], lat_lims[1]])
     ax.set_aspect("equal")
 
-    return ax, lat_lims, lon_lims
+    return ax, variable_name, lat_lims, lon_lims
 
 
 def generate_variable_timeseries_gif(
@@ -236,11 +242,11 @@ def generate_variable_timeseries_gif(
     -------
     animation.FuncAnimation: The animation object.
 
-    TODO: Fix the time resampling function; add single colorbar
+    TODO: Fix the time resampling function
     """
-    variable_name = xa_da.name
-    if variable_dict:
-        variable_name = variable_dict[variable_name]
+    fig, ax = plt.subplots(subplot_kw={"projection": ccrs.PlateCarree()})
+    ax, variable_name, _, _ = format_xa_array_spatial_plot(ax, xa_da)
+    fig.tight_layout()
 
     def update(i, variable_name=variable_name) -> None:
         """Updates a Matplotlib plot with a new frame.
@@ -253,10 +259,12 @@ def generate_variable_timeseries_gif(
         Returns
         -------
         None
+        TODO: add single colorbar (could delete previous one each time, somehow)
         """
+
         timestamp = data.date_from_dt(xa_da.time[i].values)
         ax.set_title(f"{variable_name}\n{timestamp}")
-        xa_da.isel(time=i).plot(ax=ax, add_colorbar=False, cmap="viridis")
+        xa_da.isel(time=i).plot(ax=ax, add_colorbar=True, cmap="viridis")
 
     if start_end_freq:
         # temporally resample DataArray
@@ -268,10 +276,6 @@ def generate_variable_timeseries_gif(
         data.date_from_dt(xa_da.time.max().values),
     )
     gif_name = f"{variable_name}_{start}_{end}"
-
-    fig, ax = plt.subplots(subplot_kw={"projection": ccrs.PlateCarree()})
-    ax, _, _ = format_xa_array_spatial_plot(ax, xa_da)
-    fig.tight_layout()
 
     # if duration_specified
     if duration:
@@ -302,3 +306,65 @@ def generate_variable_timeseries_gif(
     )
 
     return ani
+
+
+def plot_var_at_time(
+    xa_da: xa.DataArray,
+    time: str = None,
+    figsize: tuple[float, float] = (10, 6),
+    variable_dict: dict = None,
+    coastlines: bool = True,
+):
+    """Plots the values of a variable in a single xarray DataArray at a specified time.
+
+    Parameters
+    ----------
+    var (xa.DataArray): The xarray DataArray to plot.
+    time (str): The time at which variables are plotted.
+    variable_name (str): The name of the variable being plotted.
+    lat_lims (tuple): tuple of latitude bounds.
+    lon_lims (tuple): tuple of longitude bounds.
+    """
+    fig, ax = plt.subplots(
+        figsize=figsize,
+        subplot_kw={"projection": ccrs.PlateCarree()},
+    )
+    format_xa_array_spatial_plot(ax, xa_da, coastlines=coastlines)
+
+    # if time not specified, choose latest
+    if not time:
+        time = xa_da.time.max().values
+
+    xa_da.sel(time=time).plot(ax=ax)
+
+
+def plot_vars_at_time(
+    xa_ds: xa.Dataset,
+    time: str = None,
+    figsize: tuple[float, float] = (10, 6),
+    variable_dict: dict = None,
+    coastlines: bool = True,
+):
+    """Plots the values of all non-empty variables in the given xarray Dataset at a specified time.
+
+    Parameters
+    ----------
+    xa_ds (xa.Dataset): The xarray Dataset to plot.
+    time (str, defaults to 2020-12-16T12:00:00): The time at which variables are plotted.
+    TODO: add in satellite/ground values
+    """
+    non_empty_vars = data.return_non_empty_vars(xa_ds)
+    blank_list = list(set(list(xa_ds.data_vars)) - set(non_empty_vars))
+    if len(blank_list) > 0:
+        print(
+            f"The following variables returned empty arrays, and so are not plotted: {blank_list}"
+        )
+
+    for var_name, xa_da in tqdm(xa_ds[non_empty_vars].items()):
+        plot_var_at_time(
+            xa_da,
+            time=time,
+            figsize=figsize,
+            variable_dict=variable_dict,
+            coastlines=coastlines,
+        )
