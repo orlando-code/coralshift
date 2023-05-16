@@ -288,6 +288,7 @@ def generate_variable_timeseries_gif(
         interval=interval,
         repeat_delay=repeat_delay,
         repeat=True,
+        blit=True,
     )
 
     # save animation as a gif
