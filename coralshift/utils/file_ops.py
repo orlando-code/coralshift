@@ -150,7 +150,7 @@ def check_path_suffix(path: Path | str, comparison: str) -> bool:
         return False
 
 
-def load_merge_nc_files(nc_dir: Path | str):
+def load_merge_nc_files(nc_dir: Path | str, concat_dim: str = "time"):
     """Load and merge all netCDF files in a directory.
 
     Parameters
@@ -162,8 +162,14 @@ def load_merge_nc_files(nc_dir: Path | str):
         xr.Dataset: merged xarray Dataset object containing the data from all netCDF files.
     """
     files = return_list_filepaths(nc_dir, ".nc")
+    if len(files) == 1:
+        return xa.open_dataset(files[0])
     # combine nc files by coordinates
-    return xa.open_mfdataset(files)
+    # return xa.open_mfdataset(files, concat_dim=concat_dim, combine="nested")
+    ds = xa.open_mfdataset(
+        files, concat_dim=concat_dim, combine="nested", decode_cf=False
+    )
+    return xa.decode_cf(ds)
 
 
 def pad_suffix(suffix: str) -> str:
@@ -386,3 +392,12 @@ def add_suffix_if_necessary(filepath: Path | str, suffix_to_add: str) -> Path:
         raise ValueError(
             f"{filepath} terminates in a conflicting suffix to suffix_to_add: {suffix_to_add}."
         )
+
+
+def merge_save_nc_files(download_dir, filename):
+    # read relevant .nc files and merge to return master xarray
+    xa_ds = load_merge_nc_files(download_dir, concat_dim="time")
+    save_path = Path(Path(download_dir), filename).with_suffix(".nc")
+    xa_ds.to_netcdf(save_path)
+    print(f"Combined nc file written to {save_path}.")
+    return xa_ds
