@@ -8,8 +8,8 @@ import geopandas as gpd
 from coralshift.processing import data
 
 
-def guarantee_existence(path: str) -> Path:
-    """Checks if string is an existing path, else creates it
+def guarantee_existence(path: Path | str) -> Path:
+    """Checks if string is an existing directory path, else creates it
 
     Parameter
     ---------
@@ -33,7 +33,7 @@ def check_file_exists(
     suffix: str = None,
 ) -> bool:
     """Check if a file with the specified filename and optional suffix exists in the given directory.
-
+    # TODO: think this won't behave as inteded: more testing and comments necessary
     Parameters
     ----------
     dir_path (Path | str): Path to the directory where the file should be located.
@@ -59,11 +59,11 @@ def prune_file_list_on_existence(file_list: list[Path | str]) -> list:
 
     Parameters
     ----------
-        file_list (List[Path | str]): A list of file paths.
+        file_list (list[Path | str]): A list of file paths.
 
     Returns
     -------
-        List[Path | str]: A list of file paths that exist on disk.
+        list[Path | str]: A list of file paths that exist on disk.
     """
     # filter out files that do not exist on disk
     existing_files = [p for p in file_list if Path(p).exists()]
@@ -150,7 +150,9 @@ def check_path_suffix(path: Path | str, comparison: str) -> bool:
         return False
 
 
-def load_merge_nc_files(nc_dir: Path | str, concat_dim: str = "time"):
+def load_merge_nc_files(
+    nc_dir: Path | str, incl_subdirs: bool = True, concat_dim: str = "time"
+):
     """Load and merge all netCDF files in a directory.
 
     Parameters
@@ -161,15 +163,42 @@ def load_merge_nc_files(nc_dir: Path | str, concat_dim: str = "time"):
     -------
         xr.Dataset: merged xarray Dataset object containing the data from all netCDF files.
     """
-    files = return_list_filepaths(nc_dir, ".nc")
+    # specify whether searching subdirectories as well
+    files = return_list_filepaths(nc_dir, ".nc", incl_subdirs)
+    # if only a single file present (no need to merge)
     if len(files) == 1:
         return xa.open_dataset(files[0])
-    # combine nc files by coordinates
-    # return xa.open_mfdataset(files, concat_dim=concat_dim, combine="nested")
+    # combine nc files by time
     ds = xa.open_mfdataset(
-        files, concat_dim=concat_dim, combine="nested", decode_cf=False
+        files, decode_cf=False, concat_dim=concat_dim, combine="nested"
     )
-    return xa.decode_cf(ds)
+    return xa.decode_cf(ds).sortby("time", ascending=True)
+
+
+def merge_save_nc_files(download_dir: Path | str, filename: str):
+    # read relevant .nc files and merge to return master xarray
+    xa_ds = load_merge_nc_files(Path(download_dir))
+    save_path = Path(Path(download_dir), filename).with_suffix(".nc")
+    xa_ds.to_netcdf(save_path)
+    print(f"Combined nc file written to {save_path}.")
+    return xa_ds
+
+
+# hopefully isn't necessary, since loading all datasets into memory is very intensive and not scalable
+# def naive_nc_merge(dir: Path | str):
+#     file_paths = return_list_filepaths(dir, ".nc")
+#     # get names of files
+#     filenames = [file_path.stem for file_path in file_paths]
+#     # load in files to memory as xarray
+#     das = [xa.load_dataset(file_path) for file_path in file_paths]
+
+#     combined = xa.merge([da for da in das], compat="override")
+
+#     # save combined file
+#     save_name = filenames[0] + "&" + filenames[-1] + "_merged.nc"
+#     save_path = Path(dir) / save_name
+#     combined.to_netcdf(path=save_path)
+#     print(f"{save_name} saved successfully")
 
 
 def pad_suffix(suffix: str) -> str:
@@ -202,19 +231,28 @@ def remove_suffix(filename: str) -> str:
     return split_list[:-1][0]
 
 
-def return_list_filepaths(files_dir: Path | str, suffix: str) -> list[Path]:
+def return_list_filepaths(
+    files_dir: Path | str, suffix: str, incl_subdirs: bool = False
+) -> list[Path]:
     """Return a list of file paths in the specified directory that have the given suffix.
 
     Parameters
     ----------
-        files_dir (Path | str): directory in which to search for files.
-        suffix (str): file suffix to look for.
+    files_dir (Path | str): Directory in which to search for files.
+    suffix (str): File suffix to look for.
+    incl_subdirs (bool, optional) If True, search for files in subdirectories as well. Defaults to False.
 
     Returns
     -------
-        list[Path]: list of file paths in the directory with the specified suffix.
+    list[Path]
+        List of file paths in the directory with the specified suffix.
     """
-    return list(Path(files_dir).glob("*" + pad_suffix(suffix)))
+    # if searching in only specified directory, files_dir:
+    if incl_subdirs:
+        return list(Path(files_dir).glob("*" + pad_suffix(suffix)))
+    # if also searching in subdirectories
+    else:
+        return list(Path(files_dir).glob("**/*" + pad_suffix(suffix)))
 
 
 def read_nc_path(nc_file_path: Path | str, engine: str = "h5netcdf") -> xa.DataArray:
@@ -394,10 +432,17 @@ def add_suffix_if_necessary(filepath: Path | str, suffix_to_add: str) -> Path:
         )
 
 
-def merge_save_nc_files(download_dir, filename):
-    # read relevant .nc files and merge to return master xarray
-    xa_ds = load_merge_nc_files(download_dir, concat_dim="time")
-    save_path = Path(Path(download_dir), filename).with_suffix(".nc")
-    xa_ds.to_netcdf(save_path)
-    print(f"Combined nc file written to {save_path}.")
-    return xa_ds
+def generate_filepath(
+    dir_path: str | Path, filename: str = None, suffix: str = None
+) -> Path:
+    """Generates directory path if non-existant; if filename provided, generates filepath, adding suffix if
+    necessary."""
+    # if generating/ensuring directory path
+    if not filename:
+        return guarantee_existence(dir_path)
+    # if filename provided, seemingly with suffix included
+    elif not suffix:
+        return Path(dir_path) / filename
+    # if filename and suffix provided
+    else:
+        return (Path(dir_path) / filename).with_suffix(suffix)
