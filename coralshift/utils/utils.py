@@ -83,7 +83,7 @@ def underscore_list_of_tuples(tuples: str | list[tuple]) -> str:
 
 
 def generate_date_pairs(
-    date_lims: tuple[str, str], freq: str = "2D"
+    date_lims: tuple[str, str], freq: str = "10y"
 ) -> list[tuple[str, str]]:
     """Generate pairs of start and end dates based on the given date limits.
 
@@ -98,4 +98,25 @@ def generate_date_pairs(
         return [date_lims]
 
     date_list = pd.date_range(date_lims[0], date_lims[1], freq=freq)
-    return [(date_list[i], date_list[i + 1]) for i in range(len(date_list) - 1)]
+    return [
+        (
+            np.datetime64(date_list[i]),
+            np.datetime64(date_list[i + 1]),
+        )
+        for i in range(len(date_list) - 1)
+    ]
+
+
+def pad_number_with_zeros(number: str | int) -> str:
+    """
+    Add a leading zero to any number, X, into 0X. Useful for generating dates in URL strings.
+    """
+    if not type(number) == str:
+        try:
+            number = str(number)
+        except ValueError:
+            print(f"Failed to convert {number} to string")
+    if len(number) == 1:
+        number = "".join(("0", number))
+
+    return number
