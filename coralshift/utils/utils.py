@@ -3,43 +3,39 @@ import numpy as np
 from coralshift.processing import data
 
 
-def round_list_tuples(tup_list: list) -> list[list[str]]:
-    """Round the elements of each tuple in the list and return a new rounded list.
+def is_type_or_list_of_type(obj, target_type):
+    if isinstance(obj, target_type):
+        return True
 
-    Parameters
-    ----------
-    tup_list (list[tuple[float]]): A list of tuples containing float values.
+    if isinstance(obj, list) or isinstance(obj, tuple):
+        return all(isinstance(element, target_type) for element in obj)
 
-    Returns
-    -------
-    rounded (list[list[str]]): A new list with rounded elements of the input tuples.
-    """
-
-    rounded = []
-    for tup in tup_list:
-        rounded.append(round_tuple_els(tup))
-    return rounded
+    return False
 
 
-def round_tuple_els(tup: tuple[float], prec_str: str = "{:.2f}") -> list[str]:
+def round_list_tuples(
+    tuple_list: list[tuple[float, ...]], decimal_places: int = 2
+) -> list[tuple]:
     """Round each element in a tuple to a specified precision.
 
     Parameters
     ----------
-    tup (tuple[float]): A tuple of floats.
-    prec (int): The precision to round the elements to. Defaults to 2.
+        tup (tuple[float]): A tuple of floats.
+        prec (int): The precision to round the elements to. Defaults to 2.
 
     Returns
     -------
-    List[str]: A list of rounded values as strings.
+        list[str]: A list of rounded values as strings.
     """
-    rounded = []
-    for el in tup:
-        rounded.append(prec_str.format(el))
-    return rounded
+    if type(tuple_list) == tuple:
+        tuple_list = [tuple_list]
+    return [
+        tuple(round(element, decimal_places) for element in sub_tuple)
+        for sub_tuple in tuple_list
+    ]
 
 
-def dates_from_dt(dts: list[str | np.datetime64]) -> list[str]:
+def underscore_str_of_dates(dts: list[str | np.datetime64]) -> list[str]:
     """Extract date strings from a list of datetime objects.
 
     Parameters
@@ -50,13 +46,17 @@ def dates_from_dt(dts: list[str | np.datetime64]) -> list[str]:
     -------
     list[str]: A list of date strings.
     """
-    dates = []
-    for dt in dts:
-        dates.append(data.date_from_dt(dt))
-    return dates
+    # dates = []
+    # for dt in dts:
+    #     dates.append(data.date_from_dt(dt))
+    # return dates
+    if type(dts) == list or type(dts) == tuple:
+        return "_".join([data.date_from_dt(dt) for dt in dts])
+    else:
+        return data.date_from_dt(dts)
 
 
-def vars_to_strs(variables: str | list[str]) -> str:
+def underscore_str_of_strings(variables: str | list[str]) -> str:
     """Convert variable(s) to a string.
 
     Parameters
@@ -74,8 +74,16 @@ def vars_to_strs(variables: str | list[str]) -> str:
         return "_".join(variables)
 
 
+def underscore_list_of_tuples(tuples: str | list[tuple]) -> str:
+    if type(tuples) == list:
+        flattened_list = [item for sublist in tuples for item in sublist]
+        return "_".join(map(str, flattened_list))
+    else:
+        return "_".join([str(tup) for tup in tuples])
+
+
 def generate_date_pairs(
-    date_lims: tuple[str, str], freq: str = "W"
+    date_lims: tuple[str, str], freq: str = "2D"
 ) -> list[tuple[str, str]]:
     """Generate pairs of start and end dates based on the given date limits.
 
@@ -86,8 +94,8 @@ def generate_date_pairs(
     date_pairs (list[tuple[str, str]]): A list of date pairs.
     """
     start_overall, end_overall = min(date_lims), max(date_lims)
-    # if already less than a month apart
-    if (end_overall - start_overall).item().days <= 30:
+    # if already less than a month apart TODO: update this
+    if (end_overall - start_overall).item().days <= 2:
         return [date_lims]
 
     date_list = pd.date_range(date_lims[0], date_lims[1], freq=freq)
