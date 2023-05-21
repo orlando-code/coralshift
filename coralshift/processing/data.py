@@ -660,7 +660,7 @@ def return_non_empty_vars(xa_array: xa.Dataset) -> list[str]:
     return non_empty_vars
 
 
-def date_from_dt(datetime: str) -> str:
+def date_from_dt(datetime: str | np.datetime64) -> str:
     """Converts a datetime string to a string with just the date.
 
     Parameters
