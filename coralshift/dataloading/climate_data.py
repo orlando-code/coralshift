@@ -68,8 +68,7 @@ def generate_metadata(
     query (str): The MOTU query used for downloading the file.
     """
     filepath = (Path(download_dir) / filename).with_suffix(".json")
-    print(filepath)
-    print(type(download_dir))
+
     var_dict = {
         "mlotst": "ocean mixed layer thickness (sigma theta)",
         "siconc": "sea ice area fraction",
