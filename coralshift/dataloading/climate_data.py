@@ -4,42 +4,44 @@ import json
 import os
 
 # import getpass
+# import cdsapi
 
 from pathlib import Path
 from tqdm import tqdm
+from pandas._libs.tslibs.timestamps import Timestamp
 
 from coralshift.utils import utils, file_ops
 
 
-def generate_spatiotemporal_var_filename(
-    variable: str | list[str],
-    date_lims: tuple[np.datetime64, np.datetime64],
-    lon_lims: list[tuple[float]],
-    lat_lims: list[tuple[float]],
-    depth_lims: list[tuple[float]],
+def generate_spatiotemporal_var_filename_from_dict(
+    info_dict: dict,
 ) -> str:
     """Generate a filename based on variable, date, and coordinate limits.
 
     Parameters
     ----------
-    variable (str | list[str]): The variable(s) as a string or a list of variables.
-    date_lims (tuple[datetime, datetime]): A tuple of start and end datetime objects.
-    lon_lims (list[tuple[float]]): A list of tuples representing longitude limits.
-    lat_lims (list[tuple[float]]): A list of tuples representing latitude limits.
-    depth_lims (list[tuple[float]]): A list of tuples representing depth limits.
+    info_dict (dict): A dictionary containing information about the variable, date, and coordinate limits.
 
-    Returns:
-    --------
+    Returns
+    -------
     str: The generated filename.
     """
-    vars = utils.vars_to_strs(variable)
-    date_lims = utils.dates_from_dt(date_lims)
-    lon_lims, lat_lims, depth_lims = utils.round_list_tuples(
-        [lon_lims, lat_lims, depth_lims]
-    )
-    date_str = f"dts_{date_lims[0]}_{date_lims[1]}"
-    coord_str = f"lon_{lon_lims[0]}_{lon_lims[1]}_lat_{lat_lims[0]}_{lat_lims[1]}_dep_{depth_lims[0]}_{depth_lims[1]}"
-    return "_".join((f"{vars}", date_str, coord_str)).replace(".", "-")
+    filename_list = []
+    for k, v in info_dict.items():
+        # strings (variables)
+        if utils.is_type_or_list_of_type(v, str):
+            filename_list.extend([k.upper(), utils.underscore_str_of_strings(v)])
+        # np.datetime64 (dates)
+        elif utils.is_type_or_list_of_type(
+            v, np.datetime64
+        ) or utils.is_type_or_list_of_type(v, Timestamp):
+            filename_list.extend([k.upper(), utils.underscore_str_of_dates(v)])
+        # tuples (coordinates limits)
+        elif utils.is_type_or_list_of_type(v, tuple):
+            filename_list.extend(
+                [k.upper(), utils.underscore_list_of_tuples(utils.round_list_tuples(v))]
+            )
+    return "_".join(filename_list)
 
 
 def generate_metadata(
@@ -66,7 +68,8 @@ def generate_metadata(
     query (str): The MOTU query used for downloading the file.
     """
     filepath = (Path(download_dir) / filename).with_suffix(".json")
-
+    print(filepath)
+    print(type(download_dir))
     var_dict = {
         "mlotst": "ocean mixed layer thickness (sigma theta)",
         "siconc": "sea ice area fraction",
@@ -84,7 +87,7 @@ def generate_metadata(
 
     metadata = {
         "filename": filename,
-        "download directory": download_dir,
+        "download directory": str(download_dir),
         "variable acronym": variable,
         "variable name": var_dict[variable],
         "longitude-min": lon_lims[0],
@@ -100,10 +103,25 @@ def generate_metadata(
 
     # Serializing json
     json_object = json.dumps(metadata, indent=4)
-    print(filename)
 
-    with open(filepath, "w") as outfile:
+    with open(str(filepath), "w") as outfile:
         outfile.write(json_object)
+
+
+def generate_name_dict(
+    variables: list[str],
+    date_lims: tuple[str, str],
+    lon_lims: tuple[str, str],
+    lat_lims: tuple[str, str],
+    depth_lims: tuple[str, str],
+) -> dict:
+    return {
+        "vars": variables,
+        "dates": date_lims,
+        "lons": lon_lims,
+        "lats": lat_lims,
+        "depths": depth_lims,
+    }
 
 
 def download_reanalysis(
@@ -148,11 +166,13 @@ def download_reanalysis(
     for var in tqdm(variables, desc=" variable loop", position=0):
         # split request by time
         date_pairs = utils.generate_date_pairs(date_lims)
-        # print(date_pairs)
         for sub_date_lims in tqdm(date_pairs):
-            filename = generate_spatiotemporal_var_filename(
+            # generate name info dictionary
+            name_dict = generate_name_dict(
                 var, sub_date_lims, lon_lims, lat_lims, depth_lims
             )
+            filename = generate_spatiotemporal_var_filename_from_dict(name_dict)
+            # if file doesn't already exist, generate and execute API query
             if not (Path(download_dir) / filename).with_suffix(".nc").is_file():
                 query = generate_motu_query(
                     download_dir,
@@ -182,9 +202,9 @@ def download_reanalysis(
                 print(f"{filename} already exists in {download_dir}.")
         print("Moving on to next variable...")
 
-    main_filename = generate_spatiotemporal_var_filename(
-        variables, date_lims, lon_lims, lat_lims, depth_lims
-    )
+    # generate name of combined file
+    name_dict = generate_name_dict(variables, date_lims, lon_lims, lat_lims, depth_lims)
+    main_filename = generate_spatiotemporal_var_filename_from_dict(name_dict)
 
     return file_ops.merge_save_nc_files(download_dir, main_filename)
 
@@ -301,3 +321,78 @@ def download_data_slice(query):
     except ConnectionAbortedError():
         print("Data download failed.")
         return False
+
+
+def ecmwf_api_call(
+    c,
+    download_dest_dir: Path | str,
+    parameter: str,
+    time_info_dict: dict,
+    area: list[tuple[float]],
+    format: str,
+):
+    api_call_dict = generate_ecmwf_api_dict(parameter, time_info_dict, area, format)
+    # make api call
+    try:
+        # TODO: update this
+        c.retrieve("reanalysis-era5-land", api_call_dict, download_dest_dir)
+    # if error in fetching, limit the parameter
+    except ConnectionAbortedError():
+        print(f"API call failed for {parameter}. Moving on to the next parameter...")
+
+
+def generate_ecmwf_api_dict(
+    weather_params: list[str], time_info_dict: dict, area: list[float], format: str
+) -> dict:
+    """Generate api dictionary format for single month of event"""
+
+    api_call_dict = {
+        "variable": weather_params,
+        "area": area,
+        "format": format,
+    } | time_info_dict
+
+    return api_call_dict
+
+
+def return_full_ecmwf_weather_param_strings(dict_keys: list[str]):
+    """Look up weather parameters in a dictionary so they can be entered as short strings rather than typed out in full.
+    Key:value pairs ordered in expected importance
+
+    Parameters
+    ----------
+    dict_keys : list[str]
+        list of shorthand keys for longhand weather parameters. See accompanying documentation on GitHub
+    """
+
+    weather_dict = {
+        "d2m": "2m_dewpoint_temperature",
+        "t2m": "2m_temperature",
+        "skt": "skin_temperature",
+        "tp": "total_precipitation",
+        "sp": "surface_pressure",
+        "src": "skin_reservoir_content",
+        "swvl1": "volumetric_soil_water_layer_1",
+        "swvl2": "volumetric_soil_water_layer_2",
+        "swvl3": "volumetric_soil_water_layer_3",
+        "swvl4": "volumetric_soil_water_layer_4",
+        "slhf": "surface_latent_heat_flux",
+        "sshf": "surface_sensible_heat_flux",
+        "ssr": "surface_net_solar_radiation",
+        "str": "surface_net_thermal_radiation",
+        "ssrd": "surface_solar_radiation_downwards",
+        "strd": "surface_thermal_radiation_downwards",
+        "e": "total_evaporation",
+        "pev": "potential_evaporation",
+        "ro": "runoff",
+        "ssro": "sub-surface_runoff",
+        "sro": "surface_runoff",
+        "u10": "10m_u_component_of_wind",
+        "v10": "10m_v_component_of_wind",
+    }
+
+    weather_params = []
+    for key in dict_keys:
+        weather_params.append(weather_dict.get(key))
+
+    return weather_params
