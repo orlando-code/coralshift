@@ -94,7 +94,6 @@ def generate_date_pairs(
     date_pairs (list[tuple[str, str]]): A list of date pairs.
     """
     start_overall, end_overall = min(date_lims), max(date_lims)
-    # if already less than a month apart TODO: update this
     if (end_overall - start_overall).item().days <= 2:
         return [date_lims]
 
