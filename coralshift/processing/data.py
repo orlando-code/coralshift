@@ -718,3 +718,44 @@ def get_variable_values(xa_ds: xa.Dataset, var_name: str) -> list:
     for time in xa_ds.time:
         values_list.append(xa_ds[var_name].sel(time=time).values)
     return values_list
+
+
+def buffer_nans(array, size=1):
+    """Buffer nan values in a 2D array by taking the mean of valid neighbors.
+
+    Parameters
+    ----------
+        array (ndarray): Input 2D array with NaN values representing land.
+        size (int, optional): Buffer size in pixels. Defaults to 1.
+
+    Returns
+    -------
+        np.ndarray: Buffered array with NaN values replaced by the mean of valid neighbors.
+    """
+
+    def nan_sweeper(values):
+        """Custom function to sweep NaN values and calculate the mean of valid neighbors.
+
+        Parameters
+        ----------
+            values (np.ndarray): 1D array representing the neighborhood of an element.
+
+        Returns
+        -------
+            float: Mean value of valid neighbors or the central element if not NaN.
+        """
+        # check if central element of kernel is nan
+        if np.isnan(values[len(values) // 2]):
+            # extract valid (non-nan values)
+            valid_values = values[~(np.isnan(values))]
+            # and return the mean of these values, to be assigned to rest of the buffer kernel
+            return np.mean(valid_values)
+        else:
+            return values[len(values) // 2]
+
+    # call nan_sweeper on each element of "array"
+    # "constant" – array extended by filling all values beyond edge with same constant value, defined by cval
+    buffered_array = generic_filter(
+        array, nan_sweeper, size=size, mode="constant", cval=np.nan
+    )
+    return buffered_array
