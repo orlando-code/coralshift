@@ -7,7 +7,7 @@ import haversine
 
 from rasterio import features
 from tqdm import tqdm
-from scipy.ndimage import binary_dilation
+from scipy.ndimage import binary_dilation, generic_filter
 from pathlib import Path
 from coralshift.utils import file_ops
 
