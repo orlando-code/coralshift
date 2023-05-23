@@ -175,6 +175,68 @@ def load_merge_nc_files(
     return xa.decode_cf(ds).sortby("time", ascending=True)
 
 
+def merge_nc_files_in_dirs(parent_dir: Path | str, concat_dim: str = "time"):
+    """Load and merge all netCDF files in a directory.
+
+    Parameters
+    ----------
+        nc_dir (Path | str): directory containing the netCDF files to be merged.
+
+    Returns
+    -------
+        xr.Dataset: merged xarray Dataset object containing the data from all netCDF files.
+    """
+    dirs = [d for d in Path(parent_dir).iterdir() if d.is_dir()]
+    for dir in tqdm(dirs):
+        merged_name = f"{str(dir.stem)}_time_merged.nc"
+        merged_path = dir / merged_name
+        print(f"Merging .nc files into {merged_path}")
+
+        # if merged doesn't already exist
+        if not merged_path.is_file():
+            files = return_list_filepaths(dir, ".nc", incl_subdirs=False)
+            if len(files) == 1:
+                ds = xa.open_dataset(files[0])
+            else:
+                # combine nc files by time
+                ds = xa.open_mfdataset(
+                    files, decode_cf=False, concat_dim=concat_dim, combine="nested"
+                ).sortby("time", ascending=True)
+            ds.to_netcdf(merged_path)
+        else:
+            print(f"{merged_path} already exists.")
+
+
+def merge_from_dirs(parent_dir: Path | str, concat_files_common: str):
+    """Merging iteratively to speed up"""
+    files_to_merge = list(Path(parent_dir).glob("**/*" + concat_files_common))
+
+    merged_data = None
+    for path in files_to_merge:
+        dataset = xa.open_dataset(path)
+        if merged_data is None:
+            merged_data = dataset
+        else:
+            merged_data = xa.merge([merged_data, dataset])
+
+    return merged_data
+
+    # # specify whether searching subdirectories as well
+    # files = return_list_filepaths(nc_dir, ".nc", incl_subdirs)
+    # # if only a single file present (no need to merge)
+    # if len(files) == 1:
+    #     return xa.open_dataset(files[0])
+    # # combine nc files by time
+    # ds = xa.open_mfdataset(
+    #     files, decode_cf=False, concat_dim=concat_dim, combine="nested"
+    # )
+    # return xa.decode_cf(ds).sortby("time", ascending=True)
+
+    # for each subdir in turn, get list of files
+    # merge files in list with distinct name
+    # concatenate merged files
+
+
 def merge_save_nc_files(download_dir: Path | str, filename: str):
     # read relevant .nc files and merge to return master xarray
     xa_ds = load_merge_nc_files(Path(download_dir))
@@ -232,7 +294,7 @@ def remove_suffix(filename: str) -> str:
 
 
 def return_list_filepaths(
-    files_dir: Path | str, suffix: str, incl_subdirs: bool = False
+    files_dir: Path | str, suffix: str, incl_subdirs: bool = True
 ) -> list[Path]:
     """Return a list of file paths in the specified directory that have the given suffix.
 
@@ -249,10 +311,10 @@ def return_list_filepaths(
     """
     # if searching in only specified directory, files_dir:
     if incl_subdirs:
-        return list(Path(files_dir).glob("*" + pad_suffix(suffix)))
+        return list(Path(files_dir).glob("**/*" + pad_suffix(suffix)))
     # if also searching in subdirectories
     else:
-        return list(Path(files_dir).glob("**/*" + pad_suffix(suffix)))
+        return list(Path(files_dir).glob("*" + pad_suffix(suffix)))
 
 
 def read_nc_path(nc_file_path: Path | str, engine: str = "h5netcdf") -> xa.DataArray:
