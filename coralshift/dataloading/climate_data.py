@@ -164,6 +164,7 @@ def download_reanalysis(
 
     # split request by variable
     for var in tqdm(variables, desc=" variable loop", position=0):
+        print(f"Downloading {var}...")
         # split request by time
         date_pairs = utils.generate_date_pairs(date_lims)
         # create download folder for each variable (if not already existing)
@@ -204,7 +205,6 @@ def download_reanalysis(
                 )
             else:
                 print(f"{filename} already exists in {save_dir}.")
-        print("Moving on to next variable...")
 
     # generate name of combined file
     name_dict = generate_name_dict(variables, date_lims, lon_lims, lat_lims, depth_lims)
@@ -347,7 +347,7 @@ def ecmwf_api_call(
         c.retrieve("reanalysis-era5-land", api_call_dict, download_dest_dir)
     # if error in fetching, limit the parameter
     except ConnectionAbortedError():
-        print(f"API call failed for {parameter}. Moving on to the next parameter...")
+        print(f"API call failed for {parameter}.")
 
 
 def generate_ecmwf_api_dict(
