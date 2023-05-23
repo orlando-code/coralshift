@@ -162,7 +162,9 @@ def return_max_of_coord(xa_array: xa.DataArray, coord: str) -> float:
     return float(xa_array[coord].max().values)
 
 
-def min_max_of_coords(xa_array: xa.DataArray, coord: str) -> tuple[float, float]:
+def min_max_of_coords(
+    xa_array: xa.DataArray | xa.Dataset, coord: str
+) -> tuple[float, float]:
     """Returns the minimum and maximum values of the specified coordinate field in the given xarray DataArray.
 
     Parameters
@@ -408,6 +410,7 @@ def generate_lat_lon_arrays(
     tuple[np.ndarray]: A tuple with the latitude and longitude arrays.
     """
     # xarray requires first coordinate in vertical direction to be the topmost
+    # TODO: this could cause issues with coords in other quartiles
     if lat_bounds[0] < lat_bounds[1]:
         lats_list = np.arange(lat_bounds[1], lat_bounds[0], -resolution)
     else:
