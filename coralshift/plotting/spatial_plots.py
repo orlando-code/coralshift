@@ -261,10 +261,12 @@ def generate_variable_timeseries_gif(
         None
         TODO: add single colorbar (could delete previous one each time, somehow)
         """
-
+        cb = True
         timestamp = data.date_from_dt(xa_da.time[i].values)
         ax.set_title(f"{variable_name}\n{timestamp}")
-        xa_da.isel(time=i).plot(ax=ax, add_colorbar=True, cmap="viridis")
+        if i > 1:
+            cb = False
+        xa_da.isel(time=i).plot(ax=ax, add_colorbar=cb, cmap="viridis")
 
     if start_end_freq:
         # temporally resample DataArray
@@ -290,7 +292,7 @@ def generate_variable_timeseries_gif(
         repeat=True,
         blit=False,
     )
-
+    # TODO: put in different function
     # save animation as a gif
     writergif = animation.PillowWriter(fps=30)
     # if destination directory not provided, save in current working directory
