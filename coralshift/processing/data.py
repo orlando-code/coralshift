@@ -622,7 +622,7 @@ def xa_ds_to_3d_numpy(
         vals = ds_stacked[var].values
         array_list.append(vals)
 
-    # move location to first column. New shape: grid_cell_val x var x time
+    # swap first and third columns. New shape: grid_cell_val x var x time
     return np.moveaxis(np.array(array_list), 2, 0)
 
 
