@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
