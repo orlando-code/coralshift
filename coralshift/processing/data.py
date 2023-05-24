@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import xarray as xa
 import rioxarray as rio
 import numpy as np
