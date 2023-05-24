@@ -1,0 +1,5 @@
+name: o-builds
+channels:
+  - conda-forge
+  - defaults
+prefix: /Users/orlandotimmerman/miniconda3/envs/o-builds
