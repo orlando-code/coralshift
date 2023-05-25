@@ -764,3 +764,31 @@ def buffer_nans(array, size=1):
         array, nan_sweeper, size=size, mode="constant", cval=np.nan
     )
     return buffered_array
+
+
+def filter_out_nans(X_with_nans, y_with_nans):
+    # must be in shape (num_samples, num_params, seq_length)
+
+    # filter out columns that contain entirely NaN values
+    # boolean mask indicating which columns to keep
+    col_mask = ~np.all(np.isnan(X_with_nans), axis=(0, 2))
+    # keep only the columns that don't contain entirely NaN values
+    masked_cols = X_with_nans[:, col_mask, :]
+
+    # filter out all rows which contain any NaN values
+    # boolean mask indicating which rows to keep
+    row_mask = ~np.any(np.isnan(masked_cols), axis=1)
+    # keep only the rows that don't contain any NaN values
+    masked_cols_rows = masked_cols[row_mask[:, 0], :, :]
+
+    # filter out all depths which contain any NaN values
+    # boolean mask indicating which depths to keep
+    depth_mask = ~np.any(np.isnan(masked_cols_rows), axis=(0, 1))
+    # keep only the depths that don't contain any NaN values
+    X = masked_cols_rows[:, :, depth_mask]
+    # swap axes so shape (num_samples, seq_length, num_params)
+    X = np.swapaxes(X, 1, 2)
+
+    y = y_with_nans[row_mask[:, 0]]
+
+    return X, y
