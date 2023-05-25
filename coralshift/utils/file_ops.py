@@ -172,7 +172,11 @@ def load_merge_nc_files(
         return xa.open_dataset(files[0])
     # combine nc files by time
     ds = xa.open_mfdataset(
-        files, decode_cf=False, concat_dim=concat_dim, combine="nested"
+        files,
+        decode_cf=False,
+        concat_dim=concat_dim,
+        combine="nested",
+        coords="minimal",
     )
     return xa.decode_cf(ds).sortby("time", ascending=True)
 
