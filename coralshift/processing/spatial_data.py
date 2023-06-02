@@ -121,7 +121,7 @@ def process_xa_arrays_in_dict(
     print(
         f"Processing xa_arrays in dictionary. Dropping {coords_to_drop}, renaming {coords_to_rename.keys()}."
     )
-    for name, xa_array in tqdm(xa_array_dict.items()):
+    for name, xa_array in tqdm(xa_array_dict.items(), desc="processing xarray: "):
         processed_dict[name] = process_xa_array(
             xa_array, coords_to_drop, coords_to_rename, resolution, shape, verbose=False
         )
@@ -322,7 +322,7 @@ def upsample_dict_of_xa_arrays(
     """
     upsampled_dict = {}
     print(f"Upsampling {xa_dict.keys()} from dictionary to {resolution}{shape}.")
-    for name, array in tqdm(xa_dict.items()):
+    for name, array in tqdm(xa_dict.items(), desc="processing xarray dict: "):
         upsampled_name = "_".join(
             (file_ops.remove_suffix(name), "upsampled", "{0:.3g}".format(resolution))
         )
@@ -692,7 +692,9 @@ def xa_ds_to_3d_numpy(
 
     array_list = []
     variables_to_read = filter_strings(list(xa_ds.variables), exclude_vars)
-    for var in tqdm(variables_to_read):
+    for var in tqdm(
+        variables_to_read, desc="converting xarray Dataset to numpy arrays: "
+    ):
         vals = ds_stacked[var].values
         array_list.append(vals)
 
@@ -1069,3 +1071,79 @@ def normalise_3d_array(array):
 
     # Normalize the values for each variable between 0 and 1
     return np.divide((array - min_vals), (max_vals - min_vals))
+
+
+def reformat_prediction(xa_ds, sample, predicted, lat_lon_vals_dict):
+    reshaped_pred = reshape_from_ds_sample(sample, predicted)
+    return assign_prediction_to_ds(xa_ds, reshaped_pred, lat_lon_vals_dict)
+
+
+def spatially_buffer_timeseries(
+    xa_ds,
+    buffer_size=1,
+    exclude_vars: list = ["spatial_ref", "coral_algae_1-12_degree"],
+):
+    data_vars = list(xa_ds.data_vars)
+    filtered_vars = filter_strings(data_vars, exclude_vars)
+
+    buffered_ds = xa.Dataset()
+    for data_var in filtered_vars:
+        buffered = xa.apply_ufunc(
+            buffer_nans,
+            xa_ds[data_var],
+            input_core_dims=[[]],
+            output_core_dims=[[]],
+            kwargs={"size": buffer_size},
+        )
+        buffered_ds[data_var] = buffered
+
+    return buffered_ds
+
+
+def find_chunks_with_percentage(
+    array, range_min, range_max, chunk_size, threshold_percent
+):
+    rows, cols = array.shape
+    chunk_rows = np.arange(0, rows - chunk_size, chunk_size)
+    chunk_cols = np.arange(0, cols - chunk_size, chunk_size)
+
+    chunk_coords = [
+        (
+            (start_row, start_col),
+            (start_row + chunk_size - 1, start_col + chunk_size - 1),
+        )
+        for start_row in chunk_rows
+        for start_col in chunk_cols
+        if np.mean(
+            np.logical_and(
+                array[
+                    start_row : start_row + chunk_size,  # noqa
+                    start_col : start_col + chunk_size,  # noqa
+                ]
+                >= range_min,
+                array[
+                    start_row : start_row + chunk_size,  # noqa
+                    start_col : start_col + chunk_size,  # noqa
+                ]
+                <= range_max,
+            )
+        )
+        * 100
+        > threshold_percent
+    ]
+
+    return chunk_coords
+
+
+def index_to_coord(xa_da, index):
+    lon = xa_da.longitude.values[index[1]]
+    lat = xa_da.latitude.values[index[0]]
+    return lon, lat
+
+
+def delta_index_to_distance(xa_da, start_index, end_index):
+    start_inds = index_to_coord(xa_da, start_index)
+    end_inds = index_to_coord(xa_da, end_index)
+    diffs = np.subtract(end_inds, start_inds)
+    delta_y, delta_x = diffs[0], diffs[1]
+    return delta_y, delta_x
