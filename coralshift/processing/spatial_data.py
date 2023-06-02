@@ -1109,8 +1109,10 @@ def find_chunks_with_percentage(
 
     chunk_coords = [
         (
-            (start_row, start_col),
-            (start_row + chunk_size - 1, start_col + chunk_size - 1),
+            # (start_row, start_col),
+            # (start_row + chunk_size - 1, start_col + chunk_size - 1),
+            (start_row, start_row + chunk_size - 1),
+            (start_col, start_col + chunk_size - 1),
         )
         for start_row in chunk_rows
         for start_col in chunk_cols
