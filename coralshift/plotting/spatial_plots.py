@@ -58,7 +58,7 @@ def plot_DEM(
 
     im = region_array.plot(
         ax=ax,
-        cmap="BrBG",
+        cmap=cmap,
         # vmin=float(region_array.min().values), vmax=float(region_array.max().values),
         vmin=vmin,
         vmax=vmax,
@@ -313,6 +313,21 @@ def generate_variable_timeseries_gif(
     return ani
 
 
+def plot_var(
+    xa_da: xa.DataArray,
+    figsize: tuple[float, float] = (10, 6),
+    variable_dict: dict = None,
+    coastlines: bool = True,
+):
+    fig, ax = plt.subplots(
+        figsize=figsize,
+        subplot_kw={"projection": ccrs.PlateCarree()},
+    )
+    format_xa_array_spatial_plot(ax, xa_da, coastlines=coastlines)
+
+    return fig, ax
+
+
 def plot_var_at_time(
     xa_da: xa.DataArray,
     time: str = None,
@@ -341,6 +356,8 @@ def plot_var_at_time(
         time = xa_da.time.max().values
 
     xa_da.sel(time=time).plot(ax=ax)
+
+    return fig, ax
 
 
 def plot_vars_at_time(
