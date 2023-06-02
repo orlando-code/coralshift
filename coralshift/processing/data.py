@@ -14,7 +14,26 @@ from pathlib import Path
 from coralshift.utils import file_ops
 
 
-def upsample_xarray(xa_array: xa.DataArray, factors: dict) -> xa.DataArray:
+def upsample_xarray_to_target(
+    xa_array: xa.DataArray | xa.Dataset, target_resolution: float
+) -> xa.Dataset:
+    # N.B. not perfect at getting starts/ends matching up
+    # TODO: enable flexible upsampling by time also
+    lat_lims = xarray_coord_limits(xa_array, "latitude")
+    lon_lims = xarray_coord_limits(xa_array, "longitude")
+    # get current degree resolution
+    lat_scale = int((xa_array.latitude.size / np.diff(lat_lims)) * target_resolution)
+    lon_scale = int((xa_array.longitude.size / np.diff(lon_lims)) * target_resolution)
+
+    # Coarsen the dataset
+    return xa_array.coarsen(
+        latitude=lat_scale, longitude=lon_scale, boundary="pad"
+    ).mean()
+
+
+def upsample_xarray_by_factor(
+    xa_array: xa.DataArray | xa.Dataset, factors: dict
+) -> xa.DataArray:
     """Upsamples (decreases resolution) of an xarray.DataArray object by a given factor along each dimension.
 
     Parameters
@@ -552,9 +571,31 @@ def check_nc_exists_generate_raster_xa(
         return xa.open_dataset(filepath)
 
 
+def degrees_to_distances(
+    target_lat_res: float,
+    target_lon_res: float = None,
+    approx_lat: float = -18,
+    approx_lon: float = 145,
+) -> tuple[float]:
+    """TODO: docstring"""
+    start_coord = (approx_lat, approx_lon)
+    lat_end_coord = (approx_lat + target_lat_res, approx_lon)
+    # if both lat and lon resolutions specified
+    if target_lon_res:
+        lon_end_coord = (approx_lat, approx_lon + target_lon_res)
+    else:
+        lon_end_coord = (approx_lat, approx_lon + target_lat_res)
+
+    return (
+        haversine.haversine(start_coord, lat_end_coord, unit=haversine.Unit.METERS),
+        haversine.haversine(start_coord, lon_end_coord, unit=haversine.Unit.METERS),
+    )
+
+
 def distance_to_degree(
     distance: float, approx_lat: float = -18, approx_lon: float = 145
 ) -> float:
+    # TODO: enable specification of distance in different orthogonal directions
     """Converts a distance in meters to the corresponding distance in degrees, given an approximate location on Earth.
 
     Parameters
