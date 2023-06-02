@@ -1147,3 +1147,18 @@ def delta_index_to_distance(xa_da, start_index, end_index):
     diffs = np.subtract(end_inds, start_inds)
     delta_y, delta_x = diffs[0], diffs[1]
     return delta_y, delta_x
+
+
+def encode_nans_one_hot(array: np.ndarray, all_nan_dims: int = 1) -> np.ndarray:
+    """One-hot encode nan values in 3d array."""
+    # TODO: enable all nan dims
+    nans_array = exclude_all_nan_dim(array, dim=all_nan_dims)
+    land_mask = np.all(np.isnan(nans_array), (1, 2))
+    # TODO: not sure about this
+    reshaped_column = np.where(land_mask, 1, 0)
+    repeated_column = np.reshape(
+        np.repeat(reshaped_column, nans_array.shape[2], axis=1),
+        (nans_array.shape[0], 1, nans_array.shape[2]),
+    )
+
+    return np.concatenate([nans_array, repeated_column], axis=1)
