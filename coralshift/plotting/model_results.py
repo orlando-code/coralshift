@@ -65,7 +65,7 @@ def plot_spatial_confusion(
     confusion_values, vals_dict = spatial_confusion_matrix_da(
         xa_ds[predicted_var], xa_ds[ground_truth_var]
     )
-    xa_ds["comparison"] = (("latitude", "longitude"), confusion_values)
+    xa_ds["comparison"] = confusion_values
 
     # from Wes Anderson: https://github.com/karthik/wesanderson/blob/master/R/colors.R
     cmap = ["#3B9AB2", "#78B7C5", "#EBCC2A", "#E1AF00", "#F21A00"]
