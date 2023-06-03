@@ -944,50 +944,56 @@ def sample_spatial_batch(
 
 def process_xa_ds_for_ml(
     xa_ds: xa.Dataset,
-    feature_vars: list[str],
+    feature_vars: list[str] = None,
     gt_var: str = None,
     normalise: bool = True,
     onehot: bool = True,
-):
-    """Process xarray Dataset for machine learning
+) -> tuple[np.ndarray, ...]:
+    """
+    Process xarray Dataset for machine learning.
 
     Parameters
     ----------
-    xa_ds (xa.Dataset): The input xarray dataset.
-    lat_lon_starts (tuple): The starting latitude and longitude indices for sampling the patch.
-    coord_range (tuple): The latitude and longitude range for sampling the patch.
-    feature_vars (list[str], optional): List of variable names to be used as features.
-        Default is ["bottomT", "so", "mlotst", "uo", "vo", "zos", "thetao"].
-    gt_var (str, optional): The variable name for the ground truth. Default is "coral_algae_1-12_degree".
-    normalise (bool, optional): Flag indicating whether to normalize each variable between 0 and 1. Default is True.
-    onehot (bool, optional): Flag indicating whether to encode NaN values using the one-hot method. Default is True.
+    xa_ds : xa.Dataset
+        The input xarray dataset.
+    feature_vars : list[str], optional
+        List of variable names to be used as features. Default is None.
+    gt_var : str, optional
+        The variable name for the ground truth. Default is None.
+    normalise : bool, optional
+        Flag indicating whether to normalize each variable between 0 and 1. Default is True.
+    onehot : bool, optional
+        Flag indicating whether to encode NaN values using the one-hot method. Default is True.
 
     Returns
     -------
-    tuple: A tuple containing the feature array and ground truth array
+    tuple[np.ndarray, ...]
+        A tuple containing the feature array and ground truth array.
     """
-    # assign features and convert to lat, lon to latxlon column
-    Xs = spatial_array_to_column(xa_d_to_np_array(xa_ds[feature_vars]))
+    to_return = []
+    if feature_vars is not None:
+        # assign features and convert to lat, lon to latxlon column
+        Xs = spatial_array_to_column(xa_d_to_np_array(xa_ds[feature_vars]))
 
-    # if normalise = True, normalise each variable between 0 and 1
-    if normalise:
-        Xs = normalise_3d_array(Xs)
-    # remove columns containing only nans. TODO: enable removal of all nan dims
-    nans_array = exclude_all_nan_dim(Xs, dim=1)
+        # if normalise = True, normalise each variable between 0 and 1
+        if normalise:
+            Xs = normalise_3d_array(Xs)
+        # remove columns containing only nans. TODO: enable removal of all nan dims
+        nans_array = exclude_all_nan_dim(Xs, dim=1)
 
-    # if encoding nans using onehot method
-    if onehot:
-        Xs = encode_nans_one_hot(nans_array)
-    Xs = naive_nan_replacement(Xs)
+        # if encoding nans using onehot method
+        if onehot:
+            Xs = encode_nans_one_hot(nans_array)
+        to_return.append(naive_nan_replacement(Xs))
 
     if gt_var:
         # assign ground truth and convert to column vector
         ys = spatial_array_to_column(xa_d_to_np_array(xa_ds[gt_var]))
         # take single time slice (since broadcasted back through time)
         ys = ys[:, 0]
-        return Xs, ys
+        to_return.append(ys)
 
-    return Xs
+    return tuple(to_return)
 
 
 def generate_patch(
@@ -1104,7 +1110,7 @@ def xa_d_to_np_array(xa_d: xa.Dataset | xa.DataArray) -> np.ndarray:
     elif utils.is_type_or_list_of_type(xa_d, xa.Dataset):
         # transpose coordinates for consistency
         ds = xa_d.transpose("latitude", "longitude", "time")
-        # send to array
+        # send to array N.B. slow for larger datasets
         array = ds.to_array().values
         # reorder dimensions to (lat x lon x var x time)
         return np.moveaxis(array, 0, 3)
