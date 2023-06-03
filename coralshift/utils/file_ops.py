@@ -35,7 +35,7 @@ def check_file_exists(
     suffix: str = None,
 ) -> bool:
     """Check if a file with the specified filename and optional suffix exists in the given directory.
-    # TODO: think this won't behave as inteded: more testing and comments necessary
+    # TODO: potentially more checking required
     Parameters
     ----------
     dir_path (Path | str): Path to the directory where the file should be located.
@@ -46,11 +46,10 @@ def check_file_exists(
     -------
     bool: True if the file exists, False otherwise.
     """
-    # if filepath argument not provided, try to create
-    if filepath:
+    # if filepath argument not provided, try to create from directory path and filename
+    if not filepath:
         filepath = Path(dir_path) / filename
-    else:
-        filepath = Path(dir_path) / filename
+    # if suffix argument provided (likely in conjunction with a "filename", append)
     if suffix:
         filepath = Path(filepath).with_suffix(pad_suffix(suffix))
     return filepath.is_file()
