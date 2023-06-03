@@ -14,7 +14,7 @@ import cartopy.mpl.ticker as cticker
 import numpy as np
 from tqdm import tqdm
 
-from coralshift.processing import data
+from coralshift.processing import spatial_data
 from coralshift.utils import file_ops
 
 
@@ -194,7 +194,7 @@ def format_xa_array_spatial_plot(
     ax.set_title(variable_name)
 
     # determine minimum and maximum coordinates
-    coord_lims_dict = data.dict_xarray_coord_limits(xa_da)
+    coord_lims_dict = spatial_data.dict_xarray_coord_limits(xa_da)
     lat_lims, lon_lims = coord_lims_dict["latitude"], coord_lims_dict["longitude"]
 
     # set longitude labels
@@ -264,7 +264,7 @@ def generate_variable_timeseries_gif(
         TODO: add single colorbar (could delete previous one each time, somehow)
         """
         cb = True
-        timestamp = data.date_from_dt(xa_da.time[i].values)
+        timestamp = spatial_data.date_from_dt(xa_da.time[i].values)
         ax.set_title(f"{variable_name}\n{timestamp}")
         if i > 1:
             cb = False
@@ -272,12 +272,12 @@ def generate_variable_timeseries_gif(
 
     if start_end_freq:
         # temporally resample DataArray
-        xa_da, freq = data.resample_dataarray(xa_da, start_end_freq)
+        xa_da, freq = spatial_data.resample_dataarray(xa_da, start_end_freq)
 
     # generate gif_name
     (start, end) = (
-        data.date_from_dt(xa_da.time.min().values),
-        data.date_from_dt(xa_da.time.max().values),
+        spatial_data.date_from_dt(xa_da.time.min().values),
+        spatial_data.date_from_dt(xa_da.time.max().values),
     )
     gif_name = f"{variable_name}_{start}_{end}"
 
@@ -375,7 +375,7 @@ def plot_vars_at_time(
     time (str, defaults to 2020-12-16T12:00:00): The time at which variables are plotted.
     TODO: add in satellite/ground values
     """
-    non_empty_vars = data.return_non_empty_vars(xa_ds)
+    non_empty_vars = spatial_data.return_non_empty_vars(xa_ds)
     blank_list = list(set(list(xa_ds.data_vars)) - set(non_empty_vars))
     if len(blank_list) > 0:
         print(
