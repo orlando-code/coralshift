@@ -1075,13 +1075,13 @@ def xa_d_to_np_array(xa_d: xa.Dataset | xa.DataArray) -> np.ndarray:
     """
     # if xa.DataArray
     if utils.is_type_or_list_of_type(xa_d, xa.DataArray):
-        ds = xa_d.transpose("latitude", "longitude")
+        ds = xa_d.transpose("latitude", "longitude", ...)
         return np.array(ds.values)
 
     # else if dataset
     elif utils.is_type_or_list_of_type(xa_d, xa.Dataset):
         # transpose coordinates for consistency
-        ds = xa_d.transpose("latitude", "longitude", "time")
+        ds = xa_d.transpose("latitude", "longitude", ...)
         # send to array N.B. slow for larger datasets
         array = ds.to_array().values
         # reorder dimensions to (lat x lon x var x time)
