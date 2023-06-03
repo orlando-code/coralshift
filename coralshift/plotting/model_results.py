@@ -1,5 +1,4 @@
 import seaborn as sns
-import matplotlib.pyplot as plt
 import xarray as xa
 
 
@@ -48,7 +47,7 @@ def spatial_confusion_matrix_da(
 
 
 def plot_spatial_confusion(
-    xa_ds: xa.xa_ds, ground_truth_var: str, predicted_var: str
+    xa_ds: xa.Dataset, ground_truth_var: str, predicted_var: str
 ) -> xa.Dataset:
     """Plot a spatial confusion matrix based on the predicted and ground truth variables in the xarray dataset.
 
