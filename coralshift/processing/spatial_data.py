@@ -942,6 +942,58 @@ def sample_spatial_batch(
     }
 
 
+def xa_ds_to_X_y(
+    xa_ds: xa.Dataset,
+    feature_vars: list[str],
+    gt_var: str,
+    normalise: bool = True,
+    onehot: bool = True,
+):
+    """Process xarray Dataset for machine learning
+
+    Parameters
+    ----------
+    xa_ds (xa.Dataset): The input xarray dataset.
+    lat_lon_starts (tuple): The starting latitude and longitude indices for sampling the patch.
+    coord_range (tuple): The latitude and longitude range for sampling the patch.
+    feature_vars (list[str], optional): List of variable names to be used as features.
+        Default is ["bottomT", "so", "mlotst", "uo", "vo", "zos", "thetao"].
+    gt_var (str, optional): The variable name for the ground truth. Default is "coral_algae_1-12_degree".
+    normalise (bool, optional): Flag indicating whether to normalize each variable between 0 and 1. Default is True.
+    onehot (bool, optional): Flag indicating whether to encode NaN values using the one-hot method. Default is True.
+
+    Returns
+    -------
+    tuple: A tuple containing the feature array and ground truth array
+    """
+    # assign features
+    Xs = xa_d_to_np_array(xa_ds[feature_vars])
+    # assign ground truth
+    ys = xa_d_to_np_array(xa_ds[gt_var])
+
+    # convert to column vectors
+    Xs, ys = spatial_array_to_column(Xs), spatial_array_to_column(ys)
+
+    # if normalise = True, normalise each variable between 0 and 1
+    if normalise:
+        Xs = normalise_3d_array(Xs)
+
+    # remove columns containing only nans. TODO: enable all nan dims
+    nans_array = exclude_all_nan_dim(Xs, dim=1)
+
+    # if encoding nans using onehot method
+    if onehot:
+        Xs = encode_nans_one_hot(nans_array)
+    Xs = naive_nan_replacement(Xs)
+
+    # this shouldn't ever be necessary
+    ys = naive_nan_replacement(ys)
+    # take single time slice (since broadcasted back through time)
+    ys = ys[:, 0]
+
+    return Xs, ys
+
+
 def generate_patch(
     xa_ds,
     lat_lon_starts,
@@ -971,30 +1023,38 @@ def generate_patch(
     subsample, lat_lon_vals_dict = sample_spatial_batch(
         xa_ds, lat_lon_starts=lat_lon_starts, coord_range=coord_range
     )
-    # assign features
-    Xs = xa_d_to_np_array(subsample[feature_vars])
-    # assign ground truth
-    ys = xa_d_to_np_array(subsample[gt_var])
 
-    # convert to column vectors
-    Xs, ys = spatial_array_to_column(Xs), spatial_array_to_column(ys)
+    Xs, ys = xa_ds_to_X_y(
+        xa_ds=subsample,
+        feature_vars=feature_vars,
+        gt_var=gt_var,
+        normalise=normalise,
+        onehot=onehot,
+    )
+    # # assign features
+    # Xs = xa_d_to_np_array(subsample[feature_vars])
+    # # assign ground truth
+    # ys = xa_d_to_np_array(subsample[gt_var])
 
-    # if normalise = True, normalise each variable between 0 and 1
-    if normalise:
-        Xs = normalise_3d_array(Xs)
+    # # convert to column vectors
+    # Xs, ys = spatial_array_to_column(Xs), spatial_array_to_column(ys)
 
-    # remove columns containing only nans. TODO: enable all nan dims
-    nans_array = exclude_all_nan_dim(Xs, dim=1)
+    # # if normalise = True, normalise each variable between 0 and 1
+    # if normalise:
+    #     Xs = normalise_3d_array(Xs)
 
-    # if encoding nans using onehot method
-    if onehot:
-        Xs = encode_nans_one_hot(nans_array)
-    Xs = naive_nan_replacement(Xs)
+    # # remove columns containing only nans. TODO: enable all nan dims
+    # nans_array = exclude_all_nan_dim(Xs, dim=1)
 
-    # this shouldn't ever be necessary
-    ys = naive_nan_replacement(ys)
-    # take single time slice (since broadcasted back through time)
-    ys = ys[:, 0]
+    # # if encoding nans using onehot method
+    # if onehot:
+    #     Xs = encode_nans_one_hot(nans_array)
+    # Xs = naive_nan_replacement(Xs)
+
+    # # this shouldn't ever be necessary
+    # ys = naive_nan_replacement(ys)
+    # # take single time slice (since broadcasted back through time)
+    # ys = ys[:, 0]
 
     return Xs, ys, subsample, lat_lon_vals_dict
 
