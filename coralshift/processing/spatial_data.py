@@ -1007,7 +1007,6 @@ def generate_patch(
     onehot: bool = True,
 ):
     """Generate a patch for training or evaluation.
-    # TODO: aadd in window argument
     Parameters
     ----------
     xa_ds (xa.Dataset): The input xarray dataset.
@@ -1037,30 +1036,6 @@ def generate_patch(
         normalise=normalise,
         onehot=onehot,
     )
-    # # assign features
-    # Xs = xa_d_to_np_array(subsample[feature_vars])
-    # # assign ground truth
-    # ys = xa_d_to_np_array(subsample[gt_var])
-
-    # # convert to column vectors
-    # Xs, ys = spatial_array_to_column(Xs), spatial_array_to_column(ys)
-
-    # # if normalise = True, normalise each variable between 0 and 1
-    # if normalise:
-    #     Xs = normalise_3d_array(Xs)
-
-    # # remove columns containing only nans. TODO: enable all nan dims
-    # nans_array = exclude_all_nan_dim(Xs, dim=1)
-
-    # # if encoding nans using onehot method
-    # if onehot:
-    #     Xs = encode_nans_one_hot(nans_array)
-    # Xs = naive_nan_replacement(Xs)
-
-    # # this shouldn't ever be necessary
-    # ys = naive_nan_replacement(ys)
-    # # take single time slice (since broadcasted back through time)
-    # ys = ys[:, 0]
 
     return output, subsample, lat_lon_vals_dict
 
