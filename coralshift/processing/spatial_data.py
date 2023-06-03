@@ -893,10 +893,10 @@ def sample_spatial_batch(
 
     Notes
     -----
-    - The function selects a subset of the input dataset based on the provided latitude, longitude indices, and window
-        dimensions.
+    - The function selects a subsample of the input dataset based on the provided latitude, longitude indices, and
+    window dimensions.
     - If a coord_range is provided, it is used to compute the latitude and longitude indices of the spatial window.
-    - The function returns the selected subset as a NumPy array.
+    - The function returns the selected subsample as a NumPy array.
 
     Example
     -------
@@ -908,10 +908,15 @@ def sample_spatial_batch(
     variables = ['var1', 'var2', 'var3']
     spatial_batch = sample_spatial_batch(dataset, lat_lon_starts, window_dims, coord_range, variables)
     """
+    # if selection of variables specified
+    if variables is not None:
+        xa_ds = xa_ds[variables]
+
     # N.B. have to be careful when providing coordinate ranges for areas with negative coords. TODO: make universal
     lat_start, lon_start = lat_lon_starts[0], lat_lon_starts[1]
+
     if not coord_range:
-        subset = xa_ds.isel(
+        subsample = xa_ds.isel(
             {
                 "latitude": slice(lat_start, window_dims[0]),
                 "longitude": slice(lon_start, window_dims[1]),
@@ -919,84 +924,105 @@ def sample_spatial_batch(
         )
     else:
         lat_cells, lon_cells = coord_range[0], coord_range[1]
-        subset = xa_ds.sel(
+        subsample = xa_ds.sel(
             {
                 "latitude": slice(lat_start, lat_start + lat_cells),
                 "longitude": slice(lon_start, lon_start + lon_cells),
             }
         )
 
-    lat_slice = subset["latitude"].values
-    lon_slice = subset["longitude"].values
-    time_slice = subset["time"].values
+    lat_slice = subsample["latitude"].values
+    lon_slice = subsample["longitude"].values
+    time_slice = subsample["time"].values
 
-    return subset, {"latitude": lat_slice, "longitude": lon_slice, "time": time_slice}
+    return subsample, {
+        "latitude": lat_slice,
+        "longitude": lon_slice,
+        "time": time_slice,
+    }
 
 
 def generate_patch(
     xa_ds,
     lat_lon_starts,
     coord_range,
-    featuvars: list[str] = ["bottomT", "so", "mlotst", "uo", "vo", "zos", "thetao"],
+    feature_vars: list[str] = ["bottomT", "so", "mlotst", "uo", "vo", "zos", "thetao"],
     gt_var: str = "coral_algae_1-12_degree",
     normalise: bool = True,
     onehot: bool = True,
 ):
-    # subsample, lat_lons_vals_dict = sample_spatial_batch(
-    #     xa_ds, lat_lon_starts=lat_lon_starts, coord_range=coord_range
-    # )
+    """Generate a patch for training or evaluation.
 
-    # return spatial sample of xa_ds, along with info about the min and max lat/lon values
-    Xs, lat_lons_vals_dict, subsample = subsample_to_array(
-        xa_ds,
-        lat_lon_starts=lat_lon_starts,
-        coord_range=coord_range,
-        variables=vars,
+    Parameters
+    ----------
+    xa_ds (xa.Dataset): The input xarray dataset.
+    lat_lon_starts (tuple): The starting latitude and longitude indices for sampling the patch.
+    coord_range (tuple): The latitude and longitude range for sampling the patch.
+    feature_vars (list[str], optional): List of variable names to be used as features.
+        Default is ["bottomT", "so", "mlotst", "uo", "vo", "zos", "thetao"].
+    gt_var (str, optional): The variable name for the ground truth. Default is "coral_algae_1-12_degree".
+    normalise (bool, optional): Flag indicating whether to normalize each variable between 0 and 1. Default is True.
+    onehot (bool, optional): Flag indicating whether to encode NaN values using the one-hot method. Default is True.
+
+    Returns
+    -------
+    tuple: A tuple containing the feature array, ground truth array, subsampled dataset, and latitude/longitude values.
+    """
+    subsample, lat_lon_vals_dict = sample_spatial_batch(
+        xa_ds, lat_lon_starts=lat_lon_starts, coord_range=coord_range
     )
+    # assign features
+    Xs = xa_d_to_np_array(subsample[feature_vars])
+    # assign ground truth
+    ys = xa_d_to_np_array(subsample[gt_var])
+
+    # convert to column vectors
+    Xs, ys = spatial_array_to_column(Xs), spatial_array_to_column(ys)
+
     # if normalise = True, normalise each variable between 0 and 1
     if normalise:
         Xs = normalise_3d_array(Xs)
 
-    if onehot:
-        Xs = encode_nans_one_hot(Xs)
-    else:
-        Xs = naive_X_nan_replacement(Xs)
-    # assign ground truth
-    ys = xa_ds_to_3d_numpy(subsample[gt_var])
-    # ys, _, _ = subsample_to_array(
-    #     xa_ds,
-    #     lat_lon_starts,
-    #     coord_range=coord_range,
-    #     variables=[gt_var],
-    # )
-    ys = naive_y_nan_replacement(ys)
-    ys = ys[:, :, 0]
+    # remove columns containing only nans. TODO: enable all nan dims
+    nans_array = exclude_all_nan_dim(Xs, dim=1)
 
-    return Xs, ys, subsample, lat_lons_vals_dict
+    # if encoding nans using onehot method
+    if onehot:
+        Xs = encode_nans_one_hot(nans_array)
+    Xs = naive_nan_replacement(Xs)
+
+    # this shouldn't ever be necessary
+    ys = naive_nan_replacement(ys)
+    # take single time slice (since broadcasted back through time)
+    ys = ys[:, 0]
+
+    return Xs, ys, subsample, lat_lon_vals_dict
 
 
 def subsample_to_array(
-    xa_ds,
-    lat_lon_starts,
-    coord_range,
-    variables: list[str] = [
-        "bottomT",
-        "so",
-        "mlotst",
-        "usi",
-        "sithick",
-        "uo",
-        "vo",
-        "siconc",
-        "vsi",
-        "zos",
-        "thetao",
-    ],
-):
+    xa_ds: xa.Dataset | xa.DataArray,
+    lat_lon_starts: tuple,
+    coord_range: tuple,
+    variables: list[str],
+) -> tuple:
+    """
+    Subsample specific variables from an xarray dataset and convert them to a NumPy array.
+
+    Parameters
+    ----------
+    xa_ds (xa.Dataset): The input xarray dataset.
+    lat_lon_starts (tuple): The starting latitude and longitude indices for subsampling.
+    coord_range (tuple): The latitude and longitude range for subsampling.
+    variables (list[str]): List of variable names to subsample and convert.
+
+    Returns
+    -------
+    tuple: A tuple containing the subsampled array, subsampled dataset, and latitude/longitude values.
+    """
     subsample, lat_lon_vals_dict = sample_spatial_batch(
         xa_ds[variables], lat_lon_starts=lat_lon_starts, coord_range=coord_range
     )
-    return xa_ds_to_3d_numpy(subsample), subsample, lat_lon_vals_dict
+    return xa_d_to_np_array(subsample), subsample, lat_lon_vals_dict
 
 
 def xa_d_to_np_array(xa_d: xa.Dataset | xa.DataArray) -> np.ndarray:
@@ -1015,21 +1041,64 @@ def xa_d_to_np_array(xa_d: xa.Dataset | xa.DataArray) -> np.ndarray:
     TypeError: If the provided object is neither an xarray Dataset nor an xarray DataArray.
     """
     # if xa.DataArray
-    if check_da(xa_d):
+    if utils.is_type_or_list_of_type(xa_d, xa.DataArray):
         return np.array(xa_d.values)
 
     # else if dataset
-    elif check_ds(xa_d):
+    elif utils.is_type_or_list_of_type(xa_d, xa.Dataset):
         # transpose coordinates for consistency
         ds = xa_d.transpose("latitude", "longitude", "time")
         # send to array
         array = ds.to_array().values
         # reorder dimensions to (lat x lon x var x time)
-        return np.moveaxis(array, 0, 2)
+        return np.moveaxis(array, 0, 3)
     else:
         return TypeError(
-            "object provideed was neither an xarray Dataset nor xarray DataArray."
+            "Object provided as argument was neither an xarray Dataset nor xarray DataArray."
         )
+
+
+def naive_nan_replacement(array: np.ndarray, replacement: float = 0) -> np.ndarray:
+    """Replace NaN values in a NumPy array with a specified replacement value.
+
+    Parameters
+    ----------
+    array (np.ndarray): The input array.
+    replacement (float, optional): The value to replace NaNs with. Default is 0.
+
+    Returns
+    -------
+    np.ndarray: The array with NaN values replaced.
+    """
+    # replace nans with "replacement"
+    array[np.isnan(array)] = 0
+    return array
+
+
+def exclude_all_nan_dim(array, dim):
+    """Exclude columns from a 2D or higher-dimensional array that contain only NaN values.
+
+    Parameters
+    ----------
+    array (np.ndarray): The input array.
+    dim (int): The dimension along which to check for NaN values (e.g., columns).
+
+    Returns
+    -------
+    np.ndarray: The array with columns that contain only NaN values removed.
+    """
+    # TODO: check performance. Currently only able to hand columns (see generalisation comment)
+    # filter out columns that contain entirely NaN values
+    num_dims = len(array.shape)
+    axes = tuple(set(np.arange(0, num_dims)) - {dim})
+
+    dim_mask = ~np.all(
+        np.isnan(array), axis=axes
+    )  # boolean mask indicating which columns to keep
+    # TODO: need to generalise this
+    return array[
+        :, dim_mask, :
+    ]  # keep only the columns that don't contain entirely NaN values
 
 
 def spatial_array_to_column(array: np.ndarray) -> np.ndarray:
@@ -1045,48 +1114,14 @@ def spatial_array_to_column(array: np.ndarray) -> np.ndarray:
 
     Examples
     --------
-    >>> array = np.random.rand(lat, lon, var, ...)
-    >>> column_vector = spatial_array_to_column(array)
-    >>> print(column_vector.shape)
+    array = np.random.rand(lat, lon, var, ...)
+    column_vector = spatial_array_to_column(array)
+    print(column_vector.shape)
     (lat x lon, var, ...)
     """
     array_shape = array.shape
     new_shape = (array_shape[0] * array_shape[1], *array.shape[2:])
     return np.reshape(array, new_shape)
-
-
-# def naive_X_nan_replacement(array):
-#     # filter out columns that contain entirely NaN values
-#     col_mask = ~np.all(
-#         np.isnan(array), axis=(0, 2)
-#     )  # boolean mask indicating which columns to keep
-#     sub_X = array[
-#         :, col_mask, :
-#     ]  # keep only the columns that don't contain entirely NaN values
-#     sub_X = np.moveaxis(np.array(sub_X), 2, 1)
-#     # replace nans with large negative
-#     sub_X[np.isnan(sub_X)] = 0
-#     return sub_X
-
-
-# def naive_y_nan_replacement(array):
-#     array[np.isnan(array)] = 0
-#     return array
-
-
-def exclude_all_nan_dim(array, dim):
-    # TODO: check performancee
-    # filter out columns that contain entirely NaN values
-    num_dims = len(array.shape)
-    axes = tuple(set(np.arange(0, num_dims)) - {dim})
-
-    dim_mask = ~np.all(
-        np.isnan(array), axis=axes
-    )  # boolean mask indicating which columns to keep
-    # TODO: need to generalise this
-    return array[
-        :, dim_mask, :
-    ]  # keep only the columns that don't contain entirely NaN values
 
 
 # def exclude_all_nan_dim(array, dim):
@@ -1226,15 +1261,25 @@ def delta_index_to_distance(xa_da, start_index, end_index):
 
 
 def encode_nans_one_hot(array: np.ndarray, all_nan_dims: int = 1) -> np.ndarray:
-    """One-hot encode nan values in 3d array."""
-    # TODO: enable all nan dims
-    nans_array = exclude_all_nan_dim(array, dim=all_nan_dims)
-    land_mask = np.all(np.isnan(nans_array), (1, 2))
-    # TODO: not sure about this
-    reshaped_column = np.where(land_mask, 1, 0)
-    repeated_column = np.reshape(
-        np.repeat(reshaped_column, nans_array.shape[2], axis=1),
-        (nans_array.shape[0], 1, nans_array.shape[2]),
-    )
+    """One-hot encode NaN values in a 3D array.
 
-    return np.concatenate([nans_array, repeated_column], axis=1)
+    Parameters
+    ----------
+    array (np.ndarray) The input 3D array.
+    all_nan_dims (int, optional): The number of dimensions (starting from the second dimension) to consider when
+        determining if all values are NaN. Default is 1.
+
+    Returns
+    -------
+    np.ndarray: The one-hot encoded array with NaN information.
+    """
+    # boolean mask of land (where all variable values are nan throughout all time)
+    land_mask = np.all(np.isnan(array), (1, 2))
+    # binary land mask
+    onehot_column = np.where(land_mask, 1, 0)
+    # binary land mask expanded to target dimensions
+    onehot_expanded = np.expand_dims(onehot_column, axis=(1, 2))
+    # binary land mask broadcast back through time
+    onehot_broadcast = np.repeat(onehot_expanded, array.shape[1], axis=1)
+
+    return np.concatenate((array, onehot_broadcast), axis=2)
