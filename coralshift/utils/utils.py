@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 import numpy as np
-from coralshift.processing import data
+from coralshift.processing import spatial_data
 
 
 def is_type_or_list_of_type(obj, target_type):
@@ -50,12 +50,12 @@ def underscore_str_of_dates(dts: list[str | np.datetime64]) -> list[str]:
     """
     # dates = []
     # for dt in dts:
-    #     dates.append(data.date_from_dt(dt))
+    #     dates.append(spatial_data.date_from_dt(dt))
     # return dates
     if type(dts) == list or type(dts) == tuple:
-        return "_".join([data.date_from_dt(dt) for dt in dts])
+        return "_".join([spatial_data.date_from_dt(dt) for dt in dts])
     else:
-        return data.date_from_dt(dts)
+        return spatial_data.date_from_dt(dts)
 
 
 def underscore_str_of_strings(variables: str | list[str]) -> str:
