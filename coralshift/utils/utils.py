@@ -5,7 +5,18 @@ import numpy as np
 from coralshift.processing import spatial_data
 
 
-def is_type_or_list_of_type(obj, target_type):
+def is_type_or_list_of_type(obj, target_type) -> bool:
+    """Checks if an object or a list/tuple of objects is of a specific type.
+
+    Parameters
+    ----------
+        obj: Object or list/tuple of objects to be checked.
+        target_type: Target type to check against.
+
+    Returns
+    -------
+        bool: True if the object or list/tuple of objects is of the specified type, False otherwise.
+    """
     if isinstance(obj, target_type):
         return True
 
@@ -42,16 +53,12 @@ def underscore_str_of_dates(dts: list[str | np.datetime64]) -> list[str]:
 
     Parameters
     ----------
-    dts (list[str | np.datetime64]): A list of datetime objects.
+        dts (list[str | np.datetime64]): A list of datetime objects.
 
     Returns
     -------
-    list[str]: A list of date strings.
+        list[str]: A list of date strings.
     """
-    # dates = []
-    # for dt in dts:
-    #     dates.append(spatial_data.date_from_dt(dt))
-    # return dates
     if type(dts) == list or type(dts) == tuple:
         return "_".join([spatial_data.date_from_dt(dt) for dt in dts])
     else:
@@ -63,20 +70,30 @@ def underscore_str_of_strings(variables: str | list[str]) -> str:
 
     Parameters
     ----------
-    variables (str | list[str]): A single variable as a string or a list of variables.
+        variables (str | list[str]): A single variable as a string or a list of variables.
 
     Returns
     -------
-    str: A string representation of the variable(s).
+        str: A string representation of the variable(s).
     """
     # if single variable
     if type(variables) == str:
         return variables
     else:
-        return "_".join(variables)
+        return "_".join([str(var) for var in variables])
 
 
 def underscore_list_of_tuples(tuples: str | list[tuple]) -> str:
+    """Converts a list of tuples or a single tuple into a string with elements separated by underscores.
+
+    Parameters
+    ----------
+        tuples (str or list[tuple]): List of tuples or a single tuple.
+
+    Returns
+    -------
+        str: String representation of the tuples with elements separated by underscores.
+    """
     if type(tuples) == list:
         flattened_list = [item for sublist in tuples for item in sublist]
         return "_".join(map(str, flattened_list))
