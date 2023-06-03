@@ -897,16 +897,6 @@ def sample_spatial_batch(
     window dimensions.
     - If a coord_range is provided, it is used to compute the latitude and longitude indices of the spatial window.
     - The function returns the selected subsample as a NumPy array.
-
-    Example
-    -------
-    # Sample a spatial batch from an xarray Dataset
-    dataset = ...
-    lat_lon_starts = (2, 3)
-    window_dims = (6, 6)
-    coord_range = (2.5, 3.5)
-    variables = ['var1', 'var2', 'var3']
-    spatial_batch = sample_spatial_batch(dataset, lat_lon_starts, window_dims, coord_range, variables)
     """
     # if selection of variables specified
     if variables is not None:
@@ -972,7 +962,9 @@ def process_xa_ds_for_ml(
     """
     to_return = []
     if feature_vars is not None:
+        # switch
         # assign features and convert to lat, lon to latxlon column
+
         Xs = spatial_array_to_column(xa_d_to_np_array(xa_ds[feature_vars]))
 
         # if normalise = True, normalise each variable between 0 and 1
@@ -1083,7 +1075,8 @@ def xa_d_to_np_array(xa_d: xa.Dataset | xa.DataArray) -> np.ndarray:
     """
     # if xa.DataArray
     if utils.is_type_or_list_of_type(xa_d, xa.DataArray):
-        return np.array(xa_d.values)
+        ds = xa_d.transpose("latitude", "longitude")
+        return np.array(ds.values)
 
     # else if dataset
     elif utils.is_type_or_list_of_type(xa_d, xa.Dataset):
