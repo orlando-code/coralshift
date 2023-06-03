@@ -323,10 +323,9 @@ def plot_var(
         figsize=figsize,
         subplot_kw={"projection": ccrs.PlateCarree()},
     )
-    format_xa_array_spatial_plot(ax, xa_da, coastlines=coastlines)
-
     xa_da.plot(ax=ax)
 
+    format_xa_array_spatial_plot(ax, xa_da, coastlines=coastlines)
     return fig, ax
 
 
