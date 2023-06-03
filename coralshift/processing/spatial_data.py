@@ -1006,7 +1006,7 @@ def generate_patch(
     onehot: bool = True,
 ):
     """Generate a patch for training or evaluation.
-
+    # TODO: aadd in window argument
     Parameters
     ----------
     xa_ds (xa.Dataset): The input xarray dataset.
@@ -1026,7 +1026,7 @@ def generate_patch(
         xa_ds, lat_lon_starts=lat_lon_starts, coord_range=coord_range
     )
 
-    Xs, ys = process_xa_ds_for_ml(
+    output = process_xa_ds_for_ml(
         xa_ds=subsample,
         feature_vars=feature_vars,
         gt_var=gt_var,
@@ -1058,7 +1058,7 @@ def generate_patch(
     # # take single time slice (since broadcasted back through time)
     # ys = ys[:, 0]
 
-    return Xs, ys, subsample, lat_lon_vals_dict
+    return output, subsample, lat_lon_vals_dict
 
 
 def subsample_to_array(
