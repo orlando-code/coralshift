@@ -325,6 +325,8 @@ def plot_var(
     )
     format_xa_array_spatial_plot(ax, xa_da, coastlines=coastlines)
 
+    xa_da.plot(ax=ax)
+
     return fig, ax
 
 
