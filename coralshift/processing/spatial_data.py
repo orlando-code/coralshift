@@ -942,10 +942,10 @@ def sample_spatial_batch(
     }
 
 
-def xa_ds_to_X_y(
+def process_xa_ds_for_ml(
     xa_ds: xa.Dataset,
     feature_vars: list[str],
-    gt_var: str,
+    gt_var: str = None,
     normalise: bool = True,
     onehot: bool = True,
 ):
@@ -966,19 +966,13 @@ def xa_ds_to_X_y(
     -------
     tuple: A tuple containing the feature array and ground truth array
     """
-    # assign features
-    Xs = xa_d_to_np_array(xa_ds[feature_vars])
-    # assign ground truth
-    ys = xa_d_to_np_array(xa_ds[gt_var])
-
-    # convert to column vectors
-    Xs, ys = spatial_array_to_column(Xs), spatial_array_to_column(ys)
+    # assign features and convert to lat, lon to latxlon column
+    Xs = spatial_array_to_column(xa_d_to_np_array(xa_ds[feature_vars]))
 
     # if normalise = True, normalise each variable between 0 and 1
     if normalise:
         Xs = normalise_3d_array(Xs)
-
-    # remove columns containing only nans. TODO: enable all nan dims
+    # remove columns containing only nans. TODO: enable removal of all nan dims
     nans_array = exclude_all_nan_dim(Xs, dim=1)
 
     # if encoding nans using onehot method
@@ -986,12 +980,14 @@ def xa_ds_to_X_y(
         Xs = encode_nans_one_hot(nans_array)
     Xs = naive_nan_replacement(Xs)
 
-    # this shouldn't ever be necessary
-    ys = naive_nan_replacement(ys)
-    # take single time slice (since broadcasted back through time)
-    ys = ys[:, 0]
+    if gt_var:
+        # assign ground truth and convert to column vector
+        ys = spatial_array_to_column(xa_d_to_np_array(xa_ds[gt_var]))
+        # take single time slice (since broadcasted back through time)
+        ys = ys[:, 0]
+        return Xs, ys
 
-    return Xs, ys
+    return Xs
 
 
 def generate_patch(
@@ -1024,7 +1020,7 @@ def generate_patch(
         xa_ds, lat_lon_starts=lat_lon_starts, coord_range=coord_range
     )
 
-    Xs, ys = xa_ds_to_X_y(
+    Xs, ys = process_xa_ds_for_ml(
         xa_ds=subsample,
         feature_vars=feature_vars,
         gt_var=gt_var,
