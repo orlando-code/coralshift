@@ -11,7 +11,7 @@ from rasterio import features
 from tqdm import tqdm
 from scipy.ndimage import binary_dilation, generic_filter
 from pathlib import Path
-from coralshift.utils import file_ops
+from coralshift.utils import file_ops, utils
 
 
 def upsample_xarray_to_target(
@@ -933,24 +933,42 @@ def sample_spatial_batch(
     return subset, {"latitude": lat_slice, "longitude": lon_slice, "time": time_slice}
 
 
-def generate_patch(xa_ds, lat_lon_starts, coord_range, normalise: bool = True):
-    subsample, lat_lons_vals_dict = sample_spatial_batch(
-        xa_ds, lat_lon_starts=lat_lon_starts, coord_range=coord_range
-    )
-    Xs, _ = subsample_to_array(
-        xa_ds, lat_lon_starts=lat_lon_starts, coord_range=coord_range
-    )
+def generate_patch(
+    xa_ds,
+    lat_lon_starts,
+    coord_range,
+    featuvars: list[str] = ["bottomT", "so", "mlotst", "uo", "vo", "zos", "thetao"],
+    gt_var: str = "coral_algae_1-12_degree",
+    normalise: bool = True,
+    onehot: bool = True,
+):
+    # subsample, lat_lons_vals_dict = sample_spatial_batch(
+    #     xa_ds, lat_lon_starts=lat_lon_starts, coord_range=coord_range
+    # )
 
+    # return spatial sample of xa_ds, along with info about the min and max lat/lon values
+    Xs, lat_lons_vals_dict, subsample = subsample_to_array(
+        xa_ds,
+        lat_lon_starts=lat_lon_starts,
+        coord_range=coord_range,
+        variables=vars,
+    )
+    # if normalise = True, normalise each variable between 0 and 1
     if normalise:
         Xs = normalise_3d_array(Xs)
 
-    Xs = naive_X_nan_replacement(Xs)
-    ys, _ = subsample_to_array(
-        xa_ds,
-        lat_lon_starts,
-        coord_range=coord_range,
-        variables=["coral_algae_1-12_degree"],
-    )
+    if onehot:
+        Xs = encode_nans_one_hot(Xs)
+    else:
+        Xs = naive_X_nan_replacement(Xs)
+    # assign ground truth
+    ys = xa_ds_to_3d_numpy(subsample[gt_var])
+    # ys, _, _ = subsample_to_array(
+    #     xa_ds,
+    #     lat_lon_starts,
+    #     coord_range=coord_range,
+    #     variables=[gt_var],
+    # )
     ys = naive_y_nan_replacement(ys)
     ys = ys[:, :, 0]
 
@@ -978,26 +996,82 @@ def subsample_to_array(
     subsample, lat_lon_vals_dict = sample_spatial_batch(
         xa_ds[variables], lat_lon_starts=lat_lon_starts, coord_range=coord_range
     )
-    return xa_ds_to_3d_numpy(subsample), lat_lon_vals_dict
+    return xa_ds_to_3d_numpy(subsample), subsample, lat_lon_vals_dict
 
 
-def naive_X_nan_replacement(array):
-    # filter out columns that contain entirely NaN values
-    col_mask = ~np.all(
-        np.isnan(array), axis=(0, 2)
-    )  # boolean mask indicating which columns to keep
-    sub_X = array[
-        :, col_mask, :
-    ]  # keep only the columns that don't contain entirely NaN values
-    sub_X = np.moveaxis(np.array(sub_X), 2, 1)
-    # replace nans with large negative
-    sub_X[np.isnan(sub_X)] = 0
-    return sub_X
+def xa_d_to_np_array(xa_d: xa.Dataset | xa.DataArray) -> np.ndarray:
+    """Converts an xarray dataset or data array to a NumPy array.
+
+    Parameters
+    ----------
+    xa_d (xarray.Dataset or xarray.DataArray): The xarray dataset or data array to convert.
+
+    Returns
+    -------
+    np.ndarray: The converted NumPy array.
+
+    Raises
+    ------
+    TypeError: If the provided object is neither an xarray Dataset nor an xarray DataArray.
+    """
+    # if xa.DataArray
+    if check_da(xa_d):
+        return np.array(xa_d.values)
+
+    # else if dataset
+    elif check_ds(xa_d):
+        # transpose coordinates for consistency
+        ds = xa_d.transpose("latitude", "longitude", "time")
+        # send to array
+        array = ds.to_array().values
+        # reorder dimensions to (lat x lon x var x time)
+        return np.moveaxis(array, 0, 2)
+    else:
+        return TypeError(
+            "object provideed was neither an xarray Dataset nor xarray DataArray."
+        )
 
 
-def naive_y_nan_replacement(array):
-    array[np.isnan(array)] = 0
-    return array
+def spatial_array_to_column(array: np.ndarray) -> np.ndarray:
+    """Reshape the first two dimensions of a 3D NumPy array to a column vector.
+
+    Parameters
+    ----------
+    array (np.ndarray): The input 3D NumPy array.
+
+    Returns
+    -------
+    np.ndarray: The reshaped column vector.
+
+    Examples
+    --------
+    >>> array = np.random.rand(lat, lon, var, ...)
+    >>> column_vector = spatial_array_to_column(array)
+    >>> print(column_vector.shape)
+    (lat x lon, var, ...)
+    """
+    array_shape = array.shape
+    new_shape = (array_shape[0] * array_shape[1], *array.shape[2:])
+    return np.reshape(array, new_shape)
+
+
+# def naive_X_nan_replacement(array):
+#     # filter out columns that contain entirely NaN values
+#     col_mask = ~np.all(
+#         np.isnan(array), axis=(0, 2)
+#     )  # boolean mask indicating which columns to keep
+#     sub_X = array[
+#         :, col_mask, :
+#     ]  # keep only the columns that don't contain entirely NaN values
+#     sub_X = np.moveaxis(np.array(sub_X), 2, 1)
+#     # replace nans with large negative
+#     sub_X[np.isnan(sub_X)] = 0
+#     return sub_X
+
+
+# def naive_y_nan_replacement(array):
+#     array[np.isnan(array)] = 0
+#     return array
 
 
 def exclude_all_nan_dim(array, dim):
