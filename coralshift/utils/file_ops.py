@@ -7,7 +7,7 @@ import xarray as xa
 import pandas as pd
 import geopandas as gpd
 
-from coralshift.processing import data
+from coralshift.processing import spatial_data
 
 
 def guarantee_existence(path: Path | str) -> Path:
@@ -464,7 +464,7 @@ def read_write_nc_file(
         print(f"{filename} not found in {files_dir}.")
         # if raster_array provided
         if raster_array:
-            rasterized_ds = data.xa_array_from_raster(
+            rasterized_ds = spatial_data.xa_array_from_raster(
                 raster_array, (ymin, ymax), (xmin, xmax), resolution, name
             )
             rasterized_ds.to_netcdf(filepath)
