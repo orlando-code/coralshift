@@ -1481,3 +1481,26 @@ def encode_nans_one_hot(array: np.ndarray, all_nan_dims: int = 1) -> np.ndarray:
     onehot_broadcast = np.repeat(onehot_expanded, array.shape[1], axis=1)
 
     return np.concatenate((array, onehot_broadcast), axis=2)
+
+
+def add_gt_to_xa_d(
+    xa_d: xa.DataArray | xa.Dataset,
+    gt_da: xa.DataArray,
+    gt_name: str = "coral_algae_gt",
+) -> xa.Dataset:
+    """Add a ground truth data array to an xarray DataArray or Dataset.
+
+    Parameters
+    ----------
+        xa_d (xarray.DataArray or xarray.Dataset): Input xarray DataArray or Dataset.
+        gt_da (xarray.DataArray): Ground truth DataArray to be added.
+        gt_name (str, optional): Name of the ground truth variable. Defaults to "coral_algae_gt".
+
+    Returns
+    -------
+        xarray.Dataset: Updated xarray Dataset with the ground truth variable added.
+    """
+    gt_da = gt_da.isel(latitude=slice(None, None, -1))
+    expanded_da = np.tile(gt_da.isel(time=0), (len(list(xa_d.time.values)), 1, 1))
+    xa_d[gt_name] = (("time", "latitude", "longitude"), expanded_da)
+    return xa_d
