@@ -29,6 +29,10 @@ class MyDatasets:
     def add_dataset(self, name, data):
         self.datasets[name] = data
 
+    def add_datasets(self, names, data):
+        for i, name in enumerate(names):
+            self.datasets[name] = data[i]
+
     def get_dataset(self, name):
         return self.datasets.get(name, None)
 
