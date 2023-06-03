@@ -17,6 +17,26 @@ from coralshift.utils import file_ops, utils
 def upsample_xarray_to_target(
     xa_array: xa.DataArray | xa.Dataset, target_resolution: float
 ) -> xa.Dataset:
+    """
+    Upsamples an xarray DataArray or Dataset to a target resolution.
+
+    Parameters
+    ----------
+        xa_array (xarray.DataArray or xarray.Dataset): The input xarray object to upsample.
+        target_resolution (float): The target resolution in degrees.
+
+    Returns
+    -------
+        xarray.Dataset: The upsampled dataset.
+
+    Notes
+    -----
+        - The function resamples the input xarray object by coarsening it to a target resolution.
+        - The current implementation supports upsampling along latitude and longitude dimensions only.
+        - The function calculates the degree resolution of the input dataset and scales it to match the target
+        resolution.
+        - The resampling is performed by coarsening the dataset using a mean operation.
+    """
     # N.B. not perfect at getting starts/ends matching up
     # TODO: enable flexible upsampling by time also
     lat_lims = xarray_coord_limits(xa_array, "latitude")
@@ -212,18 +232,18 @@ def return_pixels_closest_to_value(
 
     Parameters
     ----------
-    array (np.ndarray): The input array of pixel values.
-    central_value (float): The central value to which the pixels should be compared.
-    tolerance (float, optional): The tolerance within which the pixels are considered to be "close" to the central
-        value. Defaults to 0.5.
-    buffer_pixels (int, optional): The size of the buffer zone around the pixels. Defaults to 10.
-    bathymetry_only (bool, optional): Whether to only consider bathymetric data, i.e., values less than zero.
-        Defaults to True.
+        array (np.ndarray): The input array of pixel values.
+        central_value (float): The central value to which the pixels should be compared.
+        tolerance (float, optional): The tolerance within which the pixels are considered to be "close" to the central
+            value. Defaults to 0.5.
+        buffer_pixels (int, optional): The size of the buffer zone around the pixels. Defaults to 10.
+        bathymetry_only (bool, optional): Whether to only consider bathymetric data, i.e., values less than zero.
+            Defaults to True.
 
     Returns
     -------
-    np.ndarray: A 1D array of all the pixels in the input array that are closest to the specified central value within
-        the given tolerance and within the pixel buffer zone.
+        np.ndarray: A 1D array of all the pixels in the input array that are closest to the specified central value
+        within the given tolerance and within the pixel buffer zone.
     """
     binary = np.isclose(array, central_value, atol=0.5)
     # morphological dilation operation
@@ -252,20 +272,20 @@ def return_distance_closest_to_value(
     Returns a 1D array of all the pixels in the input array that are closest to a specified central value within a
     given tolerance and within a distance buffer zone.
 
-       Parameters
+    Parameters
     ----------
-    array (np.ndarray): The input array of pixel values.
-    central_value (float): The central value to which the pixels should be compared.
-    tolerance (float, optional): The tolerance within which the pixels are considered to be "close" to the central
-        value. Defaults to 0.5.
-    buffer_distance (float, optional): The size of the buffer zone around the pixels. Defaults to 300.
-    bathymetry_only (bool, optional): Whether to only consider bathymetric data, i.e., values less than zero.
-        Defaults to True.
+        array (np.ndarray): The input array of pixel values.
+        central_value (float): The central value to which the pixels should be compared.
+        tolerance (float, optional): The tolerance within which the pixels are considered to be "close" to the central
+            value. Defaults to 0.5.
+        buffer_distance (float, optional): The size of the buffer zone around the pixels. Defaults to 300.
+        bathymetry_only (bool, optional): Whether to only consider bathymetric data, i.e., values less than zero.
+            Defaults to True.
 
     Returns
     -------
-    np.ndarray: A 1D array of all the pixels in the input array that are closest to the specified central value within
-        the given tolerance and within the distance buffer zone.
+        np.ndarray: A 1D array of all the pixels in the input array that are closest to the specified central value
+        within the given tolerance and within the distance buffer zone.
     """
     buffer_pixels = buffer_distance / distance_per_pixel
     return return_pixels_closest_to_value(
@@ -340,7 +360,8 @@ def xarray_coord_limits(xa_array: xa.Dataset, dim: str) -> tuple[float]:
         xa_array (xa.Dataset): input xarray dataset.
         dim (str): coordinate name.
 
-    Returns:
+    Returns
+    -------
         tuple[float]: minimum and maximum values of the coordinate
 
     """
@@ -355,7 +376,8 @@ def dict_xarray_coord_limits(xa_array: xa.Dataset) -> dict:
     ----------
         xa_array (xa.Dataset): input xarray dataset.
 
-    Returns:
+    Returns
+    -------
         dict: dict object where keys are the names of the cooordinate and values are a tuple of the minimum and maximum
         values of the input xarray dataset.
     """
@@ -531,7 +553,7 @@ def check_nc_exists_generate_raster_xa(
     class_col: str = None,
     xa_name: str = None,
     all_touched: bool = None,
-):
+) -> xa.DataArray | xa.Dataset:
     """Check if a raster file with the given filename already exists in the directory. If not, generate the raster file
     using the given xarray dataset, and save it to the directory with the given filename.
 
@@ -551,8 +573,7 @@ def check_nc_exists_generate_raster_xa(
     None
         If the raster file already exists, print a message indicating that the file exists and no files were written.
         If the raster file does not exist, generates the raster file and saves it to the directory with the given
-        filename.
-        Either way, returns raster
+        filename. Either way, returns raster
     """
     filepath = file_ops.add_suffix_if_necessary(Path(dir_path) / filename, ".nc")
     # if specifying resolution as horizontal distance rather than degrees lat/lon, calculate approximate degrees
@@ -577,7 +598,29 @@ def degrees_to_distances(
     approx_lat: float = -18,
     approx_lon: float = 145,
 ) -> tuple[float]:
-    """TODO: docstring"""
+    """Converts target latitude and longitude resolutions from degrees to distances (in meters).
+
+    Parameters
+    ----------
+        target_lat_res (float): The target latitude resolution in degrees.
+        target_lon_res (float, optional): The target longitude resolution in degrees.
+            If not specified, the longitude resolution will be assumed to be the same as the latitude resolution.
+        approx_lat (float, optional): The approximate latitude coordinate.
+            It is used as a reference for distance calculations. Default is -18.
+        approx_lon (float, optional): The approximate longitude coordinate.
+            It is used as a reference for distance calculations. Default is 145.
+
+    Returns
+    -------
+        tuple[float]: A tuple containing the converted distances in meters
+        (latitude distance, longitude distance).
+
+    Notes
+    -----
+        - It uses the haversine formula to calculate the distance between two coordinates on a sphere.
+        - By default, the function assumes an approximate latitude of -18 and an approximate longitude of 145.
+        - If only the latitude resolution is specified, the function assumes the longitude resolution is the same.
+    """
     start_coord = (approx_lat, approx_lon)
     lat_end_coord = (approx_lat + target_lat_res, approx_lon)
     # if both lat and lon resolutions specified
@@ -653,7 +696,7 @@ def distance_to_degrees(
 
 def filter_strings(
     str_list: list[str], exclude: list[str] = ["latitude", "longitude", "depth", "time"]
-):
+) -> list[str]:
     """Filters a list of strings to exclude those contained in a second list of excluded strings.
 
     Parameters
@@ -707,10 +750,11 @@ def check_array_empty(array: xa.DataArray) -> bool:
 
     Parameters
     ----------
-    array (xa.DataArray): xarray DataArray to be checked
+        array (xa.DataArray): xarray DataArray to be checked
+
     Returns
     -------
-    bool: True if all values are 0/NaN; False otherwise
+        bool: True if all values are 0/NaN; False otherwise
     """
     vals = array.values
     # replace nans with zeros
@@ -725,10 +769,12 @@ def check_array_empty(array: xa.DataArray) -> bool:
 def return_non_empty_vars(xa_array: xa.Dataset) -> list[str]:
     """Return a list of variable names in the given xarray dataset that have non-empty values.
 
-    Args:
+    Parameters
+    ----------
         xa_array (xr.Dataset): The xarray dataset to check for non-empty variables.
 
-    Returns:
+    Returns
+    -------
         List[str]: A list of variable names with non-empty values.
     """
     non_empty_vars = []
@@ -758,40 +804,36 @@ def date_from_dt(datetime: str | np.datetime64) -> str:
     return str(pd.to_datetime(datetime).date())
 
 
-def resample_dataarray(xa_da: xa.DataArray, start_end_freq: tuple[str]) -> xa.DataArray:
-    """Resample a dataarray's time coordinate to a new frequency and date range
+# def resample_dataarray(xa_da: xa.DataArray, start_end_freq: tuple[str]) -> xa.DataArray:
+#     """Resample a dataarray's time coordinate to a new frequency and date range
 
-    TODO: fix this. Weird non-use of time_index, and makes up new values rather than selecting those closest
-    """
-    start_date, end_date, freq = start_end_freq
-    # Convert time coordinate to pandas DatetimeIndex
-    # time_index = pd.DatetimeIndex(xa_da.time.values)
-    # Create a new DatetimeIndex with the desired frequency and date range (will fetch closest value if not exact)
-    new_index = pd.date_range(start=start_date, end=end_date, freq=freq)
-    # Resample the dataarray's time coordinate to the new frequency
-    # resampled_da = xa_da.reindex(time=new_index).ffill(dim='time')
-    resampled_da = xa_da.reindex(time=new_index)
+#     TODO: fix this. Weird non-use of time_index, and makes up new values rather than selecting those closest
+#     """
+#     start_date, end_date, freq = start_end_freq
+#     # Convert time coordinate to pandas DatetimeIndex
+#     # time_index = pd.DatetimeIndex(xa_da.time.values)
+#     # Create a new DatetimeIndex with the desired frequency and date range (will fetch closest value if not exact)
+#     new_index = pd.date_range(start=start_date, end=end_date, freq=freq)
+#     # Resample the dataarray's time coordinate to the new frequency
+#     # resampled_da = xa_da.reindex(time=new_index).ffill(dim='time')
+#     resampled_da = xa_da.reindex(time=new_index)
 
-    # problem with not matching what's already there
-    return resampled_da, freq
+#     # problem with not matching what's already there
+#     return resampled_da, freq
 
 
-def get_variable_values(xa_ds: xa.Dataset, var_name: str) -> list:
-    """Returns a list of ndarrays containing the values of the given variable
-    for each timestep in the 'time' coordinate of the xarray Dataset.
+def get_variable_values(xa_ds: xa.Dataset, var_name: str) -> list[np.ndarray]:
+    """Returns a list of ndarrays containing the values of the given variable for each timestep in the 'time'
+    coordinate of the xarray Dataset.
 
     Parameters
     ----------
-    xa_ds : xa.Dataset
-        The xarray Dataset to extract the variable from.
-    var_name : str
-        The name of the variable to extract.
+    xa_ds (xa.Dataset): The xarray Dataset to extract the variable from.
+    var_name (str): The name of the variable to extract.
 
     Returns
     -------
-    list
-        A list of ndarrays containing the values of the variable for each
-        timestep in the 'time' coordinate.
+    list: A list of ndarrays containing the values of the variable for each timestep in the 'time' coordinate.
     """
     values_list = []
     for time in xa_ds.time:
@@ -799,7 +841,7 @@ def get_variable_values(xa_ds: xa.Dataset, var_name: str) -> list:
     return values_list
 
 
-def buffer_nans(array, size=1):
+def buffer_nans(array: np.ndarray, size: float = 1) -> np.ndarray:
     """Buffer nan values in a 2D array by taking the mean of valid neighbors.
 
     Parameters
@@ -812,7 +854,7 @@ def buffer_nans(array, size=1):
         np.ndarray: Buffered array with NaN values replaced by the mean of valid neighbors.
     """
 
-    def nan_sweeper(values):
+    def nan_sweeper(values: np.ndarray):
         """Custom function to sweep NaN values and calculate the mean of valid neighbors.
 
         Parameters
@@ -840,7 +882,22 @@ def buffer_nans(array, size=1):
     return buffered_array
 
 
-def filter_out_nans(X_with_nans, y_with_nans):
+def filter_out_nans(X_with_nans: np.ndarray, y_with_nans: np.ndarray) -> np.ndarray:
+    """Filters out NaN values from 3d input arrays (columns, rows, and depths: columns contain entirely NaN values are
+    removed; while rows and depths which contain any NaN values are removed. Resulting X array has a shape of
+    (num_samples, seq_length, num_params).
+
+    Parameters
+    ----------
+        X_with_nans (np.ndarray): Input array containing NaN values.
+            It must have a shape of (num_samples, num_params, seq_length).
+        y_with_nans (np.ndarray): Target array corresponding to X_with_nans.
+            It must have a shape of (num_samples,).
+
+    Returns
+    -------
+        tuple[ndarray]: A tuple containing the filtered X array and the filtered y array.
+    """
     # must be in shape (num_samples, num_params, seq_length)
 
     # filter out columns that contain entirely NaN values
@@ -997,7 +1054,7 @@ def generate_patch(
     gt_var: str = "coral_algae_1-12_degree",
     normalise: bool = True,
     onehot: bool = True,
-):
+) -> tuple[np.ndarray, xa.Dataset | xa.DataArray, dict]:
     """Generate a patch for training or evaluation.
     Parameters
     ----------
@@ -1012,7 +1069,8 @@ def generate_patch(
 
     Returns
     -------
-    tuple: A tuple containing the feature array, ground truth array, subsampled dataset, and latitude/longitude values.
+    tuple[np.ndarray, xa.Dataset | xa.DataArray, dict]: A tuple containing the feature array, ground truth array,
+        subsampled dataset, and latitude/longitude values.
     """
     subsample, lat_lon_vals_dict = sample_spatial_batch(
         xa_ds,
@@ -1037,20 +1095,21 @@ def subsample_to_array(
     lat_lon_starts: tuple,
     coord_range: tuple,
     variables: list[str],
-) -> tuple:
+) -> tuple[np.ndarray, xa.Dataset | xa.DataArray, dict]:
     """
     Subsample specific variables from an xarray dataset and convert them to a NumPy array.
 
     Parameters
     ----------
-    xa_ds (xa.Dataset): The input xarray dataset.
-    lat_lon_starts (tuple): The starting latitude and longitude indices for subsampling.
-    coord_range (tuple): The latitude and longitude range for subsampling.
-    variables (list[str]): List of variable names to subsample and convert.
+        xa_ds (xa.Dataset): The input xarray dataset.
+        lat_lon_starts (tuple): The starting latitude and longitude indices for subsampling.
+        coord_range (tuple): The latitude and longitude range for subsampling.
+        variables (list[str]): List of variable names to subsample and convert.
 
     Returns
     -------
-    tuple: A tuple containing the subsampled array, subsampled dataset, and latitude/longitude values.
+        tuple[np.ndarray, xa.Dataset | xa.DataArray, dict]: A tuple containing the subsampled array, subsampled dataset,
+            and latitude/longitude values.
     """
     subsample, lat_lon_vals_dict = sample_spatial_batch(
         xa_ds[variables], lat_lon_starts=lat_lon_starts, coord_range=coord_range
@@ -1063,15 +1122,15 @@ def xa_d_to_np_array(xa_d: xa.Dataset | xa.DataArray) -> np.ndarray:
 
     Parameters
     ----------
-    xa_d (xarray.Dataset or xarray.DataArray): The xarray dataset or data array to convert.
+        xa_d (xarray.Dataset or xarray.DataArray): The xarray dataset or data array to convert.
 
     Returns
     -------
-    np.ndarray: The converted NumPy array.
+        np.ndarray: The converted NumPy array.
 
     Raises
     ------
-    TypeError: If the provided object is neither an xarray Dataset nor an xarray DataArray.
+        TypeError: If the provided object is neither an xarray Dataset nor an xarray DataArray.
     """
     # if xa.DataArray
     if utils.is_type_or_list_of_type(xa_d, xa.DataArray):
@@ -1109,7 +1168,7 @@ def naive_nan_replacement(array: np.ndarray, replacement: float = 0) -> np.ndarr
     return array
 
 
-def exclude_all_nan_dim(array, dim):
+def exclude_all_nan_dim(array: np.ndarray, dim=int):
     """Exclude columns from a 2D or higher-dimensional array that contain only NaN values.
 
     Parameters
@@ -1168,7 +1227,19 @@ def spatial_array_to_column(array: np.ndarray) -> np.ndarray:
 # exclude_all_nan_dim(nans_array, 1).shape
 
 
-def reshape_from_ds_sample(xa_ds_sample, predicted):
+def reshape_from_ds_sample(xa_ds_sample: xa.Dataset, predicted: np.ndarray):
+    """Reshapes the predicted array to the original dimensions of the xarray dataset sample (obtained from "latitude",
+    "longitude", "time", and any "variables" dimensions of the sample).
+
+    Parameters
+    ----------
+        xa_ds_sample (xarray.Dataset or xarray.DataArray): Sample from the original xarray dataset.
+        predicted (ndarray or Tensor): Predicted array to be reshaped.
+
+    Returns
+    -------
+        ndarray: Reshaped predicted array with the original dimensions.
+    """
     # reshape to original dimensions
     original_shape = [xa_ds_sample.dims[d] for d in ["latitude", "longitude", "time"]]
     original_shape += [len(list(xa_ds_sample.data_vars))]
@@ -1177,9 +1248,27 @@ def reshape_from_ds_sample(xa_ds_sample, predicted):
     return predicted.numpy().reshape(original_shape[:2])
 
 
-def assign_prediction_to_ds(xa_ds, reshaped_pred, lat_lon_dict):
+def assign_prediction_to_ds(
+    xa_ds: xa.Dataset,
+    reshaped_pred: np.ndarray,
+    lat_lon_dict: dict,
+    new_var_name: str = "output",
+) -> xa.Dataset:
+    """Assigns the reshaped prediction array to a new variable "new_var_name" in the xarray dataset.
+
+    Parameters
+    ----------
+        xa_ds (xarray.Dataset): Input xarray dataset.
+        reshaped_pred (ndarray): Reshaped prediction array.
+        lat_lon_dict (dict): Dictionary containing latitude and longitude coordinate arrays.
+        new_var_name (str): Name for the new variable. Default is "output".
+
+    Returns
+    -------
+        xarray.Dataset: Updated xarray dataset with the prediction assigned to a new variable.
+    """
     # Create a new variable in the dataset using the output subset
-    xa_ds["output"] = xa.DataArray(
+    xa_ds[new_var_name] = xa.DataArray(
         reshaped_pred,
         dims=["latitude", "longitude"],
         coords={key: lat_lon_dict[key] for key in ["latitude", "longitude"]},
@@ -1203,7 +1292,16 @@ def assign_prediction_to_ds(xa_ds, reshaped_pred, lat_lon_dict):
     return xa_ds
 
 
-def normalise_3d_array(array):
+def normalise_3d_array(array: np.ndarray) -> np.ndarray:
+    """Normalizes a 3D array between 0 and 1 along the sample and sequence dimensions by computing the min and max
+    values for each variable along the sample and sequence dimensions.
+
+    Parameters
+        array (ndarray): Input 3D array.
+
+    Returns:
+        ndarray: Normalized 3D array.
+    """
     # Compute the minimum and maximum values for each variable
     min_vals = np.nanmin(
         array, axis=(0, 1)
@@ -1216,16 +1314,42 @@ def normalise_3d_array(array):
     return np.divide((array - min_vals), (max_vals - min_vals))
 
 
-def reformat_prediction(xa_ds, sample, predicted, lat_lon_vals_dict):
+def reformat_prediction(
+    xa_ds: xa.Dataset,
+    sample: xa.Dataset,
+    predicted: np.ndarray,
+    lat_lon_vals_dict: dict,
+) -> xa.Dataset:
+    """Reformats the predicted array and assigns it to the xarray dataset.
+
+    Parameters
+        xa_ds (xarray.Dataset): Input xarray dataset.
+        sample (xarray.Dataset or xarray.DataArray): Sample from the original xarray dataset.
+        predicted (ndarray or Tensor): Predicted array.
+        lat_lon_vals_dict (dict): Dictionary containing latitude and longitude coordinate arrays.
+
+    Returns:
+        xarray.Dataset: Updated xarray dataset with the reformatted prediction assigned to a new variable.
+    """
     reshaped_pred = reshape_from_ds_sample(sample, predicted)
     return assign_prediction_to_ds(xa_ds, reshaped_pred, lat_lon_vals_dict)
 
 
 def spatially_buffer_timeseries(
-    xa_ds,
-    buffer_size=1,
-    exclude_vars: list = ["spatial_ref", "coral_algae_1-12_degree"],
-):
+    xa_ds: xa.Dataset,
+    buffer_size: int = 1,
+    exclude_vars: list[str] = ["spatial_ref", "coral_algae_1-12_degree"],
+) -> xa.Dataset:
+    """Applies a spatial buffer to each data variable in the xarray dataset.
+
+    Parameters
+        xa_ds (xarray.Dataset): Input xarray dataset.
+        buffer_size (int): Buffer size in grid cells.
+        exclude_vars (list[str]): List of variable names to exclude from buffering.
+
+    Returns:
+        xarray.Dataset: Xarray dataset with buffered data variables.
+    """
     data_vars = list(xa_ds.data_vars)
     filtered_vars = filter_strings(data_vars, exclude_vars)
 
@@ -1244,8 +1368,24 @@ def spatially_buffer_timeseries(
 
 
 def find_chunks_with_percentage(
-    array, range_min, range_max, chunk_size, threshold_percent
-):
+    array: np.ndarray,
+    range_min: float,
+    range_max: float,
+    chunk_size: int,
+    threshold_percent: float,
+) -> list[tuple[float, float]]:
+    """Find chunks in the array that contain a certain threshold percentage of pixel values within a specified range.
+
+    Parameters
+        array (ndarray): Input array.
+        range_min (float): Minimum value for the range.
+        range_max (float): Maximum value for the range.
+        chunk_size (int): Size of the chunks in rows and columns.
+        threshold_percent (float): Threshold percentage for chunk selection.
+
+    Returns:
+        list[tuple[float, float]]: List of chunk coordinates that meet the threshold percentage criteria.
+    """
     rows, cols = array.shape
     chunk_rows = np.arange(0, rows - chunk_size, chunk_size)
     chunk_cols = np.arange(0, cols - chunk_size, chunk_size)
@@ -1280,16 +1420,40 @@ def find_chunks_with_percentage(
     return chunk_coords
 
 
-def index_to_coord(xa_da, index):
+def index_to_coord(xa_da: xa.DataArray, index: tuple[int, int]) -> tuple[float, float]:
+    """Convert a pair of indices of a DataArray to their corresponding coordinate values.
+
+    Parameters
+        xa_da (xa.DataArray): Input DataArray.
+        index (tuple[int, int]): Index tuple in the form (row_index, col_index).
+
+    Returns:
+        tuple[float, float]: Tuple of latitude and longitude coordinate values corresponding to the index.
+
+    """
     lon = xa_da.longitude.values[index[1]]
     lat = xa_da.latitude.values[index[0]]
     return lon, lat
 
 
-def delta_index_to_distance(xa_da, start_index, end_index):
-    start_inds = index_to_coord(xa_da, start_index)
-    end_inds = index_to_coord(xa_da, end_index)
-    diffs = np.subtract(end_inds, start_inds)
+def delta_index_to_distance(
+    xa_da: xa.DataArray, start_index: tuple[int, int], end_index: tuple[int, int]
+) -> tuple[float, float]:
+    """Convert the delta index between two coordinates to their corresponding distance values.
+
+    Parameters
+        xa_da (xarray.DataArray): Input DataArray.
+        start_index (tuple[int, int]): Start index tuple in the form (start_row_index, start_col_index).
+        end_index (tuple[int, int]): End index tuple in the form (end_row_index, end_col_index).
+
+    Returns:
+        tuple[float, float]: Tuple of delta latitude and delta longitude distance values between the coordinates.
+    """
+    # determine start and end coordinates
+    start_coords = index_to_coord(xa_da, start_index)
+    end_coords = index_to_coord(xa_da, end_index)
+    # calculate differences
+    diffs = np.subtract(end_coords, start_coords)
     delta_y, delta_x = diffs[0], diffs[1]
     return delta_y, delta_x
 
@@ -1299,13 +1463,13 @@ def encode_nans_one_hot(array: np.ndarray, all_nan_dims: int = 1) -> np.ndarray:
 
     Parameters
     ----------
-    array (np.ndarray) The input 3D array.
-    all_nan_dims (int, optional): The number of dimensions (starting from the second dimension) to consider when
-        determining if all values are NaN. Default is 1.
+        array (np.ndarray) The input 3D array.
+        all_nan_dims (int, optional): The number of dimensions (starting from the second dimension) to consider when
+            determining if all values are NaN. Default is 1.
 
     Returns
     -------
-    np.ndarray: The one-hot encoded array with NaN information.
+        np.ndarray: The one-hot encoded array with NaN information.
     """
     # boolean mask of land (where all variable values are nan throughout all time)
     land_mask = np.all(np.isnan(array), (1, 2))
