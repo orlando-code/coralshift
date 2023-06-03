@@ -13,13 +13,13 @@ class MyDatasets:
         self.files_location = Path()
         # fetching external functions
 
-    def set_location(self, location="remote"):
+    def set_location(self, location: str = "remote", volume_name: str = "MRes Drive"):
         if location == "remote":
             # change directory to home. TODO: make less hacky
             os.chdir("/home/jovyan")
             self.files_location = Path("lustre_scratch/datasets/")
         elif location == "local":
-            self.files_location = directories.get_volume_dir()
+            self.files_location = directories.get_volume_dir(volume_name)
         else:
             raise ValueError
 
