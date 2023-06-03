@@ -997,9 +997,10 @@ def process_xa_ds_for_ml(
 
 
 def generate_patch(
-    xa_ds,
-    lat_lon_starts,
-    coord_range,
+    xa_ds: xa.DataArray | xa.Dataset,
+    lat_lon_starts: tuple[float, float],
+    coord_range: tuple[float, float],
+    window_dims: tuple[int, int] = None,
     feature_vars: list[str] = ["bottomT", "so", "mlotst", "uo", "vo", "zos", "thetao"],
     gt_var: str = "coral_algae_1-12_degree",
     normalise: bool = True,
@@ -1023,7 +1024,10 @@ def generate_patch(
     tuple: A tuple containing the feature array, ground truth array, subsampled dataset, and latitude/longitude values.
     """
     subsample, lat_lon_vals_dict = sample_spatial_batch(
-        xa_ds, lat_lon_starts=lat_lon_starts, coord_range=coord_range
+        xa_ds,
+        lat_lon_starts=lat_lon_starts,
+        coord_range=coord_range,
+        window_dims=window_dims,
     )
 
     output = process_xa_ds_for_ml(
