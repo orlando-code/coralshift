@@ -65,7 +65,7 @@ def plot_DEM(
         # vmin=float(region_array.min().values), vmax=float(region_array.max().values),
         vmin=vmin,
         vmax=vmax,
-        add_olorbar=False,
+        add_colorbar=False,
     )
 
     format_spatial_plot(im, fig, ax, title, orient_colorbar)
