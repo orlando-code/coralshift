@@ -536,3 +536,6 @@ def save_json(
 
     with open(str(filepath), "w") as outfile:
         outfile.write(json_object)
+
+    if verbose:
+        print(f"Dictionary saved as json file at {filepath}")
