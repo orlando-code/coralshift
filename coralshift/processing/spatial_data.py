@@ -1643,6 +1643,7 @@ def nc_chunk_files(
         sub_ds.to_netcdf(path=file_path.with_suffix(".nc"))
 
     print(f".nc chunk files and accompanying metadata written to {str(dest_dir_path)}")
+    return chunk_coord_pairs, coverages
 
 
 def generate_chunk_json(
