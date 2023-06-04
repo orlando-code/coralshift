@@ -63,7 +63,7 @@ def plot_DEM(
         vmin=vmin,
         vmax=vmax,
         add_colorbar=False,
-        cbar_kwargs={"orientation": "horizontal"},
+        cbar_kwargs={"orientation": "vertical"},
     )
 
     format_spatial_plot(im, fig, ax, title)
