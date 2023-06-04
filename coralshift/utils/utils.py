@@ -126,16 +126,26 @@ def generate_date_pairs(
     ]
 
 
-def pad_number_with_zeros(number: str | int) -> str:
-    """
-    Add a leading zero to any number, X, into 0X. Useful for generating dates in URL strings.
+def pad_number_with_zeros(number: str | int, resulting_len: str = 2) -> str:
+    """Add leading zeros to a number until the desired length. Useful for generating dates in URL strings or any other
+    scenario where leading zeros are required.
+
+    Parameters
+    ----------
+    number (str | int): The number to be padded with zeros.
+    resulting_len (int, optional): The desired length of the resulting string (default is 2).
+
+    Returns
+    -------
+    str: The padded number as a string.
     """
     if not type(number) == str:
         try:
             number = str(number)
         except ValueError:
             print(f"Failed to convert {number} to string")
-    if len(number) == 1:
+
+    while len(number) < resulting_len:
         number = "".join(("0", number))
 
     return number
