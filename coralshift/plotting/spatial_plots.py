@@ -33,7 +33,7 @@ def format_spatial_plot(image: xa.DataArray, fig: Figure, ax: Axes, title: str) 
         None
     """
     # great info here: https://stackoverflow.com/questions/13310594/positioning-the-colorbar
-    fig.colorbar(image, orientation="horizontal", pad=0.1, label="elevation")
+    fig.colorbar(image, orientation="vertical", pad=0.1, label="elevation")
     ax.set_title(title)
     ax.coastlines(resolution="10m", color="black", linewidth=1)
     ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True)
@@ -63,7 +63,6 @@ def plot_DEM(
         vmin=vmin,
         vmax=vmax,
         add_colorbar=False,
-        cbar_kwargs={"orientation": "vertical"},
     )
 
     format_spatial_plot(im, fig, ax, title)
