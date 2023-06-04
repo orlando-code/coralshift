@@ -3,7 +3,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import xarray as xa
-import json
 import os
 
 # import getpass
@@ -102,12 +101,8 @@ def generate_metadata(
         "depth-max": depth_lims[1],
         "motu_query": query,
     }
-
-    # Serializing json
-    json_object = json.dumps(metadata, indent=4)
-
-    with open(str(filepath), "w") as outfile:
-        outfile.write(json_object)
+    # save metadata as json file at filepath
+    file_ops.save_json(metadata, filepath)
 
 
 def generate_name_dict(
