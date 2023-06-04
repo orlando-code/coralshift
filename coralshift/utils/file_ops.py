@@ -7,6 +7,7 @@ import json
 import xarray as xa
 import pandas as pd
 import geopandas as gpd
+import numpy as np
 
 from coralshift.processing import spatial_data
 
@@ -516,6 +517,29 @@ def generate_filepath(
         return (Path(dir_path) / filename).with_suffix(suffix)
 
 
+class NpEncoder(json.JSONEncoder):
+    """
+    Custom JSON encoder to handle NumPy types.
+
+    This class extends the `json.JSONEncoder` class and provides custom handling for NumPy types, including
+    `np.integer`, `np.floating`, and `np.ndarray`. It converts these types to their corresponding Python types to
+    ensure proper JSON serialization.
+
+    Usage:
+    To use this custom encoder, create an instance of `NpEncoder` and pass it as the `cls` parameter when calling
+    `json.dumps()` or `json.dump()`
+    """
+
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+
+
 def save_json(
     json_file: dict, filepath: str | Path, indent: int = 4, verbose: bool = True
 ) -> None:
@@ -532,7 +556,7 @@ def save_json(
     None
     """
     # Serializing json
-    json_object = json.dumps(json_file, indent=indent)
+    json_object = json.dumps(json_file, indent=indent, cls=NpEncoder)
 
     with open(str(filepath), "w") as outfile:
         outfile.write(json_object)
