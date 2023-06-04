@@ -1384,40 +1384,46 @@ def find_chunks_with_percentage(
         threshold_percent (float): Threshold percentage for chunk selection.
 
     Returns:
-        list[tuple[float, float]]: List of chunk coordinates that meet the threshold percentage criteria.
+        tuple[list[tuple[float, float]], list[float]]: List of chunk coordinates that meet the threshold percentage
+            criteria and list of perceentage of gridcell meeting criteria.
     """
+    # to make chunk_size behave as expected in the face of non-inclusive final indices
+    chunk_size = chunk_size + 1
     rows, cols = array.shape
     chunk_rows = np.arange(0, rows - chunk_size, chunk_size)
     chunk_cols = np.arange(0, cols - chunk_size, chunk_size)
 
-    chunk_coords = [
-        (
-            # (start_row, start_col),
-            # (start_row + chunk_size - 1, start_col + chunk_size - 1),
-            (start_row, start_row + chunk_size - 1),
-            (start_col, start_col + chunk_size - 1),
-        )
-        for start_row in chunk_rows
-        for start_col in chunk_cols
-        if np.mean(
-            np.logical_and(
-                array[
-                    start_row : start_row + chunk_size,  # noqa
-                    start_col : start_col + chunk_size,  # noqa
-                ]
-                >= range_min,
-                array[
-                    start_row : start_row + chunk_size,  # noqa
-                    start_col : start_col + chunk_size,  # noqa
-                ]
-                <= range_max,
+    chunk_coords = []
+    cell_coverages = []
+    for start_row in chunk_rows:
+        for start_col in chunk_cols:
+            # amount of cell covered by values within range as percentage
+            cell_coverage = (
+                np.mean(
+                    np.logical_and(
+                        array[
+                            start_row : start_row + chunk_size,  # noqa
+                            start_col : start_col + chunk_size,  # noqa
+                        ]
+                        >= range_min,
+                        array[
+                            start_row : start_row + chunk_size,  # noqa
+                            start_col : start_col + chunk_size,  # noqa
+                        ]
+                        <= range_max,
+                    )
+                )
+                * 100
             )
-        )
-        * 100
-        > threshold_percent
-    ]
-
-    return chunk_coords
+            if cell_coverage >= threshold_percent:
+                chunk_coords.append(
+                    (
+                        (start_row, start_col),
+                        (start_row + chunk_size - 1, start_col + chunk_size - 1),
+                    )
+                )
+                cell_coverages.append(cell_coverage.item())
+    return chunk_coords, cell_coverages
 
 
 def index_to_coord(xa_da: xa.DataArray, index: tuple[int, int]) -> tuple[float, float]:
