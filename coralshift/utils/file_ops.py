@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from tqdm import tqdm
 import urllib
+import json
 import xarray as xa
 import pandas as pd
 import geopandas as gpd
@@ -513,3 +514,25 @@ def generate_filepath(
     # if filename and suffix provided
     else:
         return (Path(dir_path) / filename).with_suffix(suffix)
+
+
+def save_json(
+    json_file: dict, filepath: str | Path, indent: int = 4, verbose: bool = True
+) -> None:
+    """Save a JSON object to a file.
+
+    Parameters
+    ----------
+    json_file (dict): JSON object to be saved.
+    filepath (str | Path): Path to the output file.
+    indent (int, optional): Indentation level for the JSON file (default is 4).
+
+    Returns
+    -------
+    None
+    """
+    # Serializing json
+    json_object = json.dumps(json_file, indent=indent)
+
+    with open(str(filepath), "w") as outfile:
+        outfile.write(json_object)
