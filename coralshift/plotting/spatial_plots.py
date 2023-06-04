@@ -18,7 +18,9 @@ from coralshift.processing import spatial_data
 from coralshift.utils import file_ops
 
 
-def format_spatial_plot(image: xa.DataArray, fig: Figure, ax: Axes, title: str) -> None:
+def format_spatial_plot(
+    image: xa.DataArray, fig: Figure, ax: Axes, title: str, orient_colorbar: str
+) -> None:
     """Format a spatial plot with a colorbar, title, coastlines, and gridlines.
 
     Parameters
@@ -33,7 +35,7 @@ def format_spatial_plot(image: xa.DataArray, fig: Figure, ax: Axes, title: str) 
         None
     """
     # great info here: https://stackoverflow.com/questions/13310594/positioning-the-colorbar
-    fig.colorbar(image, orientation="vertical", pad=0.1, label="elevation")
+    fig.colorbar(image, orientation=orient_colorbar, pad=0.1, label="elevation")
     ax.set_title(title)
     ax.coastlines(resolution="10m", color="black", linewidth=1)
     ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True)
@@ -46,6 +48,7 @@ def plot_DEM(
     vmax: float = 50,
     cmap="BrBG",
     landmask: bool = True,
+    orient_colorbar: str = "vertical",
 ) -> tuple[Figure, Axes]:
     """TODO: docstring; generalise to all spatial plots"""
     # TODO: add option to plot satellite imagery for land instead of DEM
@@ -62,10 +65,10 @@ def plot_DEM(
         # vmin=float(region_array.min().values), vmax=float(region_array.max().values),
         vmin=vmin,
         vmax=vmax,
-        add_colorbar=False,
+        add_olorbar=False,
     )
 
-    format_spatial_plot(im, fig, ax, title)
+    format_spatial_plot(im, fig, ax, title, orient_colorbar)
 
     return fig, ax, im
 
