@@ -1504,3 +1504,189 @@ def add_gt_to_xa_d(
     expanded_da = np.tile(gt_da.isel(time=0), (len(list(xa_d.time.values)), 1, 1))
     xa_d[gt_name] = (("time", "latitude", "longitude"), expanded_da)
     return xa_d
+
+
+def ds_subsample_from_coord(
+    xa_ds: xa.Dataset, chunk_coords: tuple[float, float]
+) -> xa.Dataset:
+    """Subsample an xarray Dataset based on given latitude and longitude chunk coordinates.
+
+    Parameters
+    ----------
+    xa_ds (xa.Dataset): Input xarray Dataset.
+    chunk_coords (tuple[float, float]): Tuple containing the latitude and longitude chunk coordinates.
+
+    Returns
+    -------
+    xa.Dataset: Subsampled xarray Dataset.
+    """
+    lats, lons = index_pair_to_lats_lons_pair(chunk_coords)
+    return xa_ds.isel(
+        {"latitude": slice(lats[0], lats[1]), "longitude": slice(lons[0], lons[1])}
+    )
+
+
+def get_vars_from_ds_or_da(xa_d: xa.DataArray | xa.Dataset) -> str | list[str]:
+    """Get the variable name(s) from an xarray Dataset or DataArray.
+
+    Parameters
+    ----------
+    xa_d (xa.DataArray | xa.Dataset): Input xarray Dataset or DataArray.
+
+    Returns
+    -------
+    str | list[str]: Variable name(s).
+    """
+    if type(xa_d) == xa.core.dataarray.DataArray:
+        vars = xa_d.name
+    elif type(xa_d) == xa.core.dataarray.Dataset:
+        vars = list(xa_d.data_vars)
+    else:
+        raise TypeError("Format was neither an xarray Dataset nor a DataArray")
+
+    return vars
+
+
+def index_pair_to_lats_lons_pair(
+    coord_pair: tuple[float],
+) -> tuple[tuple[float], tuple[float]]:
+    """Convert index pair to latitude and longitude pair.
+
+    Parameters
+    ----------
+    coord_pair (tuple[float]): Index pair containing the start and end coordinates.
+
+    Returns
+    -------
+    tuple[tuple[float], tuple[float]]: Latitude and longitude pair.
+    """
+    starts, ends = coord_pair[0], coord_pair[1]
+    lats, lons = (starts[0], ends[0]), (starts[1], ends[1])
+
+    return lats, lons
+
+
+def calculate_spatial_resolution(xa_d: xa.Dataset | xa.DataArray) -> tuple[float]:
+    """Calculate the spatial resolution of latitude and longitude in an xarray Dataset or DataArray.
+
+    Parameters
+    ----------
+    xa_d (xa.Dataset | xa.DataArray): Input xarray Dataset or DataArray.
+
+    Returns
+    -------
+    tuple[float]: Spatial resolution of latitude and longitude.
+    """
+    # calculate number of latitude and longitude data points
+    num_lats, num_lons = len(xa_d.latitude.values), len(xa_d.longitude.values)
+    # calculate extreme values of latitude and longitude
+    lat_lims = xarray_coord_limits(xa_d, "latitude")
+    lon_lims = xarray_coord_limits(xa_d, "longitude")
+    lat_resolution = np.divide(np.diff(lat_lims), num_lats).item()
+    lon_resolution = np.divide(np.diff(lon_lims), num_lons).item()
+
+    return lat_resolution, lon_resolution
+
+
+def nc_chunk_files(
+    dest_dir_path: Path | str,
+    xa_ds: xa.Dataset,
+    chunk_size: int = 20,
+    threshold_percent: float = 10,
+    vmin: float = -100,
+    vmax: float = 0,
+):
+    """Save chunks of an xarray Dataset to NetCDF files along with accompanying metadata JSON files.
+
+    Parameters
+    ----------
+    dest_dir_path (Path | str): Directory path to save the chunk files.
+    xa_ds (xa.Dataset): Input xarray Dataset.
+    chunk_size (int, optional): Size of the chunks (default is 20).
+    threshold_percent (float, optional): Threshold percentage for chunk coverage (default is 10).
+    vmin (float, optional): Minimum value for chunk selection (default is -100).
+    vmax (float, optional): Maximum value for chunk selection (default is 0).
+
+    Returns
+    -------
+    None
+    """
+
+    chunk_coord_pairs, coverages = find_chunks_with_percentage(
+        xa_ds, vmin, vmax, chunk_size, threshold_percent
+    )
+
+    for i, coord_pair in tqdm(
+        enumerate(chunk_coord_pairs),
+        desc="Saving chunks .nc and accompanying metadata .json files",
+        total=len(chunk_coord_pairs),
+    ):
+        sub_ds = ds_subsample_from_coord(xa_ds, coord_pair)
+        # generate filename and file_path
+        filename = "_".join(
+            ("chunk", utils.pad_number_with_zeros(number=i, resulting_len=3))
+        )
+        file_path = Path(dest_dir_path) / filename
+        # generate chunk metadata
+        info_dict = generate_chunk_json(sub_ds, file_path, coord_pair, coverages[i])
+        # save metadata file
+        file_ops.save_json(
+            info_dict, filepath=file_path.with_suffix(".json"), verbose=False
+        )
+        # save nc file
+        sub_ds.to_netcdf(path=file_path.with_suffix(".nc"))
+
+    print(f".nc chunk files and accompanying metadata written to {str(dest_dir_path)}")
+
+
+def generate_chunk_json(
+    xa_d: xa.DataArray, file_path: str | Path, coord_pair: tuple[int], coverage=float
+):
+    """Generate metadata JSON dictionary for a chunk of an xarray DataArray.
+
+    Parameters
+    ----------
+    xa_d (xa.DataArray): Input xarray DataArray.
+    file_path (str | Path): File path of the chunk.
+    coord_pair (tuple[int]): Index pair containing the start and end coordinates.
+    coverage (float): Chunk coverage value.
+
+    Returns
+    -------
+    dict: Metadata JSON dictionary.
+    """
+
+    # TODO: make robust with different dataset/dataarray
+
+    # make filename
+    vars = get_vars_from_ds_or_da(xa_d)
+    # convert coord indices to absolute coords (TODO: could add spatial functionality for chunking)
+    lat_lims = xarray_coord_limits(xa_d, "latitude")
+    lon_lims = xarray_coord_limits(xa_d, "longitude")
+    # find resolution
+    lat_resolution_d, lon_resolution_d = calculate_spatial_resolution(xa_d)
+    lat_resolution_m, lon_resolution_m = degrees_to_distances(
+        lat_resolution_d, lon_resolution_d
+    )
+    # calculate minimum and maximum bathymetries
+    min_bath, max_bath = xa_d.values.min(), xa_d.values.max()
+
+    info_dict = {
+        "file name": file_path.stem,
+        "file path": str(file_path),
+        "variables": vars,
+        "latitude range": lat_lims,
+        "longitude range": lon_lims,
+        "latitude chunk size": np.diff((coord_pair[0][0], coord_pair[1][0])).item(),
+        "longitude chunk size": np.diff((coord_pair[0][1], coord_pair[1][1])).item(),
+        "start index pair": coord_pair[0],
+        "end index pair": coord_pair[1],
+        "latitude resolution (degrees)": lat_resolution_d,
+        "longitude resolution (degrees)": lon_resolution_d,
+        "latitude resolution (meters)": lat_resolution_m,
+        "longitude resolution (meters)": lon_resolution_m,
+        "cell coverage": coverage,
+        "minimum bathymetry": min_bath,
+        "maximum bathymetry": max_bath,
+    }
+    return info_dict
