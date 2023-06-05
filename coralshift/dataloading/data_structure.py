@@ -40,6 +40,7 @@ class MyDatasets:
         dataset = self.datasets.get(name, None)
         if dataset is None:
             raise ValueError(f"Dataset '{name}' does not exist.")
+        return dataset
 
     def remove_dataset(self, name: str):
         if name in self.datasets:
