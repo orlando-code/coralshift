@@ -1400,7 +1400,9 @@ def find_chunks_with_percentage(
     # for start_row in tqdm(chunk_rows, desc="Calculating area within range"):
     #     for start_col in chunk_cols:
 
-    with tqdm(total=rows * cols) as pbar:
+    with tqdm(
+        total=len(chunk_rows) * len(chunk_rows), desc="Calculating area within range"
+    ) as pbar:
         for start_row in chunk_rows:
             for start_col in chunk_cols:
                 # amount of cell covered by values within range as percentage
