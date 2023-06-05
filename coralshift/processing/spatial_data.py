@@ -1354,7 +1354,9 @@ def spatially_buffer_timeseries(
     filtered_vars = filter_strings(data_vars, exclude_vars)
 
     buffered_ds = xa.Dataset()
-    for data_var in filtered_vars:
+    for data_var in tqdm(
+        filtered_vars, desc=f"Buffering variables by {buffer_size} pixel"
+    ):
         buffered = xa.apply_ufunc(
             buffer_nans,
             xa_ds[data_var],
