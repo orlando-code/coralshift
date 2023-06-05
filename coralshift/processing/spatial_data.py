@@ -1634,7 +1634,9 @@ def nc_chunk_files(
         )
         file_path = Path(dest_dir_path) / filename
         # generate chunk metadata
-        info_dict = generate_chunk_json(sub_ds, file_path, coord_pair, coverages[i])
+        info_dict = generate_chunk_json(
+            sub_ds, file_path, coord_pair=coord_pair, coverage=coverages[i]
+        )
         # save metadata file
         file_ops.save_json(
             info_dict, filepath=file_path.with_suffix(".json"), verbose=False
@@ -1647,8 +1649,11 @@ def nc_chunk_files(
 
 
 def generate_chunk_json(
-    xa_d: xa.DataArray, file_path: str | Path, coord_pair: tuple[int], coverage=float
-):
+    xa_d: xa.DataArray,
+    file_path: str | Path,
+    coord_pair: tuple[int] = None,
+    coverage: float = None,
+) -> dict:
     """Generate metadata JSON dictionary for a chunk of an xarray DataArray.
 
     Parameters
@@ -1684,16 +1689,28 @@ def generate_chunk_json(
         "variables": vars,
         "latitude range": lat_lims,
         "longitude range": lon_lims,
-        "latitude chunk size": np.diff((coord_pair[0][0], coord_pair[1][0])).item(),
-        "longitude chunk size": np.diff((coord_pair[0][1], coord_pair[1][1])).item(),
-        "start index pair": coord_pair[0],
-        "end index pair": coord_pair[1],
         "latitude resolution (degrees)": lat_resolution_d,
         "longitude resolution (degrees)": lon_resolution_d,
         "latitude resolution (meters)": lat_resolution_m,
         "longitude resolution (meters)": lon_resolution_m,
-        "cell coverage": coverage,
         "minimum bathymetry": min_bath,
         "maximum bathymetry": max_bath,
     }
+
+    if coord_pair is not None:
+        additional_info = {
+            "latitude chunk size": np.diff((coord_pair[0][0], coord_pair[1][0])).item(),
+            "longitude chunk size": np.diff(
+                (coord_pair[0][1], coord_pair[1][1])
+            ).item(),
+            "start index pair": coord_pair[0],
+            "end index pair": coord_pair[1],
+        }
+        info_dict = info_dict.update(additional_info)
+    if coverage is not None:
+        additional_info = {
+            "cell coverage": coverage,
+        }
+        info_dict = info_dict.update(additional_info)
+
     return info_dict
