@@ -1511,10 +1511,47 @@ def add_gt_to_xa_d(
     gt_da = gt_da.isel(latitude=slice(None, None, -1))
     if "time" in gt_da.dims:
         gt_da = gt_da.isel(time=0)
-    expanded_da = np.tile(gt_da, (len(list(xa_d.time.values)), 1, 1))
+    expanded_da = np.tile(gt_da, (len(list(xa_d.time.values)), 1, 1)).astype("int")
 
     xa_d[gt_name] = (("time", "latitude", "longitude"), expanded_da)
     return xa_d
+
+
+def generate_and_add_gt_to_xa_d(
+    xa_d: xa.DataArray | xa.Dataset,
+    gt_da: xa.DataArray,
+    lat_lon_starts=(-10, 141.95),
+    coord_range=(-7.01, 5.11),
+    gt_name: str = "coral_algae_gt",
+) -> xa.Dataset:
+    """Generate and add ground truth (gt) data to an xarray dataset or data array.
+
+    Parameters
+    ----------
+        xa_d (xa.DataArray or xa.Dataset): Input xarray dataset or data array.
+        gt_da (xa.DataArray): Ground truth data array to be added.
+        lat_lon_starts (tuple[float, float], optional): Latitude and longitude starting values
+            for generating ground truth data. Defaults to (-10, 141.95).
+        coord_range (tuple[float, float], optional): Range of latitude and longitude coordinates
+            for generating ground truth data. Defaults to (-7.01, 5.11).
+        gt_name (str, optional): Name of the ground truth variable. Defaults to "coral_algae_gt".
+
+    Returns
+    -------
+        xa.Dataset or xa.DataArray: Xarray dataset or data array with ground truth data added.
+    """
+    # if lat_lon_starts and coord_range activately not supplied (indicating considering whole dataset)
+    if lat_lon_starts is None and coord_range is None:
+        lat_lims = xarray_coord_limits(xa_d, "latitude")
+        lon_lims = xarray_coord_limits(xa_d, "longitude")
+        lat_lon_starts = (lat_lims[0], lat_lims[1]), (lon_lims[0], lon_lims[1])
+        coord_range = (np.diff(lat_lims).item(), np.diff(lon_lims).item())
+
+    gt, _ = sample_spatial_batch(
+        gt_da, lat_lon_starts=lat_lon_starts, coord_range=coord_range
+    )
+
+    return add_gt_to_xa_d(xa_d, gt)
 
 
 def ds_subsample_from_coord(
