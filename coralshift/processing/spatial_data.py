@@ -1509,7 +1509,10 @@ def add_gt_to_xa_d(
         xarray.Dataset: Updated xarray Dataset with the ground truth variable added.
     """
     gt_da = gt_da.isel(latitude=slice(None, None, -1))
-    expanded_da = np.tile(gt_da.isel(time=0), (len(list(xa_d.time.values)), 1, 1))
+    if "time" in gt_da.dims:
+        gt_da = gt_da.isel(time=0)
+    expanded_da = np.tile(gt_da, (len(list(xa_d.time.values)), 1, 1))
+
     xa_d[gt_name] = (("time", "latitude", "longitude"), expanded_da)
     return xa_d
 
