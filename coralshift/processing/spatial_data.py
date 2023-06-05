@@ -1397,34 +1397,40 @@ def find_chunks_with_percentage(
 
     chunk_coords = []
     cell_coverages = []
-    for start_row in tqdm(chunk_rows, desc="Calculating area within range"):
-        for start_col in chunk_cols:
-            # amount of cell covered by values within range as percentage
-            cell_coverage = (
-                np.mean(
-                    np.logical_and(
-                        array[
-                            start_row : start_row + chunk_size,  # noqa
-                            start_col : start_col + chunk_size,  # noqa
-                        ]
-                        >= range_min,
-                        array[
-                            start_row : start_row + chunk_size,  # noqa
-                            start_col : start_col + chunk_size,  # noqa
-                        ]
-                        <= range_max,
+    # for start_row in tqdm(chunk_rows, desc="Calculating area within range"):
+    #     for start_col in chunk_cols:
+
+    with tqdm(total=rows * cols) as pbar:
+        for start_row in chunk_rows:
+            for start_col in chunk_cols:
+                # amount of cell covered by values within range as percentage
+                cell_coverage = (
+                    np.mean(
+                        np.logical_and(
+                            array[
+                                start_row : start_row + chunk_size,  # noqa
+                                start_col : start_col + chunk_size,  # noqa
+                            ]
+                            >= range_min,
+                            array[
+                                start_row : start_row + chunk_size,  # noqa
+                                start_col : start_col + chunk_size,  # noqa
+                            ]
+                            <= range_max,
+                        )
                     )
+                    * 100
                 )
-                * 100
-            )
-            if cell_coverage >= threshold_percent:
-                chunk_coords.append(
-                    (
-                        (start_row, start_col),
-                        (start_row + chunk_size - 1, start_col + chunk_size - 1),
+                if cell_coverage >= threshold_percent:
+                    chunk_coords.append(
+                        (
+                            (start_row, start_col),
+                            (start_row + chunk_size - 1, start_col + chunk_size - 1),
+                        )
                     )
-                )
-                cell_coverages.append(cell_coverage.item())
+                    cell_coverages.append(cell_coverage.item())
+                # update tqdm progress bar
+                pbar.update(1)
     return chunk_coords, cell_coverages
 
 
