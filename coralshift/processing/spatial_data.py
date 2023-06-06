@@ -865,14 +865,17 @@ def buffer_nans(array: np.ndarray, size: float = 1) -> np.ndarray:
         -------
             float: Mean value of valid neighbors or the central element if not NaN.
         """
+        central_value = values[len(values) // 2]
         # check if central element of kernel is nan
-        if np.isnan(values[len(values) // 2]):
+        if np.isnan(central_value):
+            if np.isnan(values).all():
+                return central_value
             # extract valid (non-nan values)
             valid_values = values[~(np.isnan(values))]
             # and return the mean of these values, to be assigned to rest of the buffer kernel
             return np.mean(valid_values)
         else:
-            return values[len(values) // 2]
+            return central_value
 
     # call nan_sweeper on each element of "array"
     # "constant" – array extended by filling all values beyond edge with same constant value, defined by cval
@@ -1350,8 +1353,7 @@ def spatially_buffer_timeseries(
     Returns:
         xarray.Dataset: Xarray dataset with buffered data variables.
     """
-    data_vars = list(xa_ds.data_vars)
-    filtered_vars = filter_strings(data_vars, exclude_vars)
+    filtered_vars = [var for var in xa_ds.data_vars if var not in exclude_vars]
 
     buffered_ds = xa.Dataset()
     for data_var in tqdm(
