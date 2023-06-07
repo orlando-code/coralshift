@@ -394,3 +394,35 @@ def plot_vars_at_time(
             variable_dict=variable_dict,
             coastlines=coastlines,
         )
+
+
+def visualise_variable_in_region(
+    xa_array: xa.DataArray,
+    lat_lims: tuple[float, float] = None,
+    lon_lims: tuple[(float, float)] = None,
+) -> None:
+    fig, ax = plt.subplots(
+        1,
+        3,
+        figsize=[15, 5],
+        # sharey=True,
+        gridspec_kw={"width_ratios": [1, 2, 1]},
+    )
+
+    if lat_lims is not None:
+        xa_array = xa_array.sel(
+            latitude=slice(min(lat_lims), max(lat_lims)),
+            longitude=slice(min(lon_lims), max(lon_lims)),
+        )
+
+    flat_data = xa_array.values.flatten()
+    spatial_mean = xa_array.mean(dim=["latitude", "longitude"])
+    ax[0].boxplot(spatial_mean)
+    spatial_mean.plot.line(ax=ax[1])
+    spatial_mean.plot.hist(ax=ax[2])
+
+    # format
+    ax[0].set_ylabel(xa_array.name)
+    ax[1].set_xlabel("time")
+
+    return spatial_mean
