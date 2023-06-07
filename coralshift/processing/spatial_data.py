@@ -884,6 +884,32 @@ def buffer_nans(array: np.ndarray, size: float = 1) -> np.ndarray:
     )
     return buffered_array
 
+    # # Use Dask array instead of NumPy array for parallel computation
+    # dask_array = da.from_array(array, chunks=array.shape)
+    # buffered_array = da.map_blocks(
+    #     buffer_nans,
+    #     dask_array,
+    #     size=size,
+    #     dtype=float,
+    #     drop_axis=0,  # Drop the first axis (the one processed by map_blocks)
+    # )
+    # return buffered_array.compute()  # Compute the result to get a NumPy array
+
+    # for data_var in tqdm(
+    #     filtered_vars, desc=f"Buffering variables by {buffer_size} pixel(s)"
+    # ):
+    #     buffered = xa.apply_ufunc(
+    #     buffer_nans,
+    #     xa_ds[data_var].chunk(),
+    #     # xa_ds[data_var],
+    #     input_core_dims=[[]],
+    #     output_core_dims=[[]],
+    #     kwargs={"size": buffer_size},
+    #     dask="parallelized",  # Enable parallel computation with Dask
+    #     output_dtypes=[float]
+    # )
+    # buffered_ds[data_var] = buffered
+
 
 def filter_out_nans(X_with_nans: np.ndarray, y_with_nans: np.ndarray) -> np.ndarray:
     """Filters out NaN values from 3d input arrays (columns, rows, and depths: columns contain entirely NaN values are
@@ -1357,7 +1383,7 @@ def spatially_buffer_timeseries(
 
     buffered_ds = xa.Dataset()
     for data_var in tqdm(
-        filtered_vars, desc=f"Buffering variables by {buffer_size} pixel"
+        filtered_vars, desc=f"Buffering variables by {buffer_size} pixel(s)"
     ):
         buffered = xa.apply_ufunc(
             buffer_nans,
