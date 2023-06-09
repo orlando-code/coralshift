@@ -371,7 +371,7 @@ def xarray_coord_limits(xa_array: xa.Dataset, dim: str) -> tuple[float]:
 
 def dict_xarray_coord_limits(xa_array: xa.Dataset) -> dict:
     """Compute the minimum and maximum values for each coordinate dimension of an xarray dataset and assign to a dict
-
+    # TODO: rename generate_dict_xa_coord_limits
     Parameters
     ----------
         xa_array (xa.Dataset): input xarray dataset.
@@ -887,7 +887,7 @@ def buffer_nans(array: np.ndarray, size: float = 1) -> np.ndarray:
     # # Use Dask array instead of NumPy array for parallel computation
     # dask_array = da.from_array(array, chunks=array.shape)
     # buffered_array = da.map_blocks(
-    #     buffer_nans,
+    #     buffer_nans,generate_and_add_gt_to_xa_d
     #     dask_array,
     #     size=size,
     #     dtype=float,
@@ -962,7 +962,7 @@ def sample_spatial_batch(
     variables: list[str] = None,
 ) -> np.ndarray:
     """Sample a spatial batch from an xarray Dataset.
-
+    # TODO: SORT OUT SELECTION into separate functions perhaps
     Parameters
     ----------
     xa_ds (xa.Dataset): The input xarray Dataset.
