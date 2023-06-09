@@ -514,7 +514,7 @@ def generate_filepath(
         return Path(dir_path) / filename
     # if filename and suffix provided
     else:
-        return (Path(dir_path) / filename).with_suffix(suffix)
+        return (Path(dir_path) / filename).with_suffix(pad_suffix(suffix))
 
 
 class NpEncoder(json.JSONEncoder):
