@@ -335,7 +335,8 @@ def ecmwf_api_call(
     parameter: str,
     time_info_dict: dict,
     area: list[tuple[float]],
-    format: str,
+    dataset_tag: str = "reanalysis-era5-single-levels",
+    format: str = "grib",
 ):
     api_call_dict = generate_ecmwf_api_dict(parameter, time_info_dict, area, format)
     # make api call
@@ -404,32 +405,32 @@ def return_full_ecmwf_weather_param_strings(dict_keys: list[str]):
     return weather_params
 
 
-def generate_times_from_start_end(start_end_dates: list[tuple[pd.Timestamp]]) -> dict:
-    """Generate dictionary containing ecmwf time values from list of start and end dates.
+# def generate_times_from_start_end(start_end_dates: list[tuple[pd.Timestamp]]) -> dict:
+#     """Generate dictionary containing ecmwf time values from list of start and end dates.
 
-    TODO: update so can span multiple months accurately (will involve several api calls)
-    """
+#     TODO: update so can span multiple months accurately (will involve several api calls)
+#     """
 
-    # padding dates of interest + 1 day on either side to deal with later nans
-    dates = pd.date_range(
-        start_end_dates[0] - pd.Timedelta(1, "d"),
-        start_end_dates[1] + pd.Timedelta(1, "d"),
-    )
-    years, months, days, hours = set(), set(), set(), []
-    # extract years from time
-    for date in dates:
-        years.add(str(date.year))
-        months.add(utils.pad_number_with_zeros(date.month))
-        days.add(utils.pad_number_with_zeros(date.day))
+#     # padding dates of interest + 1 day on either side to deal with later nans
+#     dates = pd.date_range(
+#         start_end_dates[0] - pd.Timedelta(1, "d"),
+#         start_end_dates[1] + pd.Timedelta(1, "d"),
+#     )
+#     years, months, days, hours = set(), set(), set(), []
+#     # extract years from time
+#     for date in dates:
+#         years.add(str(date.year))
+#         months.add(utils.pad_number_with_zeros(date.month))
+#         days.add(utils.pad_number_with_zeros(date.day))
 
-    for i in range(24):
-        hours.append(f"{i:02d}:00")
+#     for i in range(24):
+#         hours.append(f"{i:02d}:00")
 
-    years, months, days = list(years), list(months), list(days)
+#     years, months, days = list(years), list(months), list(days)
 
-    time_info = {"year": years, "month": months[0], "day": days, "time": hours}
+#     time_info = {"year": years, "month": months[0], "day": days, "time": hours}
 
-    return time_info
+#     return time_info
 
 
 def fetch_era5_data(
@@ -439,6 +440,7 @@ def fetch_era5_data(
     lon_lims: tuple[float, float],
     lat_lims: tuple[float, float],
     download_dest_dir: str | Path,
+    dataset_tag: str = "reanalysis-era5-single-levels",
     format: str = "grib",
 ) -> None:
     """Generate API call, download files, merge xarrays, save as new pkl file.
@@ -476,7 +478,9 @@ def fetch_era5_data(
 
             filename = f"{param}_{str(month)}.{format}"
             filepath = file_ops.generate_filepath(download_dir_name, filename, format)
-            ecmwf_api_call(c, download_dir_name, param, time_info_dict, area)
+            ecmwf_api_call(
+                c, download_dir_name, param, time_info_dict, area, dataset_tag, format
+            )
 
     # for i, dates in enumerate(start_end_dates):
     #     # create new folder for downloads - TODO: FUNCTION
