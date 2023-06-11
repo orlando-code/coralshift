@@ -23,6 +23,7 @@ class ReefAreas:
                 "name": "Great Barrier Reef A 2020 30m",
                 "short_name": "A",
                 "file_name": "Great_Barrier_Reef_A_2020_30m.tif",
+                "xarray_name": "bathymetry_A",
                 "lat_range": (-10, -17),
                 "lon_range": (142, 147),
                 "url": "https://ausseabed-public-warehouse-bathymetry.s3.ap-southeast-2.amazonaws.com/L3/0b9ad3f3-7ade-40a7-ae70-f7c6c0f3ae2e/Great_Barrier_Reef_A_2020_30m_MSL_cog.tif",  # noqa
@@ -31,6 +32,7 @@ class ReefAreas:
                 "name": "Great Barrier Reef B 2020 30m",
                 "short_name": "B",
                 "file_name": "Great_Barrier_Reef_B_2020_30m.tif",
+                "xarray_name": "bathymetry_B",
                 "lat_range": (-16, -23),
                 "lon_range": (144, 149),
                 "url": "https://ausseabed-public-warehouse-bathymetry.s3.ap-southeast-2.amazonaws.com/L3/4a6e7365-d7b1-45f9-a576-2be8ff8cd755/Great_Barrier_Reef_B_2020_30m_MSL_cog.tif",  # noqa
@@ -39,6 +41,7 @@ class ReefAreas:
                 "name": "Great Barrier Reef C 2020 30m",
                 "short_name": "C",
                 "file_name": "Great_Barrier_Reef_C_2020_30m.tif",
+                "xarray_name": "bathymetry_C",
                 "lat_range": (-18, -24),
                 "lon_range": (148, 154),
                 "url": "https://ausseabed-public-warehouse-bathymetry.s3.ap-southeast-2.amazonaws.com/L3/3b171f8d-9248-4aeb-8b32-0737babba3c2/Great_Barrier_Reef_C_2020_30m_MSL_cog.tif",  # noqa
@@ -47,6 +50,7 @@ class ReefAreas:
                 "name": "Great Barrier Reef D 2020 30m",
                 "short_name": "D",
                 "file_name": "Great_Barrier_Reef_D_2020_30m.tif",
+                "xarray_name": "bathymetry_D",
                 "lat_range": (-23, -29),
                 "lon_range": (150, 156),
                 "url": "https://ausseabed-public-warehouse-bathymetry.s3.ap-southeast-2.amazonaws.com/L3/7168f130-f903-4f2b-948b-78508aad8020/Great_Barrier_Reef_D_2020_30m_MSL_cog.tif",  # noqa
@@ -71,6 +75,13 @@ class ReefAreas:
         dataset = self.get_dataset(name)
         if dataset:
             return dataset["file_name"]
+        return None
+
+    def get_xarray_name(self, name):
+        name = self.get_name_from_names(name)
+        dataset = self.get_dataset(name)
+        if dataset:
+            return dataset["xarray_name"]
         return None
 
     def get_dataset(self, name):
