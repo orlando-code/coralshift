@@ -80,6 +80,26 @@ def prune_file_list_on_existence(file_list: list[Path | str]) -> list:
     return existing_files
 
 
+def xa_d_from_geojson(geojson_path: Path | str) -> xa.DataArray:
+    """
+    Load a GeoJSON file and convert it to an xarray DataArray.
+
+    Parameters
+    ----------
+        geojson_path (Path or str): Path to the GeoJSON file.
+
+    Returns
+    -------
+        xa.DataArray: xarray DataArray representing the GeoJSON data.
+    """
+    # read geojson
+    gdf = gpd.read_file(geojson_path)
+    # Convert the GeoDataFrame to a DataFrame
+    df = gdf.drop("geometry", axis=1)
+    # Convert the DataFrame to an xarray Dataset TODO: chunking
+    return xa.Dataset.from_dataframe(df)
+
+
 class DownloadProgressBar(tqdm):
     def update_to(self, b=1, bsize=1, tsize=None):
         if tsize is not None:
