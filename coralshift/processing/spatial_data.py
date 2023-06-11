@@ -986,6 +986,7 @@ def process_xa_d(
         "band": "band",
     },
     squeeze_coords: str | list[str] = ["band"],
+    chunks: dict = {"latitude": 100, "longitude": 100, "time": 100},
 ):
     # standardise coordinate names
     # temp_xa_d = xa_d.rename(
@@ -997,8 +998,10 @@ def process_xa_d(
     if squeeze_coords:
         temp_xa_d = temp_xa_d.squeeze(squeeze_coords)
 
-    # order variables
-    return temp_xa_d.sortby(list(temp_xa_d.coords))
+    # set up to chunk relevant coordinates
+    coords_to_chunk = {coord: chunks.get(coord, None) for coord in temp_xa_d.dims}
+    # sort coords by ascending values
+    return temp_xa_d.chunk(coords_to_chunk).sortby(list(temp_xa_d.dims))
 
 
 def xa_region_from_coord_bounds(xa_d, coord_bounds_dict):
