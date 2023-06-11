@@ -81,8 +81,8 @@ def process_xa_array(
     xa_array: xa.DataArray,
     coords_to_drop: list[str] = None,
     coords_to_rename: dict = {"x": "longitude", "y": "latitude"},
-    resolution: float = None,
-    shape: tuple[int] = None,
+    # resolution: float = None,
+    # shape: tuple[int] = None,
     verbose: bool = True,
 ) -> xa.DataArray:
     """Process the given xarray DataArray by dropping and renaming specified coordinates.
@@ -110,13 +110,13 @@ def process_xa_array(
     # rename specified coordinates
     xa_array = xa_array.rename(coords_to_rename)
 
-    if resolution or shape:
-        upsample_xa_array(xa_array, resolution=resolution, shape=shape)
+    # if resolution or shape:
+    #     upsample_xa_array(xa_array, resolution=resolution, shape=shape)
     if verbose:
         # show info about remaining coords
         print(xa_array.coords)
 
-    return xa_array
+    return xa_array.sortby()
 
 
 def process_xa_arrays_in_dict(
