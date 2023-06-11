@@ -976,11 +976,23 @@ def filter_out_nans(X_with_nans: np.ndarray, y_with_nans: np.ndarray) -> np.ndar
     return X, y
 
 
-def process_xa_d(xa_d: xa.Dataset | xa.DataArray):
+def process_xa_d(
+    xa_d: xa.Dataset | xa.DataArray,
+    rename_mapping: dict = {
+        "lat": "latitude",
+        "lon": "longitude",
+        "x": "longitude",
+        "y": "latitude",
+    },
+):
     # standardise coordinate names
+    # temp_xa_d = xa_d.rename(
+    #     {"lat": "latitude", "lon": "longitude", "x": "longitude", "y": "latitude"}
+    # )
     temp_xa_d = xa_d.rename(
-        {"lat": "latitude", "lon": "longitude", "x": "longitude", "y": "latitude"}
+        {coord: rename_mapping.get(coord, coord) for coord in xa_d.coords}
     )
+
     # order variables
     return temp_xa_d.sortby(list(temp_xa_d.coords))
 
