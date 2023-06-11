@@ -984,6 +984,7 @@ def process_xa_d(
         "x": "longitude",
         "y": "latitude",
     },
+    squeeze_coords: str | list[str] = ["band"],
 ):
     # standardise coordinate names
     # temp_xa_d = xa_d.rename(
@@ -992,6 +993,8 @@ def process_xa_d(
     temp_xa_d = xa_d.rename(
         {coord: rename_mapping.get(coord, coord) for coord in xa_d.coords}
     )
+    if squeeze_coords:
+        temp_xa_d = temp_xa_d.squeeze(squeeze_coords)
 
     # order variables
     return temp_xa_d.sortby(list(temp_xa_d.coords))
