@@ -153,65 +153,121 @@ def check_path_suffix(path: Path | str, comparison: str) -> bool:
         return False
 
 
-def load_merge_nc_files(
-    nc_dir: Path | str, incl_subdirs: bool = True, concat_dim: str = "time"
+# def load_merge_nc_files(
+#     nc_dir: Path | str, incl_subdirs: bool = True, concat_dim: str = "time"
+# ):
+#     """Load and merge all netCDF files in a directory.
+
+#     Parameters
+#     ----------
+#         nc_dir (Path | str): directory containing the netCDF files to be merged.
+
+#     Returns
+#     -------
+#         xr.Dataset: merged xarray Dataset object containing the data from all netCDF files.
+#     """
+#     # specify whether searching subdirectories as well
+#     files = return_list_filepaths(nc_dir, ".nc", incl_subdirs)
+#     # if only a single file present (no need to merge)
+#     if len(files) == 1:
+#         return xa.open_dataset(files[0])
+#     # combine nc files by time
+#     ds = xa.open_mfdataset(
+#         files,
+#         decode_cf=False,
+#         concat_dim=concat_dim,
+#         combine="nested",
+#         coords="minimal",
+#     )
+#     return xa.decode_cf(ds).sortby("time", ascending=True)
+
+
+def merge_nc_files_in_dir(
+    nc_dir: Path | str, incl_subdirs: bool = False, concat_dim: str = "time"
 ):
     """Load and merge all netCDF files in a directory.
+    # TODO: test
 
     Parameters
     ----------
-        nc_dir (Path | str): directory containing the netCDF files to be merged.
+        nc_dir (Path or str): The directory containing the netCDF files to be merged.
+        incl_subdirs (bool, optional): Specifies whether to search for netCDF files in subdirectories as well.
+            Default is False.
+        concat_dim (str, optional): The name of the dimension along which the netCDF files will be concatenated.
+            Default is "time".
 
     Returns
     -------
-        xr.Dataset: merged xarray Dataset object containing the data from all netCDF files.
+        xarray.Dataset: The merged xarray Dataset object containing the data from all netCDF files.
     """
     # specify whether searching subdirectories as well
-    files = return_list_filepaths(nc_dir, ".nc", incl_subdirs)
+    filepaths = return_list_filepaths(nc_dir, ".nc", incl_subdirs)
     # if only a single file present (no need to merge)
-    if len(files) == 1:
-        return xa.open_dataset(files[0])
-    # combine nc files by time
-    ds = xa.open_mfdataset(
-        files,
-        decode_cf=False,
-        concat_dim=concat_dim,
-        combine="nested",
-        coords="minimal",
-    )
-    return xa.decode_cf(ds).sortby("time", ascending=True)
+    if len(filepaths) == 1:
+        return xa.open_dataset(filepaths[0])
+
+    nc_dir = Path(nc_dir)
+    merged_name = f"{str(nc_dir.stem)}_time_merged.nc"
+    merged_path = nc_dir / merged_name
+    if not merged_path.is_file():
+        print(f"Merging .nc files into {merged_path}")
+        merged_ds = spatial_data.process_xa_array(
+            xa.open_mfdataset(
+                filepaths, chunks={"time": 100}, concat_dim=concat_dim, combine="nested"
+            )
+        )
+        merged_ds.to_netcdf(merged_path)
+        return merged_ds
+    else:
+        print(f"{merged_path} already exists.")
+
+    # # combine nc files by time
+    # ds = xa.open_mfdataset(
+    #     filepaths,
+    #     decode_cf=False,
+    #     concat_dim=concat_dim,
+    #     combine="nested",
+    #     coords="minimal",
+    # )
+    # return xa.decode_cf(ds).sortby("time", ascending=True)
 
 
 def merge_nc_files_in_dirs(parent_dir: Path | str, concat_dim: str = "time"):
-    """Load and merge all netCDF files in a directory.
-
+    """
+    Load and merge all netCDF files in multiple directories.
+    # TODO: test
     Parameters
     ----------
-        nc_dir (Path | str): directory containing the netCDF files to be merged.
+        parent_dir (Path or str): The parent directory containing the directories with netCDF files to be merged.
+        concat_dim (str, optional): The name of the dimension along which the netCDF files will be concatenated.
+            Default is "time".
 
     Returns
     -------
-        xr.Dataset: merged xarray Dataset object containing the data from all netCDF files.
+        xarray.Dataset: The merged xarray Dataset object containing the data from all netCDF files.
     """
-    dirs = [d for d in Path(parent_dir).iterdir() if d.is_dir()]
-    for dir in tqdm(dirs):
-        merged_name = f"{str(dir.stem)}_time_merged.nc"
-        merged_path = dir / merged_name
-        print(f"Merging .nc files into {merged_path}")
+    nc_dirs = [d for d in Path(parent_dir).iterdir() if d.is_dir()]
+    for nc_dir in tqdm(nc_dirs):
+        return merge_nc_files_in_dir(
+            nc_dir, include_subdirs=True, concat_dim=concat_dim
+        )
+        # merged_name = f"{str(dir.stem)}_time_merged.nc"
+        # merged_path = dir / merged_name
+        # print(f"Merging .nc files into {merged_path}")
 
-        # if merged doesn't already exist
-        if not merged_path.is_file():
-            files = return_list_filepaths(dir, ".nc", incl_subdirs=False)
-            if len(files) == 1:
-                ds = xa.open_dataset(files[0])
-            else:
-                # combine nc files by time
-                ds = xa.open_mfdataset(
-                    files, decode_cf=False, concat_dim=concat_dim, combine="nested"
-                ).sortby("time", ascending=True)
-            ds.to_netcdf(merged_path)
-        else:
-            print(f"{merged_path} already exists.")
+        # # if merged doesn't already exist
+        # if not merged_path.is_file():
+        #     files = return_list_filepaths(dir, ".nc", incl_subdirs=False)
+        #     if len(files) == 1:
+        #         ds = xa.open_dataset(files[0])
+        #     else:
+        #         # combine nc files by time
+        #         ds = xa.open_mfdataset(
+        #             files, decode_cf=False, concat_dim=concat_dim, combine="nested"
+        #         ).sortby("time", ascending=True)
+        #     ds.to_netcdf(merged_path)
+        # else:
+        #     print(f"{merged_path} already exists.")
 
 
 def merge_from_dirs(parent_dir: Path | str, concat_files_common: str):
@@ -244,13 +300,13 @@ def merge_from_dirs(parent_dir: Path | str, concat_files_common: str):
     # concatenate merged files
 
 
-def merge_save_nc_files(download_dir: Path | str, filename: str):
-    # read relevant .nc files and merge to return master xarray
-    xa_ds = load_merge_nc_files(Path(download_dir))
-    save_path = Path(Path(download_dir), filename).with_suffix(".nc")
-    xa_ds.to_netcdf(save_path)
-    print(f"Combined nc file written to {save_path}.")
-    return xa_ds
+# def merge_save_nc_files(download_dir: Path | str, filename: str):
+#     # read relevant .nc files and merge to return master xarray
+#     xa_ds = load_merge_nc_files(Path(download_dir))
+#     save_path = Path(Path(download_dir), filename).with_suffix(".nc")
+#     xa_ds.to_netcdf(save_path)
+#     print(f"Combined nc file written to {save_path}.")
+#     return xa_ds
 
 
 # hopefully isn't necessary, since loading all datasets into memory is very intensive and not scalable
