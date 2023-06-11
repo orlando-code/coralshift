@@ -120,12 +120,12 @@ def ensure_bathymetry_downloaded(area_name: str, loading_bar: bool = True) -> Re
     # download data if not already there
     file_ops.check_exists_download_url(save_path, area_url)
 
-    return ReefAreas
+    return ReefAreas()
 
 
-####
+######################################################
 # Not used within MRes: coastal bathymetry for US only
-####
+######################################################
 
 
 def fetch_links_from_url(page_url: str, suffix: str = None) -> list[str]:
