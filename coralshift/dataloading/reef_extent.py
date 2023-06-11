@@ -14,7 +14,7 @@ def generate_area_geojson(area_class, area_name: str, save_dir: Path | str) -> N
 
     Returns
     -------
-        None
+        output_path (Path): Path to GeoJSON file.
     """
 
     lat_range, lon_range = area_class.get_lat_lon_limits(area_name)
@@ -36,7 +36,7 @@ def generate_area_geojson(area_class, area_name: str, save_dir: Path | str) -> N
                     ]
                 ],
             },
-            "properties": {"name": name},
+            "properties": {"name": name, "format": "GeoJSON"},
         }
     ]
 
@@ -49,3 +49,5 @@ def generate_area_geojson(area_class, area_name: str, save_dir: Path | str) -> N
     output_path = save_dir / filename
     with open(output_path, "w") as file:
         json.dump(geojson_data, file)
+
+    return output_path
