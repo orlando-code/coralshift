@@ -11,9 +11,9 @@ from bs4 import BeautifulSoup
 class ReefAreas:
     name_mapping = {
         "A": "Great_Barrier_Reef_A_2020_30m",
-        "B": "Great_Barrier_Reef B 2020 30m",
-        "C": "Great_Barrier_Reef C 2020 30m",
-        "D": "Great_Barrier_Reef D 2020 30m",
+        "B": "Great_Barrier_Reef_B_2020_30m",
+        "C": "Great_Barrier_Reef_C_2020_30m",
+        "D": "Great_Barrier_Reef_D_2020_30m",
         # Add more mappings as needed
     }
 
@@ -23,6 +23,7 @@ class ReefAreas:
                 "name": "Great_Barrier_Reef_A_2020_30m",
                 "short_name": "A",
                 "file_name": "Great_Barrier_Reef_A_2020_30m_MSL_cog.tif",
+                "short_file_name": "Great_Barrier_Reef_A",
                 "xarray_name": "bathymetry_A",
                 "lat_range": (-10, -17),
                 "lon_range": (142, 147),
@@ -32,6 +33,7 @@ class ReefAreas:
                 "name": "Great_Barrier_Reef B 2020 30m",
                 "short_name": "B",
                 "file_name": "Great_Barrier_Reef_B_2020_30m_MSL_cog.tif",
+                "short_file_name": "Great_Barrier_Reef_B",
                 "xarray_name": "bathymetry_B",
                 "lat_range": (-16, -23),
                 "lon_range": (144, 149),
@@ -41,6 +43,7 @@ class ReefAreas:
                 "name": "Great_Barrier_Reef C 2020 30m",
                 "short_name": "C",
                 "file_name": "Great_Barrier_Reef_C_2020_30m_MSL_cog.tif",
+                "short_file_name": "Great_Barrier_Reef_C",
                 "xarray_name": "bathymetry_C",
                 "lat_range": (-18, -24),
                 "lon_range": (148, 154),
@@ -50,6 +53,7 @@ class ReefAreas:
                 "name": "Great_Barrier_Reef D 2020 30m",
                 "short_name": "D",
                 "file_name": "Great_Barrier_Reef_D_2020_30m_MSL_cog.tif",
+                "short_file_name": "Great_Barrier_Reef_D",
                 "xarray_name": "bathymetry_D",
                 "lat_range": (-23, -29),
                 "lon_range": (150, 156),
@@ -75,6 +79,13 @@ class ReefAreas:
         dataset = self.get_dataset(name)
         if dataset:
             return dataset["file_name"]
+        return None
+
+    def get_short_filename(self, name):
+        name = self.get_name_from_names(name)
+        dataset = self.get_dataset(name)
+        if dataset:
+            return dataset["short_file_name"]
         return None
 
     def get_xarray_name(self, name):
