@@ -77,46 +77,46 @@ def upsample_xarray_by_factor(
     return existing_xa_array
 
 
-def process_xa_array(
-    xa_array: xa.DataArray,
-    coords_to_drop: list[str] = None,
-    coords_to_rename: dict = {"x": "longitude", "y": "latitude"},
-    # resolution: float = None,
-    # shape: tuple[int] = None,
-    verbose: bool = True,
-) -> xa.DataArray:
-    """Process the given xarray DataArray by dropping and renaming specified coordinates.
+# def process_xa_array(
+#     xa_array: xa.DataArray,
+#     coords_to_drop: list[str] = None,
+#     coords_to_rename: dict = {"x": "longitude", "y": "latitude"},
+#     # resolution: float = None,
+#     # shape: tuple[int] = None,
+#     verbose: bool = True,
+# ) -> xa.DataArray:
+#     """Process the given xarray DataArray by dropping and renaming specified coordinates.
 
-    Parameters
-    ----------
-        xa_array (xa.DataArray): xarray DataArray to be processed.
-        coords_to_drop (list[str]): list of coordinates to be dropped from the DataArray.
-        coords_to_rename (dict, optional): dictionary of coordinates to be renamed in the DataArray.
-            Defaults to {"x": "longitude", "y": "latitude"}.
-        resolution (float, optional): Output resolution of the upsampled DataArray, in the same units as the input.
-            Defaults to None.
-        shape (tuple, optional): Shape of the output DataArray as (height, width). If specified, overrides the
-            resolution parameter. Defaults to None.
-        verbose (bool, optional): if True, print information about the remaining coordinates in the DataArray.
-            Defaults to True.
+#     Parameters
+#     ----------
+#         xa_array (xa.DataArray): xarray DataArray to be processed.
+#         coords_to_drop (list[str]): list of coordinates to be dropped from the DataArray.
+#         coords_to_rename (dict, optional): dictionary of coordinates to be renamed in the DataArray.
+#             Defaults to {"x": "longitude", "y": "latitude"}.
+#         resolution (float, optional): Output resolution of the upsampled DataArray, in the same units as the input.
+#             Defaults to None.
+#         shape (tuple, optional): Shape of the output DataArray as (height, width). If specified, overrides the
+#             resolution parameter. Defaults to None.
+#         verbose (bool, optional): if True, print information about the remaining coordinates in the DataArray.
+#             Defaults to True.
 
-    Returns
-    -------
-        xa.DataArray: The processed xarray DataArray.
-    """
-    if not coords_to_drop:
-        # drop specified coordinates
-        xa_array = xa_array.drop_vars(coords_to_drop)
-    # rename specified coordinates
-    xa_array = xa_array.rename(coords_to_rename)
+#     Returns
+#     -------
+#         xa.DataArray: The processed xarray DataArray.
+#     """
+#     if not coords_to_drop:
+#         # drop specified coordinates
+#         xa_array = xa_array.drop_vars(coords_to_drop)
+#     # rename specified coordinates
+#     xa_array = xa_array.rename(coords_to_rename)
 
-    # if resolution or shape:
-    #     upsample_xa_array(xa_array, resolution=resolution, shape=shape)
-    if verbose:
-        # show info about remaining coords
-        print(xa_array.coords)
+#     # if resolution or shape:
+#     #     upsample_xa_array(xa_array, resolution=resolution, shape=shape)
+#     if verbose:
+#         # show info about remaining coords
+#         print(xa_array.coords)
 
-    return xa_array.sortby()
+#     return xa_array.sortby()
 
 
 def process_xa_arrays_in_dict(
@@ -957,7 +957,9 @@ def filter_out_nans(X_with_nans: np.ndarray, y_with_nans: np.ndarray) -> np.ndar
 
 def process_xa_d(xa_d: xa.Dataset | xa.DataArray):
     # standardise coordinate names
-    temp_xa_d = xa_d.rename({"lat": "latitude", "lon": "longitude"})
+    temp_xa_d = xa_d.rename(
+        {"lat": "latitude", "lon": "longitude", "x": "longitude", "y": "latitude"}
+    )
     # order variables
     return temp_xa_d.sortby(list(temp_xa_d.coords))
 
