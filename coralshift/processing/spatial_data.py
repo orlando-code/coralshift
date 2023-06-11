@@ -119,35 +119,36 @@ def upsample_xarray_by_factor(
 #     return xa_array.sortby()
 
 
-def process_xa_arrays_in_dict(
-    xa_array_dict: dict,
-    coords_to_drop: list[str],
-    coords_to_rename: dict = {"x": "longitude", "y": "latitude"},
-    resolution: float = None,
-    shape: tuple[int] = None,
-) -> dict:
-    """Process multiple xarray DataArrays stored in a dictionary by dropping and renaming specified coordinates.
+# def process_xa_arrays_in_dict(
+#     xa_array_dict: dict,
+#     coords_to_drop: list[str],
+#     coords_to_rename: dict = {"x": "longitude", "y": "latitude"},
+#     resolution: float = None,
+#     shape: tuple[int] = None,
+# ) -> dict:
+#     """Process multiple xarray DataArrays stored in a dictionary by dropping and renaming specified coordinates.
 
-    Parameters
-    ----------
-        xa_array_dict (dict): A dictionary of xarray DataArrays to be processed: keys = filename, values = xa.DataArray.
-        coords_to_drop (list[str]): A list of coordinate fields to be dropped from each DataArray.
-        coords_to_rename (dict): A dictionary of coordinate fields to be renamed in each DataArray.
+#     Parameters
+#     ----------
+#         xa_array_dict (dict): A dictionary of xarray DataArrays to be processed: keys = filename,
+# values = xa.DataArray.
+#         coords_to_drop (list[str]): A list of coordinate fields to be dropped from each DataArray.
+#         coords_to_rename (dict): A dictionary of coordinate fields to be renamed in each DataArray.
 
-    Returns
-    -------
-        dict: A dictionary containing the processed xarray DataArrays.
-    """
-    processed_dict = {}
-    print(
-        f"Processing xa_arrays in dictionary. Dropping {coords_to_drop}, renaming {coords_to_rename.keys()}."
-    )
-    for name, xa_array in tqdm(xa_array_dict.items(), desc="processing xarray: "):
-        processed_dict[name] = process_xa_array(
-            xa_array, coords_to_drop, coords_to_rename, resolution, shape, verbose=False
-        )
+#     Returns
+#     -------
+#         dict: A dictionary containing the processed xarray DataArrays.
+#     """
+#     processed_dict = {}
+#     print(
+#         f"Processing xa_arrays in dictionary. Dropping {coords_to_drop}, renaming {coords_to_rename.keys()}."
+#     )
+#     for name, xa_array in tqdm(xa_array_dict.items(), desc="processing xarray: "):
+#         processed_dict[name] = process_xa_array(
+#             xa_array, coords_to_drop, coords_to_rename, resolution, shape, verbose=False
+#         )
 
-    return processed_dict
+#     return processed_dict
 
 
 def tifs_to_xa_array_dict(tif_paths: list[Path] | list[str]) -> dict:
@@ -257,6 +258,26 @@ def return_pixels_closest_to_value(
 
     # return only non-zero values as 1d array
     return array_vals[np.nonzero(array_vals)]
+
+
+def tif_to_xarray(tif_path: Path | str, renamed: str = None) -> xa.DataArray:
+    """
+    Convert a TIFF file to an xarray.DataArray object.
+
+    Parameters
+    ----------
+        tif_path (Path or str): Path to the TIFF file.
+        renamed (str, optional): Name to assign to the DataArray. If not provided, the original name will be used.
+
+    Returns
+    -------
+        xarray.DataArray: The converted DataArray object.
+    """
+    xa_da = rio.open_rasterio(rasterio.open(tif_path))
+    if renamed:
+        return process_xa_d(xa_da.rename(renamed))
+    else:
+        return process_xa_d(xa_da)
 
 
 def return_distance_closest_to_value(
