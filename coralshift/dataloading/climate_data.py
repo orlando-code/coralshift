@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 import xarray as xa
 import os
+import cdsapi
 
 # import getpass
 # import cdsapi
@@ -331,18 +331,17 @@ def download_data_slice(query):
 
 def ecmwf_api_call(
     c,
-    download_dest_dir: Path | str,
+    filepath: str,
     parameter: str,
     time_info_dict: dict,
     area: list[tuple[float]],
     dataset_tag: str = "reanalysis-era5-single-levels",
-    format: str = "grib",
+    format: str = "nc",
 ):
     api_call_dict = generate_ecmwf_api_dict(parameter, time_info_dict, area, format)
     # make api call
     try:
-        # TODO: update this
-        c.retrieve("reanalysis-era5-land", api_call_dict, download_dest_dir)
+        c.retrieve(dataset_tag, api_call_dict, filepath)
     # if error in fetching, limit the parameter
     except ConnectionAbortedError():
         print(f"API call failed for {parameter}.")
@@ -353,8 +352,11 @@ def generate_ecmwf_api_dict(
 ) -> dict:
     """Generate api dictionary format for single month of event"""
 
+    # if weather_params
+
     api_call_dict = {
-        "variable": weather_params,
+        "product_type": "reanalysis",
+        "variable": [weather_params],
         "area": area,
         "format": format,
     } | time_info_dict
@@ -405,134 +407,108 @@ def return_full_ecmwf_weather_param_strings(dict_keys: list[str]):
     return weather_params
 
 
-# def generate_times_from_start_end(start_end_dates: list[tuple[pd.Timestamp]]) -> dict:
-#     """Generate dictionary containing ecmwf time values from list of start and end dates.
-
-#     TODO: update so can span multiple months accurately (will involve several api calls)
-#     """
-
-#     # padding dates of interest + 1 day on either side to deal with later nans
-#     dates = pd.date_range(
-#         start_end_dates[0] - pd.Timedelta(1, "d"),
-#         start_end_dates[1] + pd.Timedelta(1, "d"),
-#     )
-#     years, months, days, hours = set(), set(), set(), []
-#     # extract years from time
-#     for date in dates:
-#         years.add(str(date.year))
-#         months.add(utils.pad_number_with_zeros(date.month))
-#         days.add(utils.pad_number_with_zeros(date.day))
-
-#     for i in range(24):
-#         hours.append(f"{i:02d}:00")
-
-#     years, months, days = list(years), list(months), list(days)
-
-#     time_info = {"year": years, "month": months[0], "day": days, "time": hours}
-
-#     return time_info
-
-
-def fetch_era5_data(
-    weather_params: list[str],
-    date_lims: tuple[np.datetime64, np.datetime64],
-    # areas: list[tuple[float]],
-    lon_lims: tuple[float, float],
-    lat_lims: tuple[float, float],
-    download_dest_dir: str | Path,
-    dataset_tag: str = "reanalysis-era5-single-levels",
-    format: str = "grib",
-) -> None:
-    """Generate API call, download files, merge xarrays, save as new pkl file.
-
-    Parameters
-    ----------
-    weather_keys : list[str]
-        list of weather parameter short names to be included in the call
-    start_end_dates : list[tuple[pd.Timestamp]]
-        list of start and end date/times for each event
-    area : list[tuple[float]]
-        list of max/min lat/lon values in format [north, west, south, east]
-    download_dest_dir : str | Path
-        path to download destination
-    format : str = 'grib'
-        format of data file to be downloaded
-
-    Returns
-    -------
-    None
-    """
-    # initialise client
-    c = cdsapi.Client()
-    # for parameter in weather_params
-    for param in weather_params:
-        download_dir_name = file_ops.guarantee_existence(
-            Path(download_dest_dir) / param
+def hourly_means_to_daily(hourly_dir: Path | str, suffix: str = "netcdf"):
+    filepaths = file_ops.return_list_filepaths(hourly_dir, suffix, incl_subdirs=True)
+    # create subdirectory to store averaged files
+    daily_means_dir = file_ops.guarantee_existence(Path(hourly_dir) / "daily_means")
+    for filepath in tqdm(filepaths, desc="Converting hourly means to daily means"):
+        filename = "_".join((str(filepath.stem), "daily"))
+        save_path = (daily_means_dir / filename).with_suffix(
+            file_ops.pad_suffix(suffix)
         )
-        # for month in range of time start and finish
-        for month in pd.date_range(date_lims[0], date_lims[1], freq="MS"):
-            # generate time range TODO
-            time_info_dict = generate_times_from_start_end(month)
-            # N.B. this will result in unexpected behaviour for negative values
-            area = [max(lat_lims), min(lon_lims), min(lat_lims), max(lon_lims)]
+        # open dataset
+        hourly = xa.open_dataset(filepath, chunks={"time": 100})
+        daily = hourly.resample(time="1D").mean()
+        # take average means
+        daily.to_netcdf(save_path)
 
-            filename = f"{param}_{str(month)}.{format}"
-            filepath = file_ops.generate_filepath(download_dir_name, filename, format)
-            ecmwf_api_call(
-                c, download_dir_name, param, time_info_dict, area, dataset_tag, format
+
+def generate_month_day_hour_list(items_range):
+    items = []
+
+    if isinstance(items_range, (int, np.integer)):
+        items_range = [items_range]
+    elif isinstance(items_range, np.ndarray):
+        items_range = items_range.tolist()
+    elif not isinstance(items_range, list):
+        raise ValueError(
+            "Invalid input format. Please provide an integer, a list, or a NumPy array."
+        )
+
+    for item in items_range:
+        if isinstance(item, (int, np.integer)):
+            if item < 0 or item > 31:
+                raise ValueError("Invalid items value: {}.".format(item))
+            items.append(item)
+        else:
+            raise ValueError(
+                "Invalid input format. Please provide an integer, a list, or a NumPy array."
             )
 
-    # for i, dates in enumerate(start_end_dates):
-    #     # create new folder for downloads - TODO: FUNCTION
-    #     dir_name = "_".join(utils.dates_from_dt(dates))
-    #     dir_path = file_ops.guarantee_existence(Path(download_dest_dir) / dir_name)
-    #     # dir_name = '_'.join((
-    #     #     dates[0].strftime("%d-%m-%Y"), dates[1].strftime("%d-%m-%Y")
-    #     #     ))
-    #     # dir_path = guarantee_existence(os.path.join(download_dest_dir, dir_name))
+    return items
 
-    #     time_info_dict = generate_times_from_start_end(dates)
 
-    #     for param in weather_params:
-    #         # generate api call info TODO: FUNCTION
-    #         filename = f"{param}.{format}"
-    #         filepath = file_ops.generate_filepath(download_dest_dir, filename, format)
-    #         ecmwf_api_call(c, download_dest_dir, param, time_info_dict, areas[i])
+def return_times_info(
+    year: int,
+    months: list[int] | int = np.arange(1, 13),
+    days: list[int] | int = np.arange(1, 32),
+    hours: list[int] | int = np.arange(0, 24),
+):
+    year = str(year)
+    months = [
+        utils.pad_number_with_zeros(month)
+        for month in generate_month_day_hour_list(months)
+    ]
+    days = [
+        utils.pad_number_with_zeros(day) for day in generate_month_day_hour_list(days)
+    ]
 
-    # api_call_dict = generate_api_dict(param, time_info_dict, areas[i], format)
-    # file_name = f'{param}.{format}'
-    # dest = '/'.join((dir_path, file_name))
-    # # make api call
-    # try:
-    #     c.retrieve(
-    #         'reanalysis-era5-land',
-    #         api_call_dict,
-    #         dest
-    #     )
-    # # if error in fetching, limit the parameter
-    # except TypeError():
-    #     print(f'{param} not found in {dates}. Skipping fetching, moving on.')
+    hours = [
+        utils.pad_number_with_zeros(hour)
+        for hour in generate_month_day_hour_list(hours)
+    ]
+    for h, hour in enumerate(hours):
+        hours[h] = f"{hour}:00"
 
-    # TODO: FUNCTION
+    return {"year": year, "month": months, "day": days, "time": hours}
 
-    # load in all files in folder
 
-    # filepath = climate_data.generate_spatiotemporal_var_filename(weather_params, dates, area[0], area[1],)
-    # save as new file
+def fetch_weather_data(
+    download_dest_dir,
+    weather_params,
+    years,
+    months: list[int] | int = np.arange(1, 13),
+    days: list[int] | int = np.arange(1, 32),
+    hours: list[int] | int = np.arange(0, 24),
+    lat_lims=(-10, -17),
+    lon_lims=(142, 147),
+    dataset_tag: str = "reanalysis-era5-single-levels",
+    format: str = "grib",
+):
+    c = cdsapi.Client()
 
-    # file_paths = file_ops.return_list_filepaths(download_dest_dir, suffix)
+    area = [max(lat_lims), min(lon_lims), min(lat_lims), max(lon_lims)]
 
-    # xa_dict = {}
-    # for file_path in tqdm(glob.glob(file_paths)):
-    #     # get name of file
-    #     file_name = file_path.split('/')[-1]
-    #     # read into xarray
-    #     xa_dict[file_name] = xr.load_dataset(file_path, engine="cfgrib")
+    for param in weather_params:
+        param_download_dest = file_ops.guarantee_existence(
+            Path(download_dest_dir) / param
+        )
+        for year in years:
+            filename = generate_spatiotemporal_var_filename_from_dict(
+                {"var": param, "lats": lat_lims, "lons": lon_lims, "year": str(year)}
+            )
+            # filename = str(file_ops.generate_filepath(param_download_dest, filename, format))
+            filepath = str(
+                file_ops.generate_filepath(param_download_dest, filename, format)
+            )
 
-    # # merge TODO: apparently conflicting values of 'step'. Unsure why.
-    # out = xr.merge([array for array in xa_dict.values()], compat='override')
-    # # save as new file
-    # nc_file_name = '.'.join((dir_name, 'nc'))
-    # save_file_path = '/'.join((download_dest_dir, nc_file_name))
-    # out.to_netcdf(path=save_file_path)
-    # print(f'{nc_file_name} saved successfully')
+            if not Path(filepath).is_file():
+                time_info_dict = return_times_info(year, months, days)
+                # filename = str(file_ops.generate_filepath(param_download_dest, f"{param}_{year}", format))
+                # filename = str((param_download_dest / param / str(year)).with_suffix(format))
+                ecmwf_api_call(
+                    c, filepath, param, time_info_dict, area, dataset_tag, format
+                )
+            else:
+                print(f"Filepath already exists: {filepath}")
+        # TODO: more descriptive filename
