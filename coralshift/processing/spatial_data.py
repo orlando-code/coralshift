@@ -983,6 +983,7 @@ def process_xa_d(
         "lon": "longitude",
         "x": "longitude",
         "y": "latitude",
+        "band": "band",
     },
     squeeze_coords: str | list[str] = ["band"],
 ):
