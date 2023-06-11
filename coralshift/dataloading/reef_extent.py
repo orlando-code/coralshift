@@ -1,0 +1,54 @@
+import json
+from pathlib import Path
+from coralshift.dataloading.bathymetry import ReefAreas
+
+
+def generate_area_geojson(
+    reef_areas: ReefAreas, area_name: str, save_dir: Path | str
+) -> None:
+    """
+    Generate a GeoJSON file representing a specific area.
+
+    Parameters
+    ----------
+        reef_areas (ReefAreas): An instance of the ReefAreas class containing area information.
+        area_name (str): The name of the area for which to generate the GeoJSON.
+        save_dir (Path or str): The directory path where the GeoJSON file will be saved.
+
+    Returns
+    -------
+        None
+    """
+
+    lat_range, lon_range = reef_areas.get_lat_lon_limits(area_name)
+    name = reef_areas.get_name_from_names(area_name)
+
+    # Create a GeoJSON feature collection
+    features = [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [lon_range[0], lat_range[0]],
+                        [lon_range[1], lat_range[0]],
+                        [lon_range[1], lat_range[1]],
+                        [lon_range[0], lat_range[1]],
+                        [lon_range[0], lat_range[0]],
+                    ]
+                ],
+            },
+            "properties": {"name": name},
+        }
+    ]
+
+    # Create a GeoJSON object
+    geojson_data = {"type": "FeatureCollection", "features": features}
+
+    # Save the GeoJSON data to a file
+    filename = f"{name}.geojson"
+
+    output_path = save_dir / filename
+    with open(output_path, "w") as file:
+        json.dump(geojson_data, file)
