@@ -1,44 +1,131 @@
 from __future__ import annotations
 
+from pathlib import Path
+from coralshift.utils import file_ops, directories
+
+# these two imports necessary for importing US coastal bathymetry data
 import requests
 from bs4 import BeautifulSoup
-from pathlib import Path
-from coralshift.utils import file_ops
 
 
-# def download_etopo_data(download_dest_dir: Path | str, resolution: str | int, loading_bar: bool = True) -> None:
-#     """Download bathymetry data from the NOAA ETOPO Global Relief Model dataset. This may be overspecific and links
-#     could change. Currently stored at: https://www.ncei.noaa.gov/products/etopo-global-relief-model
+class ReefAreas:
+    name_mapping = {
+        "A": "Great Barrier Reef A 2020 30m",
+        "B": "Great Barrier Reef B 2020 30m",
+        "C": "Great Barrier Reef C 2020 30m",
+        "D": "Great Barrier Reef D 2020 30m",
+        # Add more mappings as needed
+    }
 
-#     Parameters
-#     ----------
-#         download_dest_dir (Path | str): destination directory where the downloaded file will be saved.
-#         resolution (str | int): desired resolution of the data. Can be one of the following: 15, 30, or 60.
-#         loading_bar (bool, optional): If True, display a progress bar while downloading the file. Default is True.
+    def __init__(self):
+        self.datasets = [
+            {
+                "name": "Great Barrier Reef A 2020 30m",
+                "short_name": "A",
+                "file_name": "Great_Barrier_Reef_A_2020_30m.tif",
+                "lat_range": (-10, -17),
+                "lon_range": (142, 147),
+                "url": "https://ausseabed-public-warehouse-bathymetry.s3.ap-southeast-2.amazonaws.com/L3/0b9ad3f3-7ade-40a7-ae70-f7c6c0f3ae2e/Great_Barrier_Reef_A_2020_30m_MSL_cog.tif",  # noqa
+            },
+            {
+                "name": "Great Barrier Reef B 2020 30m",
+                "short_name": "B",
+                "file_name": "Great_Barrier_Reef_B_2020_30m.tif",
+                "lat_range": (-16, -23),
+                "lon_range": (144, 149),
+                "url": "https://ausseabed-public-warehouse-bathymetry.s3.ap-southeast-2.amazonaws.com/L3/4a6e7365-d7b1-45f9-a576-2be8ff8cd755/Great_Barrier_Reef_B_2020_30m_MSL_cog.tif",  # noqa
+            },
+            {
+                "name": "Great Barrier Reef C 2020 30m",
+                "short_name": "C",
+                "file_name": "Great_Barrier_Reef_C_2020_30m.tif",
+                "lat_range": (-18, -24),
+                "lon_range": (148, 154),
+                "url": "https://ausseabed-public-warehouse-bathymetry.s3.ap-southeast-2.amazonaws.com/L3/3b171f8d-9248-4aeb-8b32-0737babba3c2/Great_Barrier_Reef_C_2020_30m_MSL_cog.tif",  # noqa
+            },
+            {
+                "name": "Great Barrier Reef D 2020 30m",
+                "short_name": "D",
+                "file_name": "Great_Barrier_Reef_D_2020_30m.tif",
+                "lat_range": (-23, -29),
+                "lon_range": (150, 156),
+                "url": "https://ausseabed-public-warehouse-bathymetry.s3.ap-southeast-2.amazonaws.com/L3/7168f130-f903-4f2b-948b-78508aad8020/Great_Barrier_Reef_D_2020_30m_MSL_cog.tif",  # noqa
+            },
+        ]
 
-#     Returns
-#     -------
-#         None
-#     """
+    def get_long_name_from_short(self, short_name):
+        return self.name_mapping.get(short_name, "Unknown")
 
-#     bathymetry_url_page = f"https://www.ngdc.noaa.gov/thredds/catalog/global/ETOPO2022/{resolution}s/{resolution}s_geoid_netcdf/catalog.html" # noqa
-#     file_server_url = "https://www.ngdc.noaa.gov/thredds/fileServer/global/"
+    def get_name_from_names(self, name):
+        for dataset in self.datasets:
+            if (
+                dataset["name"] == name
+                or dataset["short_name"] == name
+                or dataset["file_name"] == name
+            ):
+                return dataset["name"]
+        raise ValueError(f"'{name}' not a dataset.")
 
-#     reqs = requests.get(bathymetry_url_page)
-#     soup = BeautifulSoup(reqs.text, 'html.parser')
+    def get_filename(self, name):
+        name = self.get_name_from_names(name)
+        dataset = self.get_dataset(name)
+        if dataset:
+            return dataset["file_name"]
+        return None
 
-#     # traverse paragraphs from soup
-#     for link in soup.find_all("a"):
-#         # if ends with nc
-#         if file_ops.check_path_suffix(link.get("href"), "nc"):
-#             # file url involves multiple levels
-#             file_specifier = file_ops.get_n_last_subparts_path(Path(link.get("href")), 4)
-#             file_name = file_ops.get_n_last_subparts_path(Path(link.get("href")), 1)
+    def get_dataset(self, name):
+        name = self.get_name_from_names(name)
+        for dataset in self.datasets:
+            if dataset["name"] == name:
+                return dataset
+        return None
 
-#             url = file_server_url + str(file_specifier)
-#             download_dest_path = Path(download_dest_dir, file_name)
+    def get_lat_lon_limits(self, name):
+        dataset = self.get_dataset(name)
+        if dataset:
+            return dataset["lat_range"], dataset["lon_range"]
+        return None
 
-#             file_ops.check_exists_download_url(download_dest_path, url, loading_bar)
+    def get_url(self, name):
+        name = self.get_name_from_names(name)
+        dataset = self.get_dataset(name)
+        if dataset:
+            return dataset["url"]
+        return None
+
+
+def ensure_bathymetry_downloaded(area_name: str, loading_bar: bool = True) -> ReefAreas:
+    """
+    Ensures that the bathymetry data for the specified area is downloaded.
+
+    Parameters
+    ----------
+        area_name (str): The name of the area.
+        loading_bar (bool, optional): Whether to display a loading bar during the download process.
+                                      Defaults to True.
+
+    Returns
+    -------
+        ReefAreas: An instance of the ReefAreas class representing information about the downloaded area, and the other
+        potentials.
+    """
+    areas_info = ReefAreas()
+
+    # get url
+    area_url = areas_info.get_url(area_name)
+    # generate path to save data to
+    save_path = directories.get_bathymetry_datasets_dir() / areas_info.get_filename(
+        area_name
+    )
+    # download data if not already there
+    file_ops.check_exists_download_url(save_path, area_url)
+
+    return ReefAreas
+
+
+####
+# Not used within MRes: coastal bathymetry for US only
+####
 
 
 def fetch_links_from_url(page_url: str, suffix: str = None) -> list[str]:
@@ -98,30 +185,3 @@ def download_etopo_data(
         download_dest_path = Path(download_dest_dir, file_name)
 
         file_ops.check_exists_download_url(download_dest_path, url, loading_bar)
-
-
-def download_30m_gbr_bathymetry(
-    download_dest_dir: Path | str, areas: list[str] = ["A", "B", "C", "D"]
-) -> None:
-    """Download bathymetry data for the Great Barrier Reef (GBR) region in TIFF format from AWS S3 bucket.
-    Dataset DOI: 10.4225/25/5a207b36022d2
-
-    Parameters
-    ----------
-        download_dest_dir (Path | str): Path to the directory where the downloaded files should be saved.
-        areas (list[str]): A list of strings indicating the areas to be downloaded. The possible values are
-            ['A', 'B', 'C', 'D'], corresponding to four different parts of the GBR region. Defaults to download all
-            these areas.
-
-    Returns
-    -------
-        None
-    """
-    page_url = "https://researchdata.edu.au/high-resolution-depth-30-m/1278835"
-    data_links = fetch_links_from_url(page_url, ".tif")
-
-    for area_url in list(data_links):
-        area_filename = file_ops.get_n_last_subparts_path(area_url, 1)
-        filepath = Path(download_dest_dir, area_filename)
-        # check whether file already downloaded: if not, download
-        file_ops.check_exists_download_url(filepath, area_url)
