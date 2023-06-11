@@ -16,7 +16,7 @@ def get_volume_dir(volume_name: str) -> Path:
 
 def get_datasets_dir() -> Path:
     """./data/datasets"""
-    return guarantee_existence(get_coralshift_dir() / "datasets")
+    return guarantee_existence(get_coralshift_dir().parent / "datasets")
 
 
 def get_reef_baseline_dir() -> Path:
