@@ -478,16 +478,16 @@ def check_pkl_else_read_gpkg(files_dir: Path | str, filename: str) -> pd.DataFra
     pd.DataFrame: and completion message detailing which file format was read
     """
     filename = remove_suffix(filename)
-    pkl_path = Path(Path(files_dir), filename).with_suffix(".pkl")
+    pkl_path = (Path(files_dir) / filename).with_suffix(".pkl")
     if pkl_path.is_file():
-        print(f"Reading {pkl_path}")
+        print(f"Reading {pkl_path}...")
         df_out = pd.read_pickle(pkl_path)
         print(f"{filename} read from {filename}.pkl")
         return df_out
 
-    gpkg_path = Path(Path(files_dir), filename).with_suffix(".gpkg")
+    gpkg_path = (Path(files_dir) / filename).with_suffix(".gpkg")
     if gpkg_path.is_file():
-        print(f"Reading {gpkg_path}")
+        print(f"Reading {gpkg_path}...")
         df_out = load_gpkg(gpkg_path)
         # write to pkl for faster access next time
         df_out.to_pickle(pkl_path)
@@ -496,7 +496,9 @@ def check_pkl_else_read_gpkg(files_dir: Path | str, filename: str) -> pd.DataFra
         )
         return df_out
 
-    raise FileNotFoundError(f"{filename}.pkl/gpkg not found in {files_dir}")
+    raise FileNotFoundError(
+        f"Neither {filename}.pkl nor {filename}.gpkg not found in {files_dir}"
+    )
 
 
 def read_write_nc_file(
