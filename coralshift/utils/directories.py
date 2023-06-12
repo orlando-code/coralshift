@@ -19,6 +19,11 @@ def get_datasets_dir() -> Path:
     return guarantee_existence(get_coralshift_dir().parent / "datasets")
 
 
+def get_processed_dir() -> Path:
+    """./data/datasets/processed"""
+    return guarantee_existence(get_datasets_dir().parent / "processed")
+
+
 def get_reef_baseline_dir() -> Path:
     """./data/datasets/reef_baseline"""
     return guarantee_existence(get_datasets_dir() / "reef_baseline")
