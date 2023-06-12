@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import xarray as xa
 from pathlib import Path
 from coralshift.utils import file_ops, directories
+from scipy.ndimage import gaussian_gradient_magnitude
 
 # these two imports necessary for importing US coastal bathymetry data
 import requests
@@ -143,6 +145,25 @@ def ensure_bathymetry_downloaded(area_name: str, loading_bar: bool = True) -> Re
     file_ops.check_exists_download_url(save_path, area_url)
 
     return ReefAreas()
+
+
+def generate_gradient_nc(
+    bathymetry_name,
+    kernel_size: int = 1,
+    return_array: bool = False,
+) -> xa.DataArray:
+    gradient_dir = directories.get_gradients_dir()
+    gradient_path = gradient_dir / f"{bathymetry_name}_gradients"
+
+    if not gradient_path.is_file():
+        bath_array = directories.get_bathymetry_datasets_dir() / bathymetry_name
+        gradients = gaussian_gradient_magnitude(bath_array, sigma=kernel_size)
+        file_ops.save_nc(gradient_dir, gradient_path.stem, gradients)
+    else:
+        gradients = xa.open_dataset(gradient_path)
+
+    if return_array:
+        return gradients
 
 
 ######################################################
