@@ -1117,10 +1117,12 @@ def xa_region_from_window(
     lat_start, lon_start = lat_lon_starts[0], lat_lon_starts[1]
     if coord_range:
         lat_cells, lon_cells = coord_range[0], coord_range[1]
+        lat_range = (lat_start, lat_start + lat_cells)
+        lon_range = (lon_start, lon_start + lon_cells)
         subsample = xa_d.sel(
             {
-                "latitude": slice(lat_start, lat_start + lat_cells),
-                "longitude": slice(lon_start, lon_start + lon_cells),
+                "latitude": slice(min(lat_range), max(lat_range)),
+                "longitude": slice(min(lon_range), max(lon_range)),
             }
         )
     else:
