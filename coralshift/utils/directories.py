@@ -21,7 +21,7 @@ def get_datasets_dir() -> Path:
 
 def get_processed_dir() -> Path:
     """./data/datasets/processed"""
-    return guarantee_existence(get_datasets_dir().parent / "processed")
+    return guarantee_existence(get_datasets_dir() / "processed")
 
 
 def get_reef_baseline_dir() -> Path:
