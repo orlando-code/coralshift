@@ -685,9 +685,8 @@ def distance_to_degrees(
     approx_lat: float = -18,
     approx_lon: float = 145,
 ) -> tuple[float, float, float]:
-    # TODO: enable specification of distance in different orthogonal directions
     """Converts a distance in meters to the corresponding distance in degrees, given an approximate location on Earth.
-
+    # TODO: check function: returning hypotenuse seems way too small
     Parameters
     ----------
     distance_lat (float): The distance in meters along the latitude direction.
@@ -1095,7 +1094,7 @@ def xa_region_from_coord_bounds(xa_d, coord_bounds_dict):
 def xa_region_from_window(
     xa_d: xa.Dataset | xa.DataArray,
     lat_lon_starts: tuple = (0, 0),
-    coord_dims: tuple[int, int] = (6, 6),
+    coord_lengths: tuple[int, int] = (6, 6),
     coord_range: tuple[float, float] = None,
 ):
     """Sample a spatial batch from an xarray Dataset or DataArray.
@@ -1105,10 +1104,10 @@ def xa_region_from_window(
         xa_d (xarray.Dataset or xarray.DataArray): The input Dataset or DataArray to sample a spatial batch from.
         lat_lon_starts (tuple, optional): A tuple containing the starting latitude and longitude coordinates.
             Default is (0, 0).
-        coord_dims (tuple[int, int], optional): A tuple specifying the number of latitude and longitude cells to include
-            in the spatial batch. Default is (6, 6).
+        coord_lengths (tuple[int, int], optional): A tuple specifying the number of latitude and longitude cells to
+            include in the spatial batch. Default is (6, 6).
         coord_range (tuple[float, float], optional): A tuple containing the latitude and longitude range in degrees. If
-            provided, `coord_dims` will be ignored, and the range will be used to determine the spatial batch size.
+            provided, `coord_lengths` will be ignored, and the range will be used to determine the spatial batch size.
             Default is None.
 
     Returns
@@ -1127,8 +1126,8 @@ def xa_region_from_window(
     else:
         subsample = xa_d.isel(
             {
-                "latitude": slice(lat_start, coord_dims[0]),
-                "longitude": slice(lon_start, coord_dims[1]),
+                "latitude": slice(lat_start, coord_lengths[0]),
+                "longitude": slice(lon_start, coord_lengths[1]),
             }
         )
     return subsample
@@ -1137,7 +1136,7 @@ def xa_region_from_window(
 def sample_spatial_batch(
     xa_d: xa.Dataset,
     lat_lon_starts: tuple = (0, 0),
-    coord_dims: tuple[int, int] = (6, 6),
+    coord_lengths: tuple[int, int] = (6, 6),
     coord_range: tuple[float] = None,
     variables: list[str] = None,
 ) -> np.ndarray:
@@ -1146,9 +1145,9 @@ def sample_spatial_batch(
     ----------
     xa_d (xa.Dataset): The input xarray Dataset.
     lat_lon_starts (tuple): Tuple specifying the starting latitude and longitude indices of the batch.
-    window_dims (tuple[int, int]): Tuple specifying the dimensions (number of cells) of the spatial window.
+    coord_range (tuple[int, int]): Tuple specifying the dimensions (number of cells) of the spatial window.
     coord_range (tuple[float], optional): Tuple specifying the latitude and longitude range (in degrees) of the spatial
-        window. If provided, it overrides the window_dims parameter.
+        window. If provided, it overrides the coord_range parameter.
     variables (list[str], optional): List of variable names to include in the spatial batch. If None, includes all
         variables.
 
@@ -1160,7 +1159,7 @@ def sample_spatial_batch(
     if variables is not None:
         xa_d = xa_d[variables]
 
-    subsample = xa_region_from_window(xa_d, lat_lon_starts, coord_dims, coord_range)
+    subsample = xa_region_from_window(xa_d, lat_lon_starts, coord_lengths, coord_range)
 
     # # N.B. have to be careful when providing coordinate ranges for areas with negative coords. TODO: make universal
     # lat_start, lon_start = lat_lon_starts[0], lat_lon_starts[1]
@@ -1168,8 +1167,8 @@ def sample_spatial_batch(
     # if not coord_range:
     #     subsample = xa_d.isel(
     #         {
-    #             "latitude": slice(lat_start, window_dims[0]),
-    #             "longitude": slice(lon_start, window_dims[1]),
+    #             "latitude": slice(lat_start, coord_range[0]),
+    #             "longitude": slice(lon_start, coord_range[1]),
     #         }
     #     )
     # else:
@@ -1251,8 +1250,8 @@ def process_xa_ds_for_ml(
 def generate_patch(
     xa_ds: xa.DataArray | xa.Dataset,
     lat_lon_starts: tuple[float, float],
-    coord_dims: tuple[float, float],
-    window_dims: tuple[int, int] = None,
+    coord_lengths: tuple[float, float],
+    coord_range: tuple[int, int] = None,
     feature_vars: list[str] = ["bottomT", "so", "mlotst", "uo", "vo", "zos", "thetao"],
     gt_var: str = "coral_algae_1-12_degree",
     normalise: bool = True,
@@ -1263,7 +1262,7 @@ def generate_patch(
     ----------
     xa_ds (xa.Dataset): The input xarray dataset.
     lat_lon_starts (tuple): The starting latitude and longitude indices for sampling the patch.
-    coord_dims (tuple): The latitude and longitude range for sampling the patch.
+    coord_lengths (tuple): The latitude and longitude range for sampling the patch.
     feature_vars (list[str], optional): List of variable names to be used as features.
         Default is ["bottomT", "so", "mlotst", "uo", "vo", "zos", "thetao"].
     gt_var (str, optional): The variable name for the ground truth. Default is "coral_algae_1-12_degree".
@@ -1278,8 +1277,8 @@ def generate_patch(
     subsample, lat_lon_vals_dict = sample_spatial_batch(
         xa_ds,
         lat_lon_starts=lat_lon_starts,
-        coord_dims=coord_dims,
-        window_dims=window_dims,
+        coord_lengths=coord_lengths,
+        coord_range=coord_range,
     )
 
     output = process_xa_ds_for_ml(
@@ -1296,7 +1295,7 @@ def generate_patch(
 def subsample_to_array(
     xa_ds: xa.Dataset | xa.DataArray,
     lat_lon_starts: tuple,
-    coord_dims: tuple,
+    coord_lengths: tuple,
     variables: list[str],
 ) -> tuple[np.ndarray, xa.Dataset | xa.DataArray, dict]:
     """
@@ -1306,7 +1305,7 @@ def subsample_to_array(
     ----------
         xa_ds (xa.Dataset): The input xarray dataset.
         lat_lon_starts (tuple): The starting latitude and longitude indices for subsampling.
-        coord_dims (tuple): The latitude and longitude range for subsampling.
+        coord_lengths (tuple): The latitude and longitude range for subsampling.
         variables (list[str]): List of variable names to subsample and convert.
 
     Returns
@@ -1315,7 +1314,7 @@ def subsample_to_array(
             and latitude/longitude values.
     """
     subsample, lat_lon_vals_dict = sample_spatial_batch(
-        xa_ds[variables], lat_lon_starts=lat_lon_starts, coord_dims=coord_dims
+        xa_ds[variables], lat_lon_starts=lat_lon_starts, coord_lengths=coord_lengths
     )
     return xa_d_to_np_array(subsample), subsample, lat_lon_vals_dict
 
