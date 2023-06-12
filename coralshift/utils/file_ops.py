@@ -71,7 +71,10 @@ def replace_dot_with_dash(string: str) -> str:
 
 
 def save_nc(
-    save_dir: Path | str, filename: str, xa_d: xa.DataArray | xa.Dataset
+    save_dir: Path | str,
+    filename: str,
+    xa_d: xa.DataArray | xa.Dataset,
+    return_array: bool = False,
 ) -> xa.DataArray | xa.Dataset:
     """
     Save the given xarray DataArray or Dataset to a NetCDF file iff no file with the same
@@ -94,7 +97,9 @@ def save_nc(
         spatial_data.process_xa_d(xa_d).to_netcdf(save_path)
     else:
         print(f"{filename} already exists in {save_dir}.")
-    return xa.open_dataset(save_path)
+
+    if return_array:
+        return xa.open_dataset(save_path)
 
 
 def prune_file_list_on_existence(file_list: list[Path | str]) -> list:
