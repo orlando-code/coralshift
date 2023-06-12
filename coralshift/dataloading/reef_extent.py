@@ -1,5 +1,6 @@
 import json
 import pandas as pd
+import geopandas as gpd
 from pathlib import Path
 
 
@@ -55,7 +56,9 @@ def generate_area_geojson(area_class, area_name: str, save_dir: Path | str) -> N
 
 
 def process_benthic_pd(
-    benthic_df: pd.DataFrame, limit_to: list[str] = ["Coral/Algae"]
+    benthic_df: pd.DataFrame,
+    limit_to: list[str] = ["Coral/Algae"],
+    geometry_col: str = "geometry",
 ) -> pd.DataFrame:
     # don't overwite original values
     working_df = benthic_df.copy()
@@ -77,4 +80,4 @@ def process_benthic_pd(
 
     # Filter the DataFrame to include only the specified classes
     filtered_df = working_df[working_df["class"].isin(limit_to)]
-    return filtered_df
+    return gpd.GeoDataFrame(filtered_df, geometry=geometry_col)
