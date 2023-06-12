@@ -102,7 +102,7 @@ def underscore_list_of_tuples(tuples: str | list[tuple]) -> str:
 
 
 def generate_date_pairs(
-    date_lims: tuple[str, str], freq: str = "10y"
+    date_lims: tuple[str, str], freq: str = "1y"
 ) -> list[tuple[str, str]]:
     """Generate pairs of start and end dates based on the given date limits.
 
@@ -112,8 +112,13 @@ def generate_date_pairs(
     Returns:
     date_pairs (list[tuple[str, str]]): A list of date pairs.
     """
-    start_overall, end_overall = min(date_lims), max(date_lims)
-    if (end_overall - start_overall).item().days <= 2:
+    # half frequency argument
+    # half_freq = pd.to_timedelta(freq) / 2
+
+    start_overall, end_overall = pd.to_datetime(min(date_lims)), pd.to_datetime(
+        max(date_lims)
+    )
+    if (end_overall - start_overall).days <= 2:
         return [date_lims]
 
     date_list = pd.date_range(date_lims[0], date_lims[1], freq=freq)
