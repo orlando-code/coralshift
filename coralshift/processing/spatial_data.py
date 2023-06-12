@@ -270,8 +270,7 @@ def tif_to_xarray(tif_path: Path | str, renamed: str = None) -> xa.DataArray:
         renamed (str, optional): Name to assign to the DataArray. If not provided, the original name will be used.
 
     Returns
-    -------
-        xarray.DataArray: The converted DataArray object.
+    -------∂aArray: The converted DataArray object.
     """
     xa_da = rio.open_rasterio(rasterio.open(tif_path))
     if renamed:
@@ -612,6 +611,29 @@ def check_nc_exists_generate_raster_xa(
     else:
         print(f"{filename} already exists in {dir_path}. No new files written.")
         return xa.open_dataset(filepath)
+
+
+def choose_resolution(resolution: float, unit: str = "m") -> float:
+    """
+    Convert the input resolution from the specified unit to degrees or return the resolution as is.
+
+    Parameters
+    ----------
+        resolution (float): The resolution value to be converted.
+        unit (str, optional): The unit of the resolution. Valid options are 'm', 'metres', 'metre'
+                              for meters, and 'd', 'degrees', 'degree' for degrees.
+                              Defaults to 'm'.
+
+    Returns
+    -------
+        float: The converted resolution in degrees or the original resolution if the unit is 'd' or 'degrees'.
+
+    """
+    if unit.lower() in ["m", "metres", "metre"]:
+        _, _, av_degrees = distance_to_degrees(resolution)
+        return av_degrees
+    elif unit.lower() in ["d", "degrees", "degree"]:
+        return resolution
 
 
 def degrees_to_distances(
@@ -1009,7 +1031,7 @@ def process_xa_d(
         "y": "latitude",
         "band": "band",
     },
-    squeeze_coords: str | list[str] = ["band"],
+    squeeze_coords: str | list[str] = None,
     chunk_dict: dict = {"latitude": 100, "longitude": 100, "time": 100},
 ):
     """
