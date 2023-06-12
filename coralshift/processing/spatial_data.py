@@ -1279,7 +1279,7 @@ def generate_patch(
         subsampled dataset, and latitude/longitude values.
     """
     subsample, lat_lon_vals_dict = sample_spatial_batch(
-        xa_ds,
+        process_xa_d(xa_ds),
         lat_lon_starts=lat_lon_starts,
         coord_lengths=coord_lengths,
         coord_range=coord_range,
