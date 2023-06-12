@@ -631,9 +631,9 @@ def choose_resolution(resolution: float, unit: str = "m") -> float:
     """
     if unit.lower() in ["m", "metres", "metre"]:
         _, _, av_degrees = distance_to_degrees(resolution)
-        return av_degrees
+        return resolution, av_degrees
     elif unit.lower() in ["d", "degrees", "degree"]:
-        return resolution
+        return distance_to_degrees(resolution), resolution
 
 
 def degrees_to_distances(
