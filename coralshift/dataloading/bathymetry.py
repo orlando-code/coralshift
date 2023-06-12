@@ -156,9 +156,14 @@ def generate_gradient_nc(
     gradient_path = gradient_dir / f"{bathymetry_name}_gradients"
 
     if not gradient_path.is_file():
-        bath_array = directories.get_bathymetry_datasets_dir() / bathymetry_name
-        gradients = gaussian_gradient_magnitude(bath_array, sigma=kernel_size)
-        file_ops.save_nc(gradient_dir, gradient_path.stem, gradients)
+        xa_bath = xa.open_dataset(
+            (directories.get_bathymetry_datasets_dir() / bathymetry_name).with_suffix(
+                ".nc"
+            )
+        )
+        gradients = gaussian_gradient_magnitude(xa_bath, sigma=kernel_size)
+        xa_gradients = xa_bath.copy(data=gradients)
+        file_ops.save_nc(gradient_dir, gradient_path.stem, xa_gradients)
     else:
         gradients = xa.open_dataset(gradient_path)
 
