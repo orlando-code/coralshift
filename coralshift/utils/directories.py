@@ -24,6 +24,21 @@ def get_reef_baseline_dir() -> Path:
     return guarantee_existence(get_datasets_dir() / "reef_baseline")
 
 
+def get_cmems_dir() -> Path:
+    """./data/datasets/global_ocean_reanalysis"""
+    return guarantee_existence(get_datasets_dir() / "global_ocean_reanalysis")
+
+
+def get_monthly_cmems_dir() -> Path:
+    """./data/datasets/global_ocean_reanalysis/monthly_means"""
+    return guarantee_existence(get_cmems_dir() / "monthly_means")
+
+
+def get_daily_cmems_dir() -> Path:
+    """./data/datasets/global_ocean_reanalysis/daily_means"""
+    return guarantee_existence(get_cmems_dir() / "daily_means")
+
+
 def get_bathymetry_datasets_dir() -> Path:
     """./datasets/bathymetry"""
     return guarantee_existence(get_datasets_dir() / "bathymetry")
