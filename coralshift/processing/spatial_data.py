@@ -1242,9 +1242,11 @@ def process_xa_ds_for_ml(
     if gt_var:
         # assign ground truth and convert to column vector
         ys = spatial_array_to_column(xa_d_to_np_array(xa_ds[gt_var]))
+        # ys = naive_nan_replacement(ys)
+
         # take single time slice (since broadcasted back through time)
-        ys = ys[:, 0]
-        to_return.append(ys)
+        # ys = ys[:, 0]
+        to_return.append(naive_nan_replacement(ys))
 
     return tuple(to_return)
 
