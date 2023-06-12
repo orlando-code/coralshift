@@ -87,9 +87,10 @@ def save_nc(
     -------
         xarray.DataArray or xarray.Dataset: The input xarray object.
     """
-    filename = replace_dot_with_dash(remove_suffix(filename))
+    filename = remove_suffix(replace_dot_with_dash(filename))
     save_path = (Path(save_dir) / filename).with_suffix(".nc")
     if not save_path.is_file():
+        print(f"Writing {filename} to file at {save_path}.")
         spatial_data.process_xa_d(xa_d).to_netcdf(save_path)
     else:
         print(f"{filename} already exists in {save_dir}.")
