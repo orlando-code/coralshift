@@ -276,10 +276,8 @@ def merge_nc_files_in_dir(
     merged_path = nc_dir / merged_name
     if not merged_path.is_file():
         print(f"Merging .nc files into {merged_path}")
-        merged_ds = spatial_data.process_xa_array(
-            xa.open_mfdataset(
-                filepaths, chunks={"time": 100}, concat_dim=concat_dim, combine="nested"
-            )
+        merged_ds = spatial_data.process_xa_d(
+            xa.open_mfdataset(filepaths, concat_dim=concat_dim, combine="nested")
         )
         merged_ds.to_netcdf(merged_path)
         return merged_ds
