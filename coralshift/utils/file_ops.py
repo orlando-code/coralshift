@@ -57,6 +57,43 @@ def check_file_exists(
     return filepath.is_file()
 
 
+def replace_dot_with_dash(string: str) -> str:
+    """
+    Replace all occurrences of "." with "-" in a string.
+
+    Args:
+        string (str): The input string.
+
+    Returns:
+        str: The modified string with "." replaced by "-".
+    """
+    return string.replace(".", "-")
+
+
+def save_nc(
+    save_dir: Path | str, filename: str, xa_d: xa.DataArray | xa.Dataset
+) -> xa.DataArray | xa.Dataset:
+    """
+    Save the given xarray DataArray or Dataset to a NetCDF file iff no file with the same
+    name already exists in the directory.
+
+    Parameters
+    ----------
+        save_dir (Path or str): The directory path to save the NetCDF file.
+        filename (str): The name of the NetCDF file.
+        xa_d (xarray.DataArray or xarray.Dataset): The xarray DataArray or Dataset to be saved.
+
+    Returns
+    -------
+        xarray.DataArray or xarray.Dataset: The input xarray object.
+    """
+    save_path = (Path(save_dir) / remove_suffix(filename)).with_suffix(".nc")
+    if not save_path.is_file():
+        spatial_data.process_xa_d(xa_d).to_netcdf(save_path)
+    else:
+        print(f"{filename} already exists in {save_dir}.")
+
+
 def prune_file_list_on_existence(file_list: list[Path | str]) -> list:
     """Given a list of file paths, remove any paths that do not exist on disk.
 
@@ -460,8 +497,7 @@ def load_gpkg(filepath):
     -------
         geopandas.GeoDataFrame: A GeoDataFrame object containing the data from the gpkg file.
     """
-    gdf = gpd.read_file(filepath, driver="GPKG")
-    return gdf
+    return gpd.read_file(filepath, driver="GPKG")
 
 
 def check_pkl_else_read_gpkg(files_dir: Path | str, filename: str) -> pd.DataFrame:
@@ -480,19 +516,19 @@ def check_pkl_else_read_gpkg(files_dir: Path | str, filename: str) -> pd.DataFra
     filename = remove_suffix(filename)
     pkl_path = (Path(files_dir) / filename).with_suffix(".pkl")
     if pkl_path.is_file():
-        print(f"Reading {pkl_path}...")
+        print(f"Reading {pkl_path}")
         df_out = pd.read_pickle(pkl_path)
-        print(f"{filename} read from {filename}.pkl")
+        print(f"{filename} data read from {filename}.pkl")
         return df_out
 
     gpkg_path = (Path(files_dir) / filename).with_suffix(".gpkg")
     if gpkg_path.is_file():
-        print(f"Reading {gpkg_path}...")
+        print(f"Reading {gpkg_path}")
         df_out = load_gpkg(gpkg_path)
         # write to pkl for faster access next time
         df_out.to_pickle(pkl_path)
         print(
-            f"{filename} read from {filename}.gpkg. {filename}.pkl created in same directory."
+            f"{filename} data read from {filename}.gpkg. {filename}.pkl created in same directory for rapid access."
         )
         return df_out
 
