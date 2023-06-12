@@ -976,6 +976,30 @@ def filter_out_nans(X_with_nans: np.ndarray, y_with_nans: np.ndarray) -> np.ndar
     return X, y
 
 
+def chunk_as_necessary(
+    xa_d: xa.DataArray | xa.Dataset, chunk_dict: dict
+) -> xa.DataArray | xa.Dataset:
+    """
+    Chunk the input xarray DataArray or Dataset along the specified dimensions according to the given chunk dictionary.
+
+    Parameters
+    -----------
+        xa_d (xa.DataArray or xa.Dataset): The xarray DataArray or Dataset to be chunked.
+        chunk_dict (dict): A dictionary specifying the chunk size for each dimension.
+                           The keys are the dimension names, and the values are the desired chunk sizes.
+                           If a dimension is not present in the dictionary or its value is None,
+                           that dimension will not be chunked.
+
+    Returns
+    -------
+        xa.DataArray or xa.Dataset: The chunked xarray DataArray or Dataset.
+
+    """
+    # set up to chunk relevant coordinates
+    dims_to_chunk = {dim: chunk_dict.get(dim, None) for dim in xa_d.dims}
+    return xa_d.chunk(dims_to_chunk)
+
+
 def process_xa_d(
     xa_d: xa.Dataset | xa.DataArray,
     rename_mapping: dict = {
@@ -986,8 +1010,30 @@ def process_xa_d(
         "band": "band",
     },
     squeeze_coords: str | list[str] = ["band"],
-    chunks: dict = {"latitude": 100, "longitude": 100, "time": 100},
+    chunk_dict: dict = {"latitude": 100, "longitude": 100, "time": 100},
 ):
+    """
+    Process the input xarray Dataset or DataArray by standardizing coordinate names, squeezing dimensions,
+    chunking along specified dimensions, and sorting coordinates.
+
+    Parameters
+    ----------
+        xa_d (xa.Dataset or xa.DataArray): The xarray Dataset or DataArray to be processed.
+        rename_mapping (dict, optional): A dictionary specifying the mapping for coordinate renaming.
+            The keys are the existing coordinate names, and the values are the desired names.
+            Defaults to a mapping that standardizes common coordinate names.
+        squeeze_coords (str or list of str, optional): The coordinates to squeeze by removing size-1 dimensions.
+                                                      Defaults to ['band'].
+        chunk_dict (dict, optional): A dictionary specifying the chunk size for each dimension.
+                                     The keys are the dimension names, and the values are the desired chunk sizes.
+                                     Defaults to {'latitude': 100, 'longitude': 100, 'time': 100}.
+
+    Returns
+    -------
+        xa.Dataset or xa.DataArray: The processed xarray Dataset or DataArray.
+
+    """
+
     # standardise coordinate names
     # temp_xa_d = xa_d.rename(
     #     {"lat": "latitude", "lon": "longitude", "x": "longitude", "y": "latitude"}
@@ -998,10 +1044,9 @@ def process_xa_d(
     if squeeze_coords:
         temp_xa_d = temp_xa_d.squeeze(squeeze_coords)
 
-    # set up to chunk relevant coordinates
-    coords_to_chunk = {coord: chunks.get(coord, None) for coord in temp_xa_d.dims}
+    chunked_xa_d = chunk_as_necessary(temp_xa_d, chunk_dict)
     # sort coords by ascending values
-    return temp_xa_d.chunk(coords_to_chunk).sortby(list(temp_xa_d.dims))
+    return chunked_xa_d.sortby(list(temp_xa_d.dims))
 
 
 def xa_region_from_coord_bounds(xa_d, coord_bounds_dict):
