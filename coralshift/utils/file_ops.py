@@ -76,7 +76,7 @@ def save_nc(
     """
     Save the given xarray DataArray or Dataset to a NetCDF file iff no file with the same
     name already exists in the directory.
-
+    # TODO: issues when suffix provided
     Parameters
     ----------
         save_dir (Path or str): The directory path to save the NetCDF file.
@@ -94,6 +94,7 @@ def save_nc(
         spatial_data.process_xa_d(xa_d).to_netcdf(save_path)
     else:
         print(f"{filename} already exists in {save_dir}.")
+    return xa.open_dataset(save_path)
 
 
 def prune_file_list_on_existence(file_list: list[Path | str]) -> list:
