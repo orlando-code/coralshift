@@ -27,14 +27,16 @@ def generate_area_geojson(area_class, area_name: str, save_dir: Path | str) -> N
         {
             "type": "Feature",
             "geometry": {
-                "type": "Polygon",
+                "type": "MultiPolygon",
                 "coordinates": [
                     [
-                        [lon_range[0], lat_range[0]],
-                        [lon_range[1], lat_range[0]],
-                        [lon_range[1], lat_range[1]],
-                        [lon_range[0], lat_range[1]],
-                        [lon_range[0], lat_range[0]],
+                        [
+                            [lon_range[0], lat_range[0]],
+                            [lon_range[1], lat_range[0]],
+                            [lon_range[1], lat_range[1]],
+                            [lon_range[0], lat_range[1]],
+                            [lon_range[0], lat_range[0]],
+                        ]
                     ]
                 ],
             },
