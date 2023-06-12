@@ -87,7 +87,7 @@ def save_nc(
     -------
         xarray.DataArray or xarray.Dataset: The input xarray object.
     """
-    filename = replace_dot_with_dash(remove_suffix(filename)).with_suffix(".nc")
+    filename = replace_dot_with_dash(remove_suffix(filename))
     save_path = (Path(save_dir) / filename).with_suffix(".nc")
     if not save_path.is_file():
         spatial_data.process_xa_d(xa_d).to_netcdf(save_path)
