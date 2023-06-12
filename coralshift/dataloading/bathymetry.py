@@ -162,7 +162,7 @@ def generate_gradient_nc(
             )
         )
         gradients = gaussian_gradient_magnitude(xa_bath.values, sigma=kernel_size)
-        xa_gradients = xa_bath.copy(data=gradients)
+        xa_gradients = xa_bath.copy(data={"gradients": gradients})
         file_ops.save_nc(gradient_dir, gradient_path.stem, xa_gradients)
     else:
         gradients = xa.open_dataset(gradient_path)
