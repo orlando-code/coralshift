@@ -123,14 +123,14 @@ def generate_name_dict(
 
 def download_reanalysis(
     download_dir: str | Path,
-    variables: list[str],
-    date_lims: tuple[str, str],
-    lon_lims: tuple[str, str],
-    lat_lims: tuple[str, str],
-    depth_lims: tuple[str, str],
+    variables: list[str] = ["mlotst", "bottomT", "uo", "so", "zos", "thetao", "vo"],
+    date_lims: tuple[str, str] = ("1993-01-01", "2020-12-31"),
+    depth_lims: tuple[str, str] = (0.494, 21.599),
+    lon_lims: tuple[str, str] = (142, 147),
+    lat_lims: tuple[str, str] = (-17, -10),
     product_type: str = "my",
-    product_id: str = "GLOBAL_MULTIYEAR_PHY_001_030",
-    dataset_id: str = "cmems_mod_glo_phy_my_0.083_P1D-m",
+    service_id: str = "GLOBAL_MULTIYEAR_PHY_001_030",
+    product_id: str = "cmems_mod_glo_phy_my_0.083_P1D-m",
 ) -> xa.Dataset:
     """
     Download reanalysis data for multiple variables and save them to the specified directory.
@@ -144,8 +144,8 @@ def download_reanalysis(
     lat_lims (tuple[str, str]): Latitude limits as a tuple of strings in the format "lat_min, lat_max".
     depth_lims (tuple[str, str]): Depth limits as a tuple of strings in the format "depth_min, depth_max".
     product_type (str, optional): Product type. Defaults to "my".
-    product_id (str, optional): Product ID. Defaults to "GLOBAL_MULTIYEAR_PHY_001_030".
-    dataset_id (str, optional): Dataset ID. Defaults to "cmems_mod_glo_phy_my_0.083_P1D-m".
+    service_id (str, optional): Product ID. Defaults to "GLOBAL_MULTIYEAR_PHY_001_030".
+    product_id (str, optional): Dataset ID. Defaults to "cmems_mod_glo_phy_my_0.083_P1D-m".
 
     Returns
     -------
@@ -185,8 +185,8 @@ def download_reanalysis(
                     lat_lims,
                     depth_lims,
                     product_type,
+                    service_id,
                     product_id,
-                    dataset_id,
                     username,
                     password,
                 )
@@ -267,8 +267,8 @@ def generate_motu_query(
     lat_lims: tuple[float, float],
     depth_lims: tuple[float, float],
     product_type: str,
+    service_id: str,
     product_id: str,
-    dataset_id: str,
     username: str,
     password: str,
 ) -> str:
@@ -284,8 +284,8 @@ def generate_motu_query(
     lat_lims (tuple[float, float]): A tuple containing the latitude limits.
     depth_lims (tuple[float, float]): A tuple containing the depth limits.
     product_type (str): The type of product.
-    product_id (str): The product ID.
-    dataset_id (str): The dataset ID.
+    service_id (str): The product ID.
+    product_id (str): The dataset ID.
     username (str): The username for authentication.
     password (str): The password for authentication.
 
@@ -302,7 +302,7 @@ def generate_motu_query(
 
     # Generate motuclient command line
     query = f"python -m motuclient --motu https://{product_type}.cmems-du.eu/motu-web/Motu \
-    --service-id {product_id}-TDS --product-id {dataset_id} \
+    --service-id {service_id}-TDS --product-id {product_id} \
     --longitude-min {lon_min} --longitude-max {lon_max} --latitude-min {lat_min} --latitude-max {lat_max} \
     --date-min '{date_min}' --date-max '{date_max}' --depth-min {depth_min} --depth-max {depth_max} \
     --variable {variable} --out-dir '{download_dir}' --out-name '{filename}.nc' --user '{username}' --pwd '{password}'"
