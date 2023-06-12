@@ -1250,7 +1250,7 @@ def process_xa_ds_for_ml(
 def generate_patch(
     xa_ds: xa.DataArray | xa.Dataset,
     lat_lon_starts: tuple[float, float],
-    coord_lengths: tuple[float, float],
+    coord_lengths: tuple[float, float] = None,
     coord_range: tuple[int, int] = None,
     feature_vars: list[str] = ["bottomT", "so", "mlotst", "uo", "vo", "zos", "thetao"],
     gt_var: str = "coral_algae_1-12_degree",
