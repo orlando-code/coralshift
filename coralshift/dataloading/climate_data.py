@@ -124,7 +124,7 @@ def generate_name_dict(
 def download_reanalysis(
     download_dir: str | Path,
     variables: list[str] = ["mlotst", "bottomT", "uo", "so", "zos", "thetao", "vo"],
-    date_lims: tuple[str, str] = ("1993-01-01", "2020-12-31"),
+    date_lims: tuple[str, str] = ("1992-12-31", "2021-12-31"),
     depth_lims: tuple[str, str] = (0.494, 21.599),
     lon_lims: tuple[str, str] = (142, 147),
     lat_lims: tuple[str, str] = (-17, -10),
