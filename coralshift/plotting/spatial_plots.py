@@ -401,6 +401,7 @@ def visualise_variable_in_region(
     lat_lims: tuple[float, float] = None,
     lon_lims: tuple[(float, float)] = None,
 ) -> None:
+    # TODO: fix flat_data
     fig, ax = plt.subplots(
         1,
         3,
@@ -415,7 +416,7 @@ def visualise_variable_in_region(
             longitude=slice(min(lon_lims), max(lon_lims)),
         )
 
-    flat_data = xa_array.values.flatten()
+    # flat_data = xa_array.values.flatten()
     spatial_mean = xa_array.mean(dim=["latitude", "longitude"])
     ax[0].boxplot(spatial_mean)
     spatial_mean.plot.line(ax=ax[1])
