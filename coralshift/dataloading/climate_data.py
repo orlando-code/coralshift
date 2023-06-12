@@ -4,8 +4,8 @@ import numpy as np
 import xarray as xa
 import os
 import cdsapi
+import getpass
 
-# import getpass
 # import cdsapi
 
 from pathlib import Path
@@ -154,10 +154,10 @@ def download_reanalysis(
     download_dir = file_ops.guarantee_existence(download_dir)
 
     # User credentials
-    # username = input("Enter your username: ")
-    # password = getpass.getpass("Enter your password: ")
-    username = "otimmerman"
-    password = "Fgg0N$tUUuL3"
+    username = input("Enter your username: ")
+    password = getpass.getpass("Enter your password: ")
+    # username = "otimmerman"
+    # password = "Fgg0N$tUUuL3"
 
     # split request by variable
     for var in tqdm(variables, desc=" variable loop", position=0):
@@ -207,7 +207,7 @@ def download_reanalysis(
     name_dict = generate_name_dict(variables, date_lims, lon_lims, lat_lims, depth_lims)
     main_filename = generate_spatiotemporal_var_filename_from_dict(name_dict)
     save_path = (Path(download_dir) / main_filename).with_suffix(".nc")
-    merged_nc = file_ops.load_merge_nc_files(download_dir)
+    merged_nc = file_ops.merge_nc_files_in_dir(download_dir)
 
     merged_nc.to_netcdf(save_path)
     print(f"Combined nc file written to {save_path}.")
