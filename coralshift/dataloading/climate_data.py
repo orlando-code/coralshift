@@ -308,7 +308,7 @@ def generate_motu_query(
 
     # generate motuclient command line
     # specifying environment to conda environment makes sure that `motuclient` module is found
-    query = f"conda run -n coralshift python -m motuclient --motu https://{product_type} \
+    query = f"conda run -n coralshift python -m motuclient --motu https://{product_type}\
         .cmems-du.eu/motu-web/Motu --service-id {service_id}-TDS --product-id {product_id} \
     --longitude-min {lon_min} --longitude-max {lon_max} --latitude-min {lat_min} --latitude-max {lat_max} \
     --date-min '{date_min}' --date-max '{date_max}' --depth-min {depth_min} --depth-max {depth_max} \
