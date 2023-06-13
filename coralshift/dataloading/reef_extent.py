@@ -3,11 +3,13 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 import rasterio
+import xarray as xa
 
 from pathlib import Path
 from tqdm import tqdm
 
 from coralshift.processing import spatial_data
+from coralshift.utils import directories, file_ops
 
 
 def generate_area_geojson(area_class, area_name: str, save_dir: Path | str) -> None:
@@ -140,3 +142,24 @@ def rasterize_gdf(gdf: gpd.GeoDataFrame, chunk_size: int = 100):
         out = rasterio.rasterize(shapes=shapes, out=raster_array, transform=transform)
 
     return out
+
+
+def process_coral_gt_tifs(tif_dir_name=None, target_resolution_d: float = None):
+    if not tif_dir_name:
+        tif_dir = directories.get_reef_baseline_dir()
+    else:
+        tif_dir = directories.get_reef_baseline_dir() / tif_dir_name
+
+    nc_dir = file_ops.guarantee_existence(tif_dir / "gt_nc_dir")
+    # save tifs to ncs in new dir
+    tif_paths = file_ops.tifs_to_ncs(nc_dir, target_resolution_d)
+    # get list of nc paths in dir
+    xa_arrays_list = [file_ops.tif_to_xa_array(tif_path) for tif_path in tif_paths]
+    # merge ncs into one mega nc file
+    if len(xa_arrays_list) > 1:
+        concatted = xa.concat(xa_arrays_list, dim=["latitude", "longitude"])
+    else:
+        concatted = xa_arrays_list[0]
+    file_ops.save_nc(
+        nc_dir, f"concatenated_{target_resolution_d:.05f}_degree", concatted
+    )
