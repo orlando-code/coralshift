@@ -1028,7 +1028,6 @@ def process_xa_d(
         "lon": "longitude",
         "x": "longitude",
         "y": "latitude",
-        "band": "band",
     },
     squeeze_coords: str | list[str] = None,
     chunk_dict: dict = {"latitude": 100, "longitude": 100, "time": 100},
