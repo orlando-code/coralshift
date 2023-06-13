@@ -306,11 +306,10 @@ def generate_motu_query(
     date_min, date_max = min(date_lims), max(date_lims)
     depth_min, depth_max = min(depth_lims), max(depth_lims)
 
-    # Generate motuclient command line
-    # You need to make sure you are executing this command in the activte environment.
-    # The issue is, it is try to execute the motuclient which has noot been installed in that environment.
-    # Maybe intialise the environment at the start then here.
-    query = f"conda run -n coralshift python -m motuclient --motu https://{product_type}.cmems-du.eu/motu-web/Motu --service-id {service_id}-TDS --product-id {product_id} \
+    # generate motuclient command line
+    # specifying environment to conda environment makes sure that `motuclient` module is found
+    query = f"conda run -n coralshift python -m motuclient --motu https://{product_type} \
+        .cmems-du.eu/motu-web/Motu --service-id {service_id}-TDS --product-id {product_id} \
     --longitude-min {lon_min} --longitude-max {lon_max} --latitude-min {lat_min} --latitude-max {lat_max} \
     --date-min '{date_min}' --date-max '{date_max}' --depth-min {depth_min} --depth-max {depth_max} \
     --variable {variable} --out-dir '{download_dir}' --out-name '{filename}.nc' --user '{username}' --pwd '{password}'"
