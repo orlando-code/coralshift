@@ -10,6 +10,7 @@ import geopandas as gpd
 import numpy as np
 
 from coralshift.processing import spatial_data
+from coralshift.utils import utils
 
 
 def guarantee_existence(path: Path | str) -> Path:
@@ -57,19 +58,6 @@ def check_file_exists(
     return filepath.is_file()
 
 
-def replace_dot_with_dash(string: str) -> str:
-    """
-    Replace all occurrences of "." with "-" in a string.
-
-    Args:
-        string (str): The input string.
-
-    Returns:
-        str: The modified string with "." replaced by "-".
-    """
-    return string.replace(".", "-")
-
-
 def save_nc(
     save_dir: Path | str,
     filename: str,
@@ -90,7 +78,7 @@ def save_nc(
     -------
         xarray.DataArray or xarray.Dataset: The input xarray object.
     """
-    filename = remove_suffix(replace_dot_with_dash(filename))
+    filename = remove_suffix(utils.replace_dot_with_dash(filename))
     save_path = (Path(save_dir) / filename).with_suffix(".nc")
     if not save_path.is_file():
         print(f"Writing {filename} to file at {save_path}.")
@@ -99,7 +87,9 @@ def save_nc(
         print(f"{filename} already exists in {save_dir}.")
 
     if return_array:
-        return xa.open_dataset(save_path)
+        return filename, xa.open_dataset(save_path)
+    else:
+        return filename
 
 
 def prune_file_list_on_existence(file_list: list[Path | str]) -> list:
