@@ -307,7 +307,7 @@ def generate_motu_query(
     depth_min, depth_max = min(depth_lims), max(depth_lims)
 
     # Generate motuclient command line
-    query = f"python -m motuclient --motu https://{product_type}.cmems-du.eu/motu-web/Motu \
+    query = f"conda activate coralshift && python -m motuclient \ --motu https://{product_type}.cmems-du.eu/motu-web/Motu \
     --service-id {service_id}-TDS --product-id {product_id} \
     --longitude-min {lon_min} --longitude-max {lon_max} --latitude-min {lat_min} --latitude-max {lat_max} \
     --date-min '{date_min}' --date-max '{date_max}' --depth-min {depth_min} --depth-max {depth_max} \
