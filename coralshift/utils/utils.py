@@ -131,6 +131,19 @@ def generate_date_pairs(
     ]
 
 
+def replace_dot_with_dash(string: str) -> str:
+    """
+    Replace all occurrences of "." with "-" in a string.
+
+    Args:
+        string (str): The input string.
+
+    Returns:
+        str: The modified string with "." replaced by "-".
+    """
+    return string.replace(".", "-")
+
+
 def pad_number_with_zeros(number: str | int, resulting_len: str = 2) -> str:
     """Add leading zeros to a number until the desired length. Useful for generating dates in URL strings or any other
     scenario where leading zeros are required.
