@@ -198,7 +198,7 @@ def download_reanalysis(
 
     if save_path.is_file():
         print(f"Merged file already exists at {save_path}")
-        return xa.open_dataset(save_path)
+        return xa.open_dataset(save_path), save_path
 
     date_merged_xas = []
     # split request by variable
@@ -273,7 +273,7 @@ def download_reanalysis(
     )
     print(f"Combined nc file written to {save_path}.")
 
-    return all_merged
+    return all_merged, save_path
 
 
 def execute_motu_query(
