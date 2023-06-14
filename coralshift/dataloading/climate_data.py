@@ -148,6 +148,7 @@ def generate_name_dict(
 
 def download_reanalysis(
     download_dir: str | Path,
+    final_filename: str = None,
     variables: list[str] = ["mlotst", "bottomT", "uo", "so", "zos", "thetao", "vo"],
     date_lims: tuple[str, str] = ("1992-12-31", "2021-12-31"),
     depth_lims: tuple[str, str] = (0.494, 21.599),
@@ -188,6 +189,12 @@ def download_reanalysis(
     name_dict = generate_name_dict(variables, date_lims, lon_lims, lat_lims, depth_lims)
     main_filename = generate_spatiotemporal_var_filename_from_dict(name_dict)
     save_path = (Path(download_dir) / main_filename).with_suffix(".nc")
+
+    # if particular filename specified
+    if final_filename:
+        save_path = (
+            Path(download_dir) / file_ops.remove_suffix(final_filename)
+        ).with_suffix(".nc")
 
     if save_path.is_file():
         print(f"Merged file already exists at {save_path}")
@@ -252,15 +259,12 @@ def download_reanalysis(
         for date_merged_xa in date_merged_xas
     ]
     all_merged = xa.merge(arrays)
-    # merged_nc = file_ops.merge_nc_files_in_dir(
-    #     download_dir,
-    # )
 
     all_merged.to_netcdf(save_path)
     # generate accompnaying metadata
     generate_metadata(
         download_dir,
-        main_filename,
+        final_filename,
         variables,
         date_lims,
         lon_lims,
