@@ -1584,12 +1584,17 @@ def spatially_buffer_timeseries(
 def spatially_buffer_nc_file(nc_path: Path | str, buffer_size: int = 3):
     # TODO: specify distance buffer
     nc_path = Path(nc_path)
-    buffered_ds = spatially_buffer_timeseries(
-        xa.open_dataset(nc_path), buffer_size=buffer_size
-    )
     buffered_name = nc_path.stem + f"_buffered_{buffer_size}_pixel"
     buffered_path = (nc_path.parent / buffered_name).with_suffix(".nc")
-    buffered_ds.to_netcdf(buffered_path)
+
+    # if buffered file doesn't already exist
+    if not buffered_path.is_file():
+        buffered_ds = spatially_buffer_timeseries(
+            xa.open_dataset(nc_path), buffer_size=buffer_size
+        )
+        buffered_ds.to_netcdf(buffered_path)
+    else:
+        print(f"Area buffered by {buffer_size} already exists at {buffered_path}.")
 
     return buffered_ds, buffered_path
 
