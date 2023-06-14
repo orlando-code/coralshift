@@ -240,7 +240,10 @@ def check_path_suffix(path: Path | str, comparison: str) -> bool:
 
 
 def merge_nc_files_in_dir(
-    nc_dir: Path | str, incl_subdirs: bool = False, concat_dim: str = "time"
+    nc_dir: Path | str,
+    filename: str = "placeholder",
+    incl_subdirs: bool = False,
+    concat_dim: str = "time",
 ):
     """Load and merge all netCDF files in a directory.
     # TODO: test
@@ -264,17 +267,18 @@ def merge_nc_files_in_dir(
         return xa.open_dataset(filepaths[0])
 
     nc_dir = Path(nc_dir)
-    merged_name = f"{str(nc_dir.stem)}_time_merged.nc"
-    merged_path = nc_dir / merged_name
+    # merged_name = f"{str(nc_dir.stem)}_time_merged.nc"
+    # merged_path = nc_dir / merged_name
+    merged_path = Path(nc_dir / remove_suffix(filename)).with_suffix(".nc")
     if not merged_path.is_file():
         print(f"Merging .nc files into {merged_path}")
         merged_ds = spatial_data.process_xa_d(
             xa.open_mfdataset(filepaths, concat_dim=concat_dim, combine="nested")
         )
         merged_ds.to_netcdf(merged_path)
-        return merged_ds
     else:
         print(f"{merged_path} already exists.")
+    return merged_path
 
     # # combine nc files by time
     # ds = xa.open_mfdataset(
@@ -287,7 +291,9 @@ def merge_nc_files_in_dir(
     # return xa.decode_cf(ds).sortby("time", ascending=True)
 
 
-def merge_nc_files_in_dirs(parent_dir: Path | str, concat_dim: str = "time"):
+def merge_nc_files_in_dirs(
+    parent_dir: Path | str, filename: str = "placeholder", concat_dim: str = "time"
+):
     """
     Load and merge all netCDF files in multiple directories.
     # TODO: test
@@ -304,7 +310,7 @@ def merge_nc_files_in_dirs(parent_dir: Path | str, concat_dim: str = "time"):
     nc_dirs = [d for d in Path(parent_dir).iterdir() if d.is_dir()]
     for nc_dir in tqdm(nc_dirs):
         return merge_nc_files_in_dir(
-            nc_dir, include_subdirs=True, concat_dim=concat_dim
+            nc_dir, filename, include_subdirs=True, concat_dim=concat_dim
         )
         # merged_name = f"{str(dir.stem)}_time_merged.nc"
         # merged_path = dir / merged_name
