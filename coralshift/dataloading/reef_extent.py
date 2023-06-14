@@ -163,3 +163,11 @@ def process_coral_gt_tifs(tif_dir_name=None, target_resolution_d: float = None):
     file_ops.save_nc(
         nc_dir, f"concatenated_{target_resolution_d:.05f}_degree", concatted
     )
+
+
+def generate_coral_shp(gdf_coral: gpd.GeoDataFrame) -> None:
+    save_path = directories.get_reef_baseline_dir() / "coral_algae_gt.shp"
+    if not save_path.is_file():
+        gdf_coral.to_file(save_path, driver="ESRI Shapefile")
+    else:
+        print(f"File at {save_path} already exists.")
