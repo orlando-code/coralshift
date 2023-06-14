@@ -34,16 +34,31 @@ def generate_spatiotemporal_var_filename_from_dict(
     for k, v in info_dict.items():
         # strings (variables)
         if utils.is_type_or_list_of_type(v, str):
-            filename_list.extend([k.upper(), utils.underscore_str_of_strings(v)])
+            filename_list.extend(
+                [
+                    k.upper(),
+                    utils.replace_dot_with_dash(utils.underscore_str_of_strings(v)),
+                ]
+            )
         # np.datetime64 (dates)
         elif utils.is_type_or_list_of_type(
             v, np.datetime64
         ) or utils.is_type_or_list_of_type(v, Timestamp):
-            filename_list.extend([k.upper(), utils.underscore_str_of_dates(v)])
+            filename_list.extend(
+                [
+                    k.upper(),
+                    utils.replace_dot_with_dash(utils.underscore_str_of_dates(v)),
+                ]
+            )
         # tuples (coordinates limits)
         elif utils.is_type_or_list_of_type(v, tuple):
             filename_list.extend(
-                [k.upper(), utils.underscore_list_of_tuples(utils.round_list_tuples(v))]
+                [
+                    k.upper(),
+                    utils.replace_dot_with_dash(
+                        utils.underscore_list_of_tuples(utils.round_list_tuples(v))
+                    ),
+                ]
             )
     return "_".join(filename_list)
 
