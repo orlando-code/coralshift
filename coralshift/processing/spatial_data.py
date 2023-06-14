@@ -1594,7 +1594,8 @@ def spatially_buffer_nc_file(nc_path: Path | str, buffer_size: int = 3):
         )
         buffered_ds.to_netcdf(buffered_path)
     else:
-        print(f"Area buffered by {buffer_size} already exists at {buffered_path}.")
+        buffered_ds = xa.open_dataset(buffered_path)
+        print(f"Area buffered by {buffer_size} pixel(s) already exists at {buffered_path}.")
 
     return buffered_ds, buffered_path
 
