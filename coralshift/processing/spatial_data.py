@@ -1062,7 +1062,7 @@ def process_xa_d(
     temp_xa_d = xa_d.copy()
 
     for coord, new_coord in rename_mapping.items():
-        if new_coord not in temp_xa_d.coords:
+        if new_coord not in temp_xa_d.coords and coord in temp_xa_d.coords:
             temp_xa_d = temp_xa_d.rename({coord: new_coord})
     # temp_xa_d = xa_d.rename(
     #     {coord: rename_mapping.get(coord, coord) for coord in xa_d.coords}
