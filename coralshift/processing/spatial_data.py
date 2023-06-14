@@ -1063,7 +1063,7 @@ def process_xa_d(
     )
     if "band" in temp_xa_d.dims:
         temp_xa_d = temp_xa_d.squeeze("band")
-    if squeeze_coords and "band" in temp_xa_d.dims:
+    if squeeze_coords:
         temp_xa_d = temp_xa_d.squeeze(squeeze_coords)
 
     chunked_xa_d = chunk_as_necessary(temp_xa_d, chunk_dict)
