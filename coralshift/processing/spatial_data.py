@@ -1584,7 +1584,9 @@ def spatially_buffer_timeseries(
 def spatially_buffer_nc_file(nc_path: Path | str, buffer_size: int = 1):
     # TODO: specify distance buffer
     nc_path = Path(nc_path)
-    buffered_ds = spatially_buffer_timeseries(xa.open_dataset(nc_path))
+    buffered_ds = spatially_buffer_timeseries(
+        xa.open_dataset(nc_path), buffer_size=buffer_size
+    )
     buffered_name = nc_path.stem + f"_buffered_{buffer_size}_pixel"
     buffered_path = nc_path.parent / buffered_name
     buffered_ds.to_netcdf(buffered_path)
