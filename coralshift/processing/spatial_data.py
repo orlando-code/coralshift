@@ -1575,6 +1575,7 @@ def spatially_buffer_timeseries(
             input_core_dims=[[]],
             output_core_dims=[[]],
             kwargs={"size": buffer_size},
+            dask="parallelized",
         )
         buffered_ds[data_var] = buffered
 
@@ -1595,7 +1596,9 @@ def spatially_buffer_nc_file(nc_path: Path | str, buffer_size: int = 3):
         buffered_ds.to_netcdf(buffered_path)
     else:
         buffered_ds = xa.open_dataset(buffered_path)
-        print(f"Area buffered by {buffer_size} pixel(s) already exists at {buffered_path}.")
+        print(
+            f"Area buffered by {buffer_size} pixel(s) already exists at {buffered_path}."
+        )
 
     return buffered_ds, buffered_path
 
