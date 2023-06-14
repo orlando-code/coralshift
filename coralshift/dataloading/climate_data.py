@@ -14,6 +14,7 @@ from tqdm import tqdm
 from pandas._libs.tslibs.timestamps import Timestamp
 
 from coralshift.utils import utils, file_ops
+from coralshift.processing import spatial_data
 
 
 def generate_spatiotemporal_var_filename_from_dict(
@@ -169,6 +170,7 @@ def download_reanalysis(
         print(f"Merged file already exists at {save_path}")
         return xa.open_dataset(save_path)
 
+    date_merged_paths = []
     # split request by variable
     for var in tqdm(variables, desc=" variable loop", position=0):
         print(f"Downloading {var} data...")
@@ -213,12 +215,28 @@ def download_reanalysis(
             else:
                 print(f"{filename} already exists in {save_dir}.")
 
-    merged_nc = file_ops.merge_nc_files_in_dir(download_dir)
+        var_name_dict = generate_name_dict(
+            var, date_lims, lon_lims, lat_lims, depth_lims
+        )
+        date_merged_name = generate_spatiotemporal_var_filename_from_dict(var_name_dict)
+        # merge files by time
+        merged_path = file_ops.merge_nc_files_in_dir(download_dir, date_merged_name)
+        date_merged_paths.append(merged_path)
 
-    merged_nc.to_netcdf(save_path)
+    # concatenate variables
+    arrays = [
+        xa.open_dataarray(spatial_data.process_xa_d(date_merged_path))
+        for date_merged_path in date_merged_paths
+    ]
+    all_merged = xa.merge(arrays, fill_value=-9999)
+    # merged_nc = file_ops.merge_nc_files_in_dir(
+    #     download_dir,
+    # )
+
+    all_merged.to_netcdf(save_path)
     print(f"Combined nc file written to {save_path}.")
 
-    return merged_nc
+    return all_merged
 
 
 def execute_motu_query(
