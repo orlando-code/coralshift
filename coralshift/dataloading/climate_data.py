@@ -66,12 +66,12 @@ def generate_spatiotemporal_var_filename_from_dict(
 def generate_metadata(
     download_dir: str,
     filename: str,
-    variable: str,
+    variables: list[str],
     date_lims: tuple[str, str],
     lon_lims: list[float],
     lat_lims: list[float],
     depth_lims: list[float],
-    query: str,
+    query: str = "n/a",
 ) -> None:
     """Generate metadata for the downloaded file and save it as a JSON file.
 
@@ -94,7 +94,7 @@ def generate_metadata(
         "thetao": "sea water potential temperature",
         "usi": "eastward sea ice velocity",
         "sithick": "sea ice thickness",
-        "bottomT": "sea water potential at sea floor",
+        "bottomT": "sea water potential temperature at sea floor",
         "vsi": "northward sea ice velocity",
         "usi": "eastward sea ice velocity",
         "vo": "northward sea water velocity",
@@ -103,11 +103,19 @@ def generate_metadata(
         "zos": "sea surface height above geoid",
     }
 
+    # if list of variables, iterate through dict to get long names
+    if len(variables) > 1:
+        variable_names = str([var_dict[var] for var in variables])
+    else:
+        variable_names = var_dict[variables[0]]
+    # send list to a string for json
+    variables = str(variables)
+
     metadata = {
         "filename": filename,
         "download directory": str(download_dir),
-        "variable acronym": variable,
-        "variable name": var_dict[variable],
+        "variable acronym(s)": variables,
+        "variable name(s)": variable_names,
         "longitude-min": lon_lims[0],
         "longitude-max": lon_lims[1],
         "latitude-min": lat_lims[0],
@@ -185,16 +193,16 @@ def download_reanalysis(
         print(f"Merged file already exists at {save_path}")
         return xa.open_dataset(save_path)
 
-    date_merged_paths = []
+    date_merged_xas = []
     # split request by variable
-    for var in tqdm(variables, desc=" variable loop", position=0):
+    for var in tqdm(variables, desc=" variable loop", position=0, leave=True):
         print(f"Downloading {var} data...")
         # split request by time
         date_pairs = utils.generate_date_pairs(date_lims)
         # create download folder for each variable (if not already existing)
         save_dir = Path(download_dir) / var
         file_ops.guarantee_existence(save_dir)
-        for sub_date_lims in tqdm(date_pairs):
+        for sub_date_lims in tqdm(date_pairs, leave=False):
             # generate name info dictionary
             name_dict = generate_name_dict(
                 var, sub_date_lims, lon_lims, lat_lims, depth_lims
@@ -220,7 +228,7 @@ def download_reanalysis(
                 execute_motu_query(
                     save_dir,
                     filename,
-                    var,
+                    [var],
                     sub_date_lims,
                     lon_lims,
                     lat_lims,
@@ -235,20 +243,30 @@ def download_reanalysis(
         )
         date_merged_name = generate_spatiotemporal_var_filename_from_dict(var_name_dict)
         # merge files by time
-        merged_path = file_ops.merge_nc_files_in_dir(download_dir, date_merged_name)
-        date_merged_paths.append(merged_path)
+        merged_path = file_ops.merge_nc_files_in_dir(save_dir, date_merged_name)
+        date_merged_xas.append(merged_path)
 
     # concatenate variables
     arrays = [
-        xa.open_dataarray(spatial_data.process_xa_d(date_merged_path))
-        for date_merged_path in date_merged_paths
+        (spatial_data.process_xa_d(date_merged_xa))
+        for date_merged_xa in date_merged_xas
     ]
-    all_merged = xa.merge(arrays, fill_value=-9999)
+    all_merged = xa.merge(arrays)
     # merged_nc = file_ops.merge_nc_files_in_dir(
     #     download_dir,
     # )
 
     all_merged.to_netcdf(save_path)
+    # generate accompnaying metadata
+    generate_metadata(
+        download_dir,
+        main_filename,
+        variables,
+        date_lims,
+        lon_lims,
+        lat_lims,
+        depth_lims,
+    )
     print(f"Combined nc file written to {save_path}.")
 
     return all_merged
