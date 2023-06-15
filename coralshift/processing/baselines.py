@@ -3,8 +3,6 @@ from __future__ import annotations
 import xarray as xa
 import numpy as np
 
-# import rioxarray as rio
-
 
 def return_time_grouping_offset(period: str):
     """
