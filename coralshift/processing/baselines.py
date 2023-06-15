@@ -3,6 +3,8 @@ from __future__ import annotations
 import xarray as xa
 import numpy as np
 
+# import rioxarray as rio
+
 
 def return_time_grouping_offset(period: str):
     """
@@ -45,6 +47,9 @@ def calc_weighted_mean(xa_da_daily_means: xa.DataArray, period: str):
     xarray.DataArray: The weighted mean values for the given period.
     """
     group, offset = return_time_grouping_offset(period)
+    # determine original crs
+    crs = xa_da_daily_means.rio.crs
+
     # Determine the month length (has no effect on other time periods)
     month_length = xa_da_daily_means.time.dt.days_in_month
     # Calculate the monthly weights
@@ -61,7 +66,7 @@ def calc_weighted_mean(xa_da_daily_means: xa.DataArray, period: str):
     ones_out = (ones * weights).resample(time=offset).sum(dim="time")
 
     # weighted average
-    return xa_da_daily_means_sum / ones_out
+    return (xa_da_daily_means_sum / ones_out).write_crs(crs)
 
 
 def calc_timeseries_params(xa_da_daily_means: xa.DataArray, period: str, param: str):
@@ -79,22 +84,39 @@ def calc_timeseries_params(xa_da_daily_means: xa.DataArray, period: str, param: 
     xarray.DataArray, xarray.DataArray, tuple(xarray.DataArray, xarray.DataArray): The weighted average,
         standard deviation, and (min, max) values for the given period.
     """
+    # determine original crs
+    crs = xa_da_daily_means.rio.crs
+
     base_name = f"{param}_{period}_"
     # weighted average
     weighted_av = calc_weighted_mean(xa_da_daily_means, period).rename(
         base_name + "mean"
     )
     # standard deviation of weighted averages
-    stdev = weighted_av.std(dim="time", skipna=True).rename(base_name + "std")
+    stdev = (
+        weighted_av.std(dim="time", skipna=True)
+        .rename(base_name + "std")
+        .write_crs(crs)
+    )
     # max and min
-    min = xa_da_daily_means.min(dim="time", skipna=True).rename(base_name + "min")
-    max = xa_da_daily_means.max(dim="time", skipna=True).rename(base_name + "max")
+    min = (
+        xa_da_daily_means.min(dim="time", skipna=True)
+        .rename(base_name + "min")
+        .write_crs(crs)
+    )
+    max = (
+        xa_da_daily_means.max(dim="time", skipna=True)
+        .rename(base_name + "max")
+        .write_crs(crs)
+    )
 
     # Return the weighted average
     return weighted_av, stdev, (min, max)
 
 
-def calculate_magnitude(horizontal_data, vertical_data) -> xa.DataArray:
+def calculate_magnitude(
+    horizontal_data: xa.DataArray, vertical_data: xa.DataArray
+) -> xa.DataArray:
     """
     Calculates the resultant magnitude of horizontal and vertical data.
 
@@ -107,6 +129,12 @@ def calculate_magnitude(horizontal_data, vertical_data) -> xa.DataArray:
     -------
     xarray.DataArray: The magnitude of the horizontal and vertical data.
     """
+    # determine original crs
+    crs_h, crs_v = horizontal_data.rio.crs, vertical_data.rio.crs
+    if crs_h != crs_v:
+        raise ValueError(
+            f"Unmatching crs values in xa.DataArrays: horizontal crs = {crs_h}, vertical crs = {crs_v}"
+        )
 
     def magnitude(horizontal_data, vertical_data) -> xa.DataArray:
         return np.sqrt(horizontal_data**2 + vertical_data**2)
@@ -115,4 +143,4 @@ def calculate_magnitude(horizontal_data, vertical_data) -> xa.DataArray:
     #     horizontal_data**2 + vertical_data**2
     # )
     # return xa.apply_ufunc(func, horizontal_data, vertical_data)
-    return xa.apply_ufunc(magnitude, horizontal_data, vertical_data)
+    return xa.apply_ufunc(magnitude, horizontal_data, vertical_data).write_crs(crs_h)
