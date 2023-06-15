@@ -57,7 +57,26 @@ def upsample_xa_d_to_other(
     method=rasterio.enums.Resampling.bilinear,
     name: str = "",
 ) -> xa.DataArray | xa.Dataset:
-    return process_xa_d(xa_d.rio.reproject_match(target_xa_d, resampling=method)).rename(name)
+    """
+    Upsample a given xarray DataArray or Dataset to match the spatial characteristics of another DataArray or Dataset.
+
+    Parameters
+    ----------
+    xa_d (xarray.DataArray or xarray.Dataset): The xarray object to upsample.
+    target_xa_d (xarray.DataArray or xarray.Dataset): The target xarray object with the desired spatial characteristics
+        (e.g., resolution, extent).
+    method (rasterio.enums.Resampling, optional): The resampling method to use during upsampling. Default is
+        rasterio.enums.Resampling.bilinear.
+    name (str, optional): The name to assign to the upsampled DataArray or Dataset. If not provided, the original
+        name is used.
+
+    Returns
+    -------
+    xarray.DataArray or xarray.Dataset: The upsampled xarray object with matching spatial characteristics as the target.
+    """
+    return process_xa_d(
+        xa_d.rio.reproject_match(target_xa_d, resampling=method)
+    ).rename(name)
 
 
 def upsample_xarray_by_factor(
