@@ -111,7 +111,7 @@ def get_cbar(cbar_type: str = "seq"):
 
 def plot_spatial(
     xa_da: xa.DataArray,
-    ax: Axes = None,
+    fax: Axes = None,
     title: str = None,
     name: str = None,
     figsize: tuple[float, float] = (10, 10),
@@ -142,9 +142,12 @@ def plot_spatial(
     map_proj = ccrs.PlateCarree()
     # may need to change this
 
-    if not ax:
+    if not fax:
         fig = plt.figure(figsize=figsize)
         ax = plt.axes(projection=map_proj)
+    else:
+        fig = fax[0]
+        ax = fax[1]
 
     resolution_d = np.mean(spatial_data.calculate_spatial_resolution(xa_da))
     resolution_m = np.mean(spatial_data.degrees_to_distances(resolution_d))
@@ -197,7 +200,7 @@ def format_spatial_plot(
     -------
         Figure, Axes
     """
-    fig.colorbar(image, orientation=orient_colorbar, pad=0.1, label=name)
+    plt.colorbar(image, orientation=orient_colorbar, pad=0.1, label=name)
     ax.set_title(title)
     ax.coastlines(resolution="10m", color="red", linewidth=1)
     ax.add_feature(
