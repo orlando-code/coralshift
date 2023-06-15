@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib import animation, colors
+import matplotlib.gridspec as gridspec
+
 from pathlib import Path
 import xarray as xa
 import cartopy.crs as ccrs
@@ -200,7 +202,9 @@ def format_spatial_plot(
     -------
         Figure, Axes
     """
-    plt.colorbar(image, orientation=orient_colorbar, pad=0.1, label=name)
+    plt.colorbar(
+        image, orientation=orient_colorbar, label=name, pad=0.1, fraction=0.046
+    )
     ax.set_title(title)
     ax.coastlines(resolution="10m", color="red", linewidth=1)
     ax.add_feature(
@@ -212,6 +216,40 @@ def format_spatial_plot(
     ax.gridlines(draw_labels={"bottom": "x", "left": "y"})
 
     return fig, ax
+
+
+def plot_spatial_diffs(
+    xa_d_pred: xa.DataArray,
+    xa_d_gt: xa.DataArray,
+    figsize: tuple[float, float] = (16, 9),
+) -> None:
+    """
+    Plot the spatial differences between predicted and ground truth data.
+
+    Parameters
+    ----------
+        xa_d_pred (xa.DataArray): Predicted data.
+        xa_d_gt (xa.DataArray): Ground truth data.
+        figsize (tuple[float, float], optional): Figure size. Default is (16, 9).
+
+    Returns
+    -------
+        None
+    """
+    xa_diff = (xa_d_gt - xa_d_pred).rename("predicted/gt_residuals")
+
+    fig = plt.figure(figsize=figsize)
+    gs = gridspec.GridSpec(2, 2)
+
+    # left plot
+    ax_r = fig.add_subplot(gs[:, 0], projection=ccrs.PlateCarree())
+    plot_spatial(fax=(fig, ax_r), xa_da=xa_diff, cmap_type="div", symmetric=True)
+
+    # right plots
+    ax_l_t = fig.add_subplot(gs[0, 1], projection=ccrs.PlateCarree())
+    plot_spatial(xa_d_gt, fax=(fig, ax_l_t), title="ground truth")
+    ax_l_b = fig.add_subplot(gs[1, 1], projection=ccrs.PlateCarree())
+    plot_spatial(xa_d_pred, fax=(fig, ax_l_b), title="inferred label")
 
 
 def plot_array_hist(
