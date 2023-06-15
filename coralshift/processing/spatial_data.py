@@ -39,16 +39,25 @@ def upsample_xarray_to_target(
     """
     # N.B. not perfect at getting starts/ends matching up
     # TODO: enable flexible upsampling by time also
-    lat_lims = xarray_coord_limits(xa_array, "latitude")
-    lon_lims = xarray_coord_limits(xa_array, "longitude")
-    # get current degree resolution
-    lat_scale = int((xa_array.latitude.size / np.diff(lat_lims)) * target_resolution)
-    lon_scale = int((xa_array.longitude.size / np.diff(lon_lims)) * target_resolution)
+    # lat_lims = xarray_coord_limits(xa_array, "latitude")
+    # lon_lims = xarray_coord_limits(xa_array, "longitude")
+    # # get current degree resolution
+    # lat_scale = int((xa_array.latitude.size / np.diff(lat_lims)) * target_resolution)
+    # lon_scale = int((xa_array.longitude.size / np.diff(lon_lims)) * target_resolution)
 
-    # Coarsen the dataset
-    return xa_array.coarsen(
-        latitude=lat_scale, longitude=lon_scale, boundary="pad"
-    ).mean()
+    # # Coarsen the dataset
+    # return xa_array.coarsen(
+    #     latitude=lat_scale, longitude=lon_scale, boundary="pad"
+    # ).mean()
+
+
+def upsample_xa_d_to_other(
+    xa_d: xa.DataArray | xa.Dataset,
+    target_xa_d: xa.DataArray | xa.Dataset,
+    method=rasterio.enums.Resampling.bilinear,
+    name: str = "",
+) -> xa.DataArray | xa.Dataset:
+    return process_xa_d(xa_d.rio.reproject_match(target_xa_d, resampling=method)).rename(name)
 
 
 def upsample_xarray_by_factor(
@@ -1550,7 +1559,7 @@ def reformat_prediction(
 
 def spatially_buffer_timeseries(
     xa_ds: xa.Dataset,
-    buffer_size: int = 1,
+    buffer_size: int = 3,
     exclude_vars: list[str] = ["spatial_ref", "coral_algae_1-12_degree"],
 ) -> xa.Dataset:
     """Applies a spatial buffer to each data variable in the xarray dataset.
