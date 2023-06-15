@@ -3,7 +3,7 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from matplotlib import animation
+from matplotlib import animation, colors
 from pathlib import Path
 import xarray as xa
 import cartopy.crs as ccrs
@@ -18,10 +18,170 @@ from coralshift.processing import spatial_data
 from coralshift.utils import file_ops
 
 
+def hex_to_rgb(value):
+    """
+    Convert a hexadecimal color code to RGB values.
+
+    Parameters
+    ----------
+    value (str): The hexadecimal color code as a string of 6 characters.
+
+    Returns
+    -------
+    tuple: A tuple of three RGB values.
+    """
+    value = value.strip("#")  # removes hash symbol if present
+    hex_el = len(value)
+    return tuple(
+        int(value[i : i + hex_el // 3], 16)  # noqa
+        for i in range(0, hex_el, hex_el // 3)
+    )
+
+
+def rgb_to_dec(value):
+    """
+    Convert RGB color values to decimal values (each value divided by 256).
+
+    Parameters
+    ----------
+    value (list): A list of three RGB values.
+
+    Returns
+    -------
+    list: A list of three decimal values.
+    """
+    return [v / 256 for v in value]
+
+
+def get_continuous_cmap(hex_list, float_list=None):
+    """
+    Create and return a color map that can be used in heat map figures.
+
+    Parameters
+    ----------
+    hex_list (list of str): List of hex code strings representing colors.
+    float_list (list of float, optional): List of floats between 0 and 1, same length as hex_list. Must start with 0
+        and end with 1.
+
+    Returns
+    -------
+    matplotlib.colors.LinearSegmentedColormap: The created color map.
+    """
+    rgb_list = [rgb_to_dec(hex_to_rgb(i)) for i in hex_list]
+    if float_list:
+        pass
+    else:
+        float_list = list(np.linspace(0, 1, len(rgb_list)))
+
+    cdict = dict()
+    for num, col in enumerate(["red", "green", "blue"]):
+        col_list = [
+            [float_list[i], rgb_list[i][num], rgb_list[i][num]]
+            for i in range(len(float_list))
+        ]
+        cdict[col] = col_list
+    cmp = colors.LinearSegmentedColormap("my_cmp", segmentdata=cdict, N=256)
+    return cmp
+
+
+def get_cbar(cbar_type: str = "seq"):
+    """
+    Get a colormap for colorbar based on the specified type.
+
+    Parameters
+    ----------
+    cbar_type (str, optional): The type of colormap to retrieve. Options are 'seq' for sequential colormap and 'div'
+        for diverging colormap.
+
+    Returns
+    -------
+    matplotlib.colors.LinearSegmentedColormap: The colormap object.
+    """
+    if cbar_type == "seq":
+        return get_continuous_cmap(
+            ["#3B9AB2", "#78B7C5", "#EBCC2A", "#E1AF00", "#F21A00"]
+        )
+    elif cbar_type == "div":
+        return get_continuous_cmap(
+            ["#3B9AB2", "#78B7C5", "#FFFFFF", "#E1AF00", "#F21A00"]
+        )
+    else:
+        raise ValueError(f"{cbar_type} not recognised.")
+
+
+def plot_spatial(
+    xa_da: xa.DataArray,
+    title: str = None,
+    name: str = None,
+    figsize: tuple[float, float] = (10, 10),
+    val_lims: tuple[float, float] = None,
+    cmap_type: str = "seq",
+    symmetric: bool = False,
+    edgecolor: str = "black",
+    orient_colorbar: str = "vertical",
+) -> tuple[Figure, Axes]:
+    """
+    Plot a spatial plot with colorbar, coastlines, landmasses, and gridlines.
+
+    Parameters
+    ----------
+    xa_da (xa.DataArray): The input xarray DataArray representing the spatial data.
+    title (str, optional): The title of the plot.
+    name (str, optional): The name of the DataArray.
+    val_lims (tuple[float, float], optional): The limits of the colorbar range.
+    cmap_type (str, optional): The type of colormap to use.
+    symmetric (bool, optional): Whether to make the colorbar symmetric around zero.
+    edgecolor (str, optional): The edge color of the landmasses.
+    orient_colorbar (str, optional): The orientation of the colorbar ('vertical' or 'horizontal').
+
+    Returns
+    -------
+    tuple: The figure and axes objects.
+    """
+    map_proj = ccrs.PlateCarree()
+    # may need to change this
+    fig = plt.figure(figsize=figsize)
+    ax = plt.axes(projection=map_proj)
+
+    resolution_d = np.mean(spatial_data.calculate_spatial_resolution(xa_da))
+    resolution_m = np.mean(spatial_data.degrees_to_distances(resolution_d))
+
+    if not name:
+        name = xa_da.name
+    if not title:
+        title = xa_da.name + " at ${:.5f}^\circ$ (~{:.0f} m) resolution".format(  # noqa
+            resolution_d, resolution_m
+        )
+
+    # if colorbar limits not specified, set to be maximum of array
+    if not val_lims:
+        vmin, vmax = np.nanmin(xa_da.values), np.nanmax(xa_da.values)
+    else:
+        vmin, vmax = min(val_lims), max(val_lims)
+
+    cmap = get_cbar(cmap_type)
+
+    # if choosing coloorbar to be centred arouoond zero (e.g. for highlighting residuals)
+    if symmetric:
+        vmin, vmax = (-vmax, vmax) if abs(vmin) > abs(vmax) else (vmin, -vmin)
+
+    im = xa_da.plot(ax=ax, cmap=cmap, vmin=vmin, vmax=vmax, add_colorbar=False)
+    # nicely format spatial plot
+    format_spatial_plot(im, fig, ax, title, name, orient_colorbar, edgecolor)
+
+    return fig, ax, im
+
+
 def format_spatial_plot(
-    image: xa.DataArray, fig: Figure, ax: Axes, title: str, orient_colorbar: str
-) -> None:
-    """Format a spatial plot with a colorbar, title, coastlines, and gridlines.
+    image: xa.DataArray,
+    fig: Figure,
+    ax: Axes,
+    title: str,
+    name: str,
+    orient_colorbar: str,
+    edgecolor: str,
+) -> tuple[Figure, Axes]:
+    """Format a spatial plot with a colorbar, title, coastlines and landmasses, and gridlines.
 
     Parameters
     ----------
@@ -32,45 +192,20 @@ def format_spatial_plot(
 
     Returns
     -------
-        None
+        Figure, Axes
     """
-    # great info here: https://stackoverflow.com/questions/13310594/positioning-the-colorbar
-    fig.colorbar(image, orientation=orient_colorbar, pad=0.1, label="elevation")
+    fig.colorbar(image, orientation=orient_colorbar, pad=0.1, label=name)
     ax.set_title(title)
-    ax.coastlines(resolution="10m", color="black", linewidth=1)
-    ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True)
-
-
-def plot_DEM(
-    region_array,
-    title: str,
-    vmin: float = -50,
-    vmax: float = 50,
-    cmap="BrBG",
-    landmask: bool = True,
-    orient_colorbar: str = "vertical",
-) -> tuple[Figure, Axes]:
-    """TODO: docstring; generalise to all spatial plots"""
-    # TODO: add option to plot satellite imagery for land instead of DEM
-    map_proj = ccrs.PlateCarree()
-    fig = plt.figure(figsize=(10, 10))
-    ax = plt.axes(projection=map_proj)
-
-    if landmask:
-        vmax = 0
-
-    im = region_array.plot(
-        ax=ax,
-        cmap=cmap,
-        # vmin=float(region_array.min().values), vmax=float(region_array.max().values),
-        vmin=vmin,
-        vmax=vmax,
-        add_colorbar=False,
+    ax.coastlines(resolution="10m", color="red", linewidth=1)
+    ax.add_feature(
+        cfeature.NaturalEarthFeature(
+            "physical", "land", "10m", edgecolor=edgecolor, facecolor="#cccccc"
+        )
     )
+    ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True)
+    ax.gridlines(draw_labels={"bottom": "x", "left": "y"})
 
-    format_spatial_plot(im, fig, ax, title, orient_colorbar)
-
-    return fig, ax, im
+    return fig, ax
 
 
 def plot_array_hist(
