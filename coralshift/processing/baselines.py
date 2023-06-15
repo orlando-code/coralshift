@@ -66,7 +66,7 @@ def calc_weighted_mean(xa_da_daily_means: xa.DataArray, period: str):
     ones_out = (ones * weights).resample(time=offset).sum(dim="time")
 
     # weighted average
-    return (xa_da_daily_means_sum / ones_out).write_crs(crs)
+    return (xa_da_daily_means_sum / ones_out).rio.write_crs(crs, inplace=True)
 
 
 def calc_timeseries_params(xa_da_daily_means: xa.DataArray, period: str, param: str):
@@ -96,18 +96,18 @@ def calc_timeseries_params(xa_da_daily_means: xa.DataArray, period: str, param: 
     stdev = (
         weighted_av.std(dim="time", skipna=True)
         .rename(base_name + "std")
-        .write_crs(crs)
+        .rio.write_crs(crs, inplace=True)
     )
     # max and min
     min = (
         xa_da_daily_means.min(dim="time", skipna=True)
         .rename(base_name + "min")
-        .write_crs(crs)
+        .rio.write_crs(crs, inplace=True)
     )
     max = (
         xa_da_daily_means.max(dim="time", skipna=True)
         .rename(base_name + "max")
-        .write_crs(crs)
+        .rio.write_crs(crs, inplace=True)
     )
 
     # Return the weighted average
@@ -143,4 +143,6 @@ def calculate_magnitude(
     #     horizontal_data**2 + vertical_data**2
     # )
     # return xa.apply_ufunc(func, horizontal_data, vertical_data)
-    return xa.apply_ufunc(magnitude, horizontal_data, vertical_data).write_crs(crs_h)
+    return xa.apply_ufunc(magnitude, horizontal_data, vertical_data).rio.write_crs(
+        crs_h, inplace=True
+    )
