@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import xarray as xa
+import numpy as np
 from pathlib import Path
-from coralshift.utils import file_ops, directories
 from scipy.ndimage import gaussian_gradient_magnitude
+
+from coralshift.utils import file_ops, directories
+from coralshift.processing import spatial_data
 
 # these two imports necessary for importing US coastal bathymetry data
 import requests
@@ -147,28 +150,57 @@ def ensure_bathymetry_downloaded(area_name: str, loading_bar: bool = True) -> Re
     return ReefAreas()
 
 
-def generate_gradient_nc(
-    bathymetry_name,
-    kernel_size: int = 1,
-    return_array: bool = False,
-) -> xa.DataArray:
-    gradient_dir = directories.get_gradients_dir()
-    gradient_path = gradient_dir / f"{bathymetry_name}_gradients"
+def calculate_gradient_magnitude(xa_da: xa.DataArray, sigma: int = 1):
+    """
+    Calculate the gradient magnitude of a DataArray using Gaussian gradient magnitude.
 
-    if not gradient_path.is_file():
-        xa_bath = xa.open_dataset(
-            (directories.get_bathymetry_datasets_dir() / bathymetry_name).with_suffix(
-                ".nc"
-            )
-        )
-        gradients = gaussian_gradient_magnitude(xa_bath.values, sigma=kernel_size)
-        xa_gradients = xa_bath.copy(data={"gradients": gradients})
-        file_ops.save_nc(gradient_dir, gradient_path.stem, xa_gradients)
+    Parameters
+    ----------
+        xa_da (xarray.DataArray): The input DataArray.
+        sigma (int, optional): Standard deviation of the Gaussian filter. Default is 1.
+
+    Returns
+    -------
+        xa.DataArray: The gradient magnitude of the input DataArray.
+    """
+    # Calculate the gradient magnitude using gaussian_gradient_magnitude. Sigma specifies kernel size.
+    gradient_magnitude = gaussian_gradient_magnitude(xa_da.compute(), sigma=sigma)
+
+    return xa.DataArray(
+        gradient_magnitude, coords=xa_da.coords, dims=xa_da.dims, attrs=xa_da.attrs
+    )
+
+
+def generate_gradient_magnitude_nc(xa_da: xa.DataArray, sigma: int = 1):
+    """
+    Generate a NetCDF file containing the gradient magnitude of a DataArray. The NetCDF file is saved in the directory
+    specified by directories.get_gradients_dir(), with the filename format
+    "{data_array_name}_{spatial_resolution}_gradients.nc".
+
+    Parameters
+    ----------
+        xa_da (xarray.DataArray): The input DataArray.
+        sigma (int, optional): Standard deviation of the Gaussian filter. Default is 1.
+
+    Returns
+    -------
+        tuple[xa.DataArray, str]: A tuple containing the gradient DataArray and the path to the saved NetCDF file.
+    """
+    # generate savepath
+    resolution_d = np.mean(spatial_data.calculate_spatial_resolution(xa_da))
+    filename = f"{xa_da.name}_{resolution_d:.5f}_gradients.nc"
+    save_path = directories.get_gradients_dir() / filename
+
+    # generate/save file as necessary
+    if not save_path.is_file():
+        grad_da = calculate_gradient_magnitude(xa_da, sigma)
+        grad_da.to_netcdf(save_path)
+        print(f"{filename} saved at {save_path}.")
     else:
-        gradients = xa.open_dataset(gradient_path)
+        print(f"{filename} already exists at {save_path}.")
+        grad_da = xa.open_dataarray(save_path)
 
-    if return_array:
-        return gradients
+    return grad_da, save_path
 
 
 ######################################################
