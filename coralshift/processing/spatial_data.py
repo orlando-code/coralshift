@@ -105,6 +105,54 @@ def upsample_xarray_by_factor(
     return existing_xa_array
 
 
+def upsample_and_save_xa_a(
+    save_dir: Path | str,
+    xa_d: xa.Dataset | xa.DataArray,
+    target_resolution_d: float = None,
+    target_xa_d: xa.DataArray | xa.Dataset = None,
+    method=None,
+    name: str = None,
+) -> tuple[xa.DataArray, str]:
+    """
+    Upsample an xarray dataset or data array and save the upsampled data.
+
+    Parameters
+    ----------
+        save_dir (Path or str): The directory where the upsampled data will be saved.
+        xa_d (xa.Dataset or xa.DataArray): The xarray dataset or data array to be upsampled.
+        target_resolution_d (float, optional): The target spatial resolution for the upsampled data.
+        target_xa_d (xa.DataArray or xa.Dataset, optional): The target xarray dataset or data array with which to match  
+        the resolution.
+        method: The method to be used for upsampling.
+        name (str, optional): The name to be given to the upsampled data.
+
+    Returns
+    -------
+        tuple[xa.DataArray, str]: A tuple containing the filepath and the saved array of the upsampled data.
+    """
+    # TODO: shift upsampling to after checking file exists
+    if target_resolution_d:
+        xa_upsampled = upsample_xarray_to_target(
+            xa_d, target_resolution=target_resolution_d
+        )
+    else:
+        xa_upsampled = upsample_xa_d_to_other(xa_d, target_xa_d)
+        # generate target resolution for filename
+        target_resolution_d = degrees_to_distances(
+            np.mean(calculate_spatial_resolution(target_xa_d))
+        )
+
+    if not name:
+        name = xa_d.name
+
+    filename = f"{name}_{target_resolution_d:.05}d"
+    filepath, array = file_ops.save_nc(
+        save_dir, filename, xa_upsampled, return_array=True
+    )
+
+    return filepath, array
+
+
 # def process_xa_array(
 #     xa_array: xa.DataArray,
 #     coords_to_drop: list[str] = None,
