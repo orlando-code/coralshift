@@ -168,7 +168,7 @@ def calculate_gradient_magnitude(xa_da: xa.DataArray, sigma: int = 1):
 
     return xa.DataArray(
         gradient_magnitude, coords=xa_da.coords, dims=xa_da.dims, attrs=xa_da.attrs
-    )
+    ).chunk(chunks="auto")
 
 
 def generate_gradient_magnitude_nc(xa_da: xa.DataArray, sigma: int = 1):
