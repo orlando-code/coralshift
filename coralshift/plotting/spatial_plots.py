@@ -206,14 +206,14 @@ def format_spatial_plot(
         image, orientation=orient_colorbar, label=name, pad=0.1, fraction=0.046
     )
     ax.set_title(title)
-    ax.coastlines(resolution="10m", color="red", linewidth=1)
+    # ax.coastlines(resolution="10m", color="red", linewidth=1)
     ax.add_feature(
         cfeature.NaturalEarthFeature(
             "physical", "land", "10m", edgecolor=edgecolor, facecolor="#cccccc"
         )
     )
     ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True)
-    ax.gridlines(draw_labels={"bottom": "x", "left": "y"})
+    # ax.gridlines(draw_labels={"bottom": "x", "left": "y"})
 
     return fig, ax
 
