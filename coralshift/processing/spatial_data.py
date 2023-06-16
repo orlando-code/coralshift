@@ -121,7 +121,7 @@ def upsample_and_save_xa_a(
         save_dir (Path or str): The directory where the upsampled data will be saved.
         xa_d (xa.Dataset or xa.DataArray): The xarray dataset or data array to be upsampled.
         target_resolution_d (float, optional): The target spatial resolution for the upsampled data.
-        target_xa_d (xa.DataArray or xa.Dataset, optional): The target xarray dataset or data array with which to match  
+        target_xa_d (xa.DataArray or xa.Dataset, optional): The target xarray dataset or data array with which to match
         the resolution.
         method: The method to be used for upsampling.
         name (str, optional): The name to be given to the upsampled data.
