@@ -265,3 +265,33 @@ def download_etopo_data(
         download_dest_path = Path(download_dest_dir, file_name)
 
         file_ops.check_exists_download_url(download_dest_path, url, loading_bar)
+
+
+def generate_bathymetry_xa_da(area_name: str):
+    """
+    Generate bathymetry data for a specified area.
+
+    Parameters
+    ----------
+        area_name (str): The name of the area.
+
+    Returns
+    -------
+        tuple[str, xa.DataArray]: A tuple containing the filepath and the processed xarray of the generated bathymetry
+        data.
+    """
+    # download .tif if not downloaded aready
+    reef_areas = ensure_bathymetry_downloaded(area_name)
+    # cast tif to processed xarray
+    xa_bath = spatial_data.tif_to_xarray(
+        directories.get_bathymetry_datasets_dir() / reef_areas.get_filename(area_name),
+        reef_areas.get_xarray_name(area_name),
+    )
+    resolution = np.mean(spatial_data.calculate_spatial_resolution(xa_bath))
+
+    bath_name = f"{reef_areas.get_xarray_name(area_name)}_{resolution:.05f}d"
+    filepath, xa_da = file_ops.save_nc(
+        directories.get_bathymetry_datasets_dir(), bath_name, xa_bath, return_array=True
+    )
+
+    return filepath, xa_da
