@@ -50,6 +50,11 @@ def get_bathymetry_datasets_dir() -> Path:
 
 
 def get_gradients_dir() -> Path:
+    """./datasets/bathymetry/gradients"""
+    return guarantee_existence(get_bathymetry_datasets_dir() / "gradients")
+
+
+def get_gradients_dir() -> Path:
     """./datasets/gradients"""
     return guarantee_existence(get_datasets_dir() / "gradients")
 
