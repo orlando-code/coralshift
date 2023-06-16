@@ -89,9 +89,9 @@ def save_nc(
         print(f"{filename} already exists in {save_dir}.")
 
     if return_array:
-        return filename, xa.open_dataset(save_path)
+        return save_path, xa.open_dataset(save_path)
     else:
-        return filename
+        return save_path
 
 
 def prune_file_list_on_existence(file_list: list[Path | str]) -> list:
