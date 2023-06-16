@@ -37,7 +37,7 @@ def upsample_xarray_to_target(
         resolution.
         - The resampling is performed by coarsening the dataset using a mean operation.
     """
-    # N.B. not perfect at getting starts/ends matching up
+    # N.B. not perfect at getting starts/ends matching up It works fine when not trying to match the coords of another
     # TODO: enable flexible upsampling by time also
     lat_lims = xarray_coord_limits(xa_array, "latitude")
     lon_lims = xarray_coord_limits(xa_array, "longitude")
