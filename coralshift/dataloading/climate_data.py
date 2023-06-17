@@ -13,7 +13,7 @@ from pathlib import Path
 from tqdm import tqdm
 from pandas._libs.tslibs.timestamps import Timestamp
 
-from coralshift.utils import utils, file_ops
+from coralshift.utils import utils, file_ops, directories
 from coralshift.processing import spatial_data
 
 
@@ -545,7 +545,7 @@ def fetch_weather_data(
     lat_lims=(-10, -17),
     lon_lims=(142, 147),
     dataset_tag: str = "reanalysis-era5-single-levels",
-    format: str = "grib",
+    format: str = "netcdf",
 ):
     c = cdsapi.Client()
 
@@ -574,3 +574,66 @@ def fetch_weather_data(
             else:
                 print(f"Filepath already exists: {filepath}")
         # TODO: more descriptive filename
+
+
+def generate_era5_data(
+    weather_params: list[float] = [
+        "evaporation",
+        "significant_height_of_combined_wind_waves_and_swell",
+        "surface_net_solar_radiation",
+        "surface_pressure",
+    ],
+    years: list[int] = np.arange(1993, 2021),
+    lat_lims: tuple[float] = (-10, -17),
+    lon_lims: tuple = (142, 147),
+) -> None:
+    """
+    Generates and merges ERA5 weather data files.
+
+    Parameters
+    ----------
+        weather_params (list[str]): A list of weather parameters to download and merge.
+        years (list[int]): A list of years for which to download and merge the data.
+        lat_lims (tuple[float, float]): A tuple specifying the latitude limits.
+        lon_lims (tuple[float, float]): A tuple specifying the longitude limits.
+
+    Returns
+    -------
+    None
+    """
+    # fetch era5 diirectory for saving
+    save_dir = directories.get_era5_data_dir()
+
+    # download data to appropriate folder(s)
+    fetch_weather_data(
+        download_dest_dir=save_dir,
+        weather_params=weather_params,
+        years=years,
+        format="netcdf",
+    )
+
+    # combine files in folder to single folder
+    combined_save_dir = file_ops.guarantee_existence(save_dir / "weather_parameters")
+
+    for param in weather_params:
+        # get path to unmerged files
+        param_dir = save_dir / param
+
+        merged_name = generate_spatiotemporal_var_filename_from_dict(
+            {
+                "var": param,
+                "lats": lat_lims,
+                "lons": lon_lims,
+                "year": f"{str(years[0])}-{str(years[-1])}",
+            }
+        )
+        # generate combined save path
+        combined_save_path = (combined_save_dir / merged_name).with_suffix(".nc")
+
+        file_ops.merge_nc_files_in_dir(
+            nc_dir=param_dir, merged_save_path=combined_save_path, format=".netcdf"
+        )
+
+    print(
+        f"All ERA5 weather files downloaded by year and merged into {combined_save_dir}"
+    )
