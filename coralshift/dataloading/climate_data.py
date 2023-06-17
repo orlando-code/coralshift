@@ -614,11 +614,10 @@ def generate_era5_data(
 
     # combine files in folder to single folder
     combined_save_dir = file_ops.guarantee_existence(save_dir / "weather_parameters")
-
+    print("\n")
     for param in weather_params:
         # get path to unmerged files
         param_dir = save_dir / param
-
         merged_name = generate_spatiotemporal_var_filename_from_dict(
             {
                 "var": param,
@@ -635,5 +634,5 @@ def generate_era5_data(
         )
 
     print(
-        f"All ERA5 weather files downloaded by year and merged into {combined_save_dir}"
+        f"\nAll ERA5 weather files downloaded by year and merged into {combined_save_dir}"
     )
