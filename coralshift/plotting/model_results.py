@@ -137,7 +137,7 @@ def investigate_label_thresholds(
     plt.ylim([0, 1])
 
 
-def evaluate_model(y_test, predictions):
+def evaluate_model(y_test: np.ndarray | pd.Series, predictions: np.ndarray):
     """
     Evaluate a model's performance using regression and classification metrics.
 
