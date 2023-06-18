@@ -282,11 +282,12 @@ def generate_bathymetry_xa_da(area_name: str):
     """
     # download .tif if not downloaded aready
     reef_areas = ensure_bathymetry_downloaded(area_name)
-    # cast tif to processed xarray
+    # cast tif to processed xarray with correct crs
     xa_bath = spatial_data.tif_to_xarray(
         directories.get_bathymetry_datasets_dir() / reef_areas.get_filename(area_name),
         reef_areas.get_xarray_name(area_name),
-    )
+    ).rio.write_crs("EPSG:4326", inplace=True)
+
     resolution = np.mean(spatial_data.calculate_spatial_resolution(xa_bath))
 
     bath_name = f"{reef_areas.get_xarray_name(area_name)}_{resolution:.05f}d"
