@@ -83,10 +83,10 @@ def save_nc(
     filename = remove_suffix(utils.replace_dot_with_dash(filename))
     save_path = (Path(save_dir) / filename).with_suffix(".nc")
     if not save_path.is_file():
-        print(f"Writing {filename} to file at {save_path}.")
+        print(f"Writing {filename} to file at {save_path}")
         spatial_data.process_xa_d(xa_d).to_netcdf(save_path)
     else:
-        print(f"{filename} already exists in {save_dir}.")
+        print(f"{filename} already exists in {save_dir}")
 
     if return_array:
         return save_path, xa.open_dataset(save_path)
@@ -178,7 +178,7 @@ def check_exists_download_url(
             urllib.request.urlretrieve(url, filename=filepath)
     # if already downloaded
     else:
-        print(f"Already exists: {filepath}")
+        print(f"{filepath.stem} already exists in {filepath.parent}")
 
 
 def get_n_last_subparts_path(path: Path | str, n: int) -> Path:
