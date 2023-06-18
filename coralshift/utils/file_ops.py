@@ -246,7 +246,7 @@ def merge_nc_files_in_dir(
     incl_subdirs: bool = False,
     concat_dim: str = "time",
     format: str = ".nc",
-    crs: str = "EPSG:4362",
+    crs: str = "EPSG:4326",
 ):
     """
     Load and merge all netCDF files in a directory.
@@ -290,7 +290,7 @@ def merge_nc_files_in_dir(
         print(f"Merging {format} files into {merged_save_path}")
         merged_ds = spatial_data.process_xa_d(
             xa.open_mfdataset(filepaths, concat_dim=concat_dim, combine="nested")
-        ).rio.set_crs(crs)
+        ).rio.write_crs(crs, inplace=True)
         merged_ds.to_netcdf(merged_save_path)
     else:
         print(f"{merged_save_path} already exists.")
@@ -473,7 +473,7 @@ def read_nc_path(nc_file_path: Path | str, engine: str = "h5netcdf") -> xa.DataA
 
 
 def dict_of_ncs_from_dir(
-    dir_path: Path | str, crs: float = "epsg:4326", engine: str = "h5netcdf"
+    dir_path: Path | str, crs: str = "epsg:4326", engine: str = "h5netcdf"
 ) -> dict:
     """Reads multiple netcdf files in a directory and returns a dictionary of DataArrays.
 
@@ -500,7 +500,7 @@ def dict_of_ncs_from_dir(
         # fetch name of file
         nc_filename = remove_suffix(str(path_end))
         # read file and assign crs
-        nc_array = read_nc_path(nc_path, engine).rio.write_crs(crs)
+        nc_array = read_nc_path(nc_path, engine).rio.write_crs(crs, inplace=True)
         nc_arrays_dict[nc_filename] = nc_array
 
     return nc_arrays_dict
