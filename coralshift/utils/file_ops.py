@@ -246,6 +246,7 @@ def merge_nc_files_in_dir(
     incl_subdirs: bool = False,
     concat_dim: str = "time",
     format: str = ".nc",
+    crs: str = "EPSG:4362",
 ):
     """
     Load and merge all netCDF files in a directory.
@@ -289,7 +290,7 @@ def merge_nc_files_in_dir(
         print(f"Merging {format} files into {merged_save_path}")
         merged_ds = spatial_data.process_xa_d(
             xa.open_mfdataset(filepaths, concat_dim=concat_dim, combine="nested")
-        )
+        ).rio.set_crs(crs)
         merged_ds.to_netcdf(merged_save_path)
     else:
         print(f"{merged_save_path} already exists.")
