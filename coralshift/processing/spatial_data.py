@@ -51,6 +51,38 @@ def upsample_xarray_to_target(
     ).mean()
 
 
+def generate_interp_lat_lons(
+    xa_high_res: xa.DataArray | xa.Dataset,
+    lat_lims: tuple = None,
+    lon_lims: tuple = None,
+    target_resolution_d: float = None,
+):
+    """
+    Generate latitude and longitude values for interpolation based on the specified limits or target resolution.
+
+    Args:
+        xa_high_res: The high-resolution xarray dataset from which to generate latitude and longitude values.
+        lat_lims: A tuple of latitude limits (min, max). If None, the latitude values from `xa_high_res` will be used.
+        lon_lims: A tuple of longitude limits (min, max). If None, the longitude values from `xa_high_res` will be used.
+        target_resolution_d: The target resolution for latitude and longitude values. If None, the original values from
+            `xa_high_res` will be used.
+
+    Returns:
+        lat_vals: The generated latitude values for interpolation.
+        lon_vals: The generated longitude values for interpolation.
+    """
+    if not (lat_lims or lon_lims or target_resolution_d):
+        lat_vals, lon_vals = xa_high_res["latitude"], xa_high_res["longitude"]
+    else:
+        lat_vals = np.arange(
+            min(lat_lims), max(lat_lims + target_resolution_d), target_resolution_d
+        )
+        lon_vals = np.arange(
+            min(lon_lims), max(lon_lims + target_resolution_d), target_resolution_d
+        )
+    return lat_vals, lon_vals
+
+
 def downsample_interp(
     xa_d: xa.DataArray | xa.Dataset,
     lat_vals: tuple[float],
