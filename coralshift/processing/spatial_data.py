@@ -1107,6 +1107,7 @@ def process_xa_d(
     },
     squeeze_coords: str | list[str] = None,
     chunk_dict: dict = {"latitude": 100, "longitude": 100, "time": 100},
+    crs: str = "EPSG:4326",
 ):
     """
     Process the input xarray Dataset or DataArray by standardizing coordinate names, squeezing dimensions,
@@ -1148,6 +1149,8 @@ def process_xa_d(
     if squeeze_coords:
         temp_xa_d = temp_xa_d.squeeze(squeeze_coords)
 
+    # add crs
+    temp_xa_d.rio.write_crs(crs, inplace=True)
     chunked_xa_d = chunk_as_necessary(temp_xa_d, chunk_dict)
     # sort coords by ascending values
     return chunked_xa_d.sortby(list(temp_xa_d.dims))
