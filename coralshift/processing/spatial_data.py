@@ -41,7 +41,7 @@ def upsample_xarray_to_target(
     # TODO: enable flexible upsampling by time also
     lat_lims = xarray_coord_limits(xa_array, "latitude")
     lon_lims = xarray_coord_limits(xa_array, "longitude")
-    # get current degree resolution
+    # get requested degree resolution
     lat_scale = int((xa_array.latitude.size / np.diff(lat_lims)) * target_resolution)
     lon_scale = int((xa_array.longitude.size / np.diff(lon_lims)) * target_resolution)
 
@@ -49,6 +49,27 @@ def upsample_xarray_to_target(
     return xa_array.coarsen(
         latitude=lat_scale, longitude=lon_scale, boundary="pad"
     ).mean()
+
+
+def downsample_interp(
+    xa_d: xa.DataArray | xa.Dataset,
+    lat_vals: tuple[float],
+    lon_vals: tuple[float],
+    interp_method: str,
+) -> xa.DataArray | xa.Dataset:
+    """
+    Downsample and interpolate an xarray DataArray or Dataset along the latitude and longitude dimensions.
+
+    Args:
+        xa_d (xa.DataArray | xa.Dataset): The xarray DataArray or Dataset to be downsampled and interpolated.
+        lat_vals (tuple[float]): A tuple of latitude values to downsample and interpolate to.
+        lon_vals (tuple[float]): A tuple of longitude values to downsample and interpolate to.
+        interp_method (str): The interpolation method to use. Supported methods are 'linear', 'nearest', 'cubic'.
+
+    Returns:
+        xa.DataArray | xa.Dataset: The downsampled and interpolated xarray DataArray or Dataset.
+    """
+    return xa_d.interp(latitude=lat_vals, longitude=lon_vals, method=interp_method)
 
 
 def upsample_xa_d_to_other(
