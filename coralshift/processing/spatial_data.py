@@ -52,7 +52,7 @@ def upsample_xarray_to_target(
 
 
 def generate_interp_lat_lons(
-    xa_high_res: xa.DataArray | xa.Dataset,
+    xa_high_res: xa.DataArray | xa.Dataset = None,
     lat_lims: tuple = None,
     lon_lims: tuple = None,
     target_resolution_d: float = None,
