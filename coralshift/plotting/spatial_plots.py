@@ -580,6 +580,17 @@ def visualise_variable_in_region(
     lat_lims: tuple[float, float] = None,
     lon_lims: tuple[(float, float)] = None,
 ) -> None:
+    """
+    Visualizes a variable in a specified geographical region.
+
+    Parameters:
+        xa_array (xarray.DataArray): Input data array containing the variable to visualize.
+        lat_lims (tuple): Latitude limits as (min_lat, max_lat).
+        lon_lims (tuple): Longitude limits as (min_lon, max_lon).
+
+    Returns:
+        None
+    """
     # TODO: fix flat_data
     fig, ax = plt.subplots(
         1,
@@ -589,7 +600,7 @@ def visualise_variable_in_region(
         gridspec_kw={"width_ratios": [1, 2, 1]},
     )
 
-    if lat_lims is not None:
+    if (lat_lims and lon_lims) is not None:
         xa_array = xa_array.sel(
             latitude=slice(min(lat_lims), max(lat_lims)),
             longitude=slice(min(lon_lims), max(lon_lims)),
