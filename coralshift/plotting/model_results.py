@@ -215,3 +215,5 @@ def save_sklearn_model(model, savedir: Path | str, filename: str) -> None:
         print(f"Saved model to {save_path}.")
     else:
         print(f"{save_path} already exists.")
+
+    return save_path
