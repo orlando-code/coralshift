@@ -62,3 +62,8 @@ def get_gbr_bathymetry_data_dir() -> Path:
 def get_era5_data_dir() -> Path:
     """./datasets/era5"""
     return guarantee_existence(get_datasets_dir() / "era5")
+
+
+def get_comparison_dir() -> Path:
+    """./datasets/comparison"""
+    return guarantee_existence(get_datasets_dir() / "era5")
