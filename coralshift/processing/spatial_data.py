@@ -51,43 +51,49 @@ def upsample_xarray_to_target(
     ).mean()
 
 
-def generate_interp_lat_lons(
-    xa_high_res: xa.DataArray | xa.Dataset = None,
-    lat_lims: tuple = None,
-    lon_lims: tuple = None,
-    target_resolution_d: float = None,
-):
+def generate_dummy_xa(
+    resolution: float, lat_lims: tuple[float], lon_lims: tuple[float]
+) -> xa.DataArray:
     """
-    Generate latitude and longitude values for interpolation based on the specified limits or target resolution.
+    Generate a dummy xarray DataArray with consistent coordinate order.
 
-    Args:
-        xa_high_res: The high-resolution xarray dataset from which to generate latitude and longitude values.
-        lat_lims: A tuple of latitude limits (min, max). If None, the latitude values from `xa_high_res` will be used.
-        lon_lims: A tuple of longitude limits (min, max). If None, the longitude values from `xa_high_res` will be used.
-        target_resolution_d: The target resolution for latitude and longitude values. If None, the original values from
-            `xa_high_res` will be used.
+    Parameters
+    ----------
+    resolution (float): The resolution in degrees for the latitude and longitude values.
+    lat_lims (tuple[float]): The latitude limits as a tuple of (min, max) values.
+    lon_lims (tuple[float]): The longitude limits as a tuple of (min, max) values.
 
-    Returns:
-        lat_vals: The generated latitude values for interpolation.
-        lon_vals: The generated longitude values for interpolation.
+    Returns
+    -------
+    xa.DataArray: The generated dummy xarray DataArray.
     """
-    if not (lat_lims or lon_lims or target_resolution_d):
-        lat_vals, lon_vals = xa_high_res["latitude"], xa_high_res["longitude"]
-    else:
-        lat_vals = np.arange(
-            min(lat_lims), max(lat_lims + target_resolution_d), target_resolution_d
-        )
-        lon_vals = np.arange(
-            min(lon_lims), max(lon_lims + target_resolution_d), target_resolution_d
-        )
-    return lat_vals, lon_vals
+    # Generate latitude and longitude values
+    lat_vals = np.arange(min(lat_lims), max(lat_lims) + resolution / 2, resolution)
+    lon_vals = np.arange(min(lon_lims), max(lon_lims) + resolution / 2, resolution)
+
+    # Create a DataArray filled with NaN values
+    data = np.full((len(lat_vals), len(lon_vals)), np.nan)
+
+    # Create xarray DataArray
+    xa_dummy = (
+        xa.DataArray(data, coords=[lat_vals, lon_vals], dims=["latitude", "longitude"])
+        .rio.write_crs("EPSG:4326")
+        .rename("dummy")
+    )
+
+    # Reindex the DataArray to ensure consistent coordinate order
+    xa_dummy = xa_dummy.reindex(
+        latitude=sorted(xa_dummy.latitude), longitude=sorted(xa_dummy.longitude)
+    )
+
+    return xa_dummy
 
 
 def downsample_interp(
     xa_d: xa.DataArray | xa.Dataset,
     lat_vals: tuple[float],
     lon_vals: tuple[float],
-    interp_method: str,
+    interp_method: str = "linear",
 ) -> xa.DataArray | xa.Dataset:
     """
     Downsample and interpolate an xarray DataArray or Dataset along the latitude and longitude dimensions.
@@ -1201,6 +1207,11 @@ def process_xa_d(
         temp_xa_d = temp_xa_d.squeeze("band")
     if squeeze_coords:
         temp_xa_d = temp_xa_d.squeeze(squeeze_coords)
+
+    if "time" in temp_xa_d.dims:
+        temp_xa_d = temp_xa_d.transpose("time", "latitude", "longitude")
+    else:
+        temp_xa_d = temp_xa_d.transpose("latitude", "longitude")
 
     # add crs
     temp_xa_d.rio.write_crs(crs, inplace=True)
