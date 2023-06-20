@@ -1,10 +1,12 @@
 import seaborn as sns
 import xarray as xa
 import matplotlib as plt
+from matplotlib.axes import Axes
 import numpy as np
 import sklearn.metrics as sklmetrics
 import pandas as pd
-
+import pickle
+from pathlib import Path
 from coralshift.plotting import spatial_plots
 
 
@@ -106,7 +108,7 @@ def investigate_label_thresholds(
     -------
         None
     """
-    plt.figure(figsize=figsize)
+    f, ax = plt.subplots(figsize=figsize)
     # prepare colour assignment
     color_map = spatial_plots.get_cbar("seq")
     num_colors = len(thresholds)
@@ -123,18 +125,22 @@ def investigate_label_thresholds(
         roc_auc = sklmetrics.auc(fpr, tpr)
 
         label = f"{thresh:.01f} | {roc_auc:.02f}"
-        plt.plot(fpr, tpr, label=label, color=colors[c])
+        ax.plot(fpr, tpr, label=label, color=colors[c])
 
     # format
-    plt.title(
-        "Receiver Operating Characteristic (ROC) Curve\nfor several coral presence/absence thresholds"
+    format_roc(
+        ax=ax,
+        title="Receiver Operating Characteristic (ROC) Curve\nfor several coral presence/absence thresholds",
     )
-    plt.xlabel("false positive rate")
-    plt.ylabel("true positive rate")
-    plt.legend(title="threshold value | auc")
-    plt.axis("square")
-    plt.xlim([0, 1])
-    plt.ylim([0, 1])
+    ax.legend(title="threshold value | auc")
+
+
+def format_roc(ax=Axes, title: str = "Receiver Operating Characteristic (ROC) Curve"):
+    ax.set_xlabel("false positive rate")
+    ax.set_ylabel("true positive rate")
+    ax.set_aspect("square")
+    ax.set_xlim([0, 1])
+    ax.set_ylim([0, 1])
 
 
 def evaluate_model(y_test: np.ndarray | pd.Series, predictions: np.ndarray):
@@ -181,3 +187,31 @@ def threshold_label(
     thresholded_labels = np.where(np.array(labels) > threshold, 1, 0)
     thresholded_preds = np.where(np.array(predictions) > threshold, 1, 0)
     return thresholded_labels, thresholded_preds
+
+
+def save_sklearn_model(model, savedir: Path | str, filename: str) -> None:
+    """
+    Save a scikit-learn model to a file using pickle.
+
+    Parameters
+    ----------
+    model : object
+        The scikit-learn model object to be saved.
+    savedir : Union[pathlib.Path, str]
+        The directory path where the model file should be saved.
+    filename : str
+        The name of the model file.
+
+    Returns
+    -------
+    None
+    """
+
+    save_path = (Path(savedir) / filename).with_suffix(".pickle")
+
+    if not save_path.is_file():
+        with open(save_path, "wb") as f:
+            pickle.dump(model, f)
+        print(f"Saved model to {save_path}.")
+    else:
+        print(f"{save_path} already exists.")
