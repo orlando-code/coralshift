@@ -167,6 +167,10 @@ def evaluate_model(y_test: np.ndarray | pd.Series, predictions: np.ndarray):
     return mse, bce
 
 
+def threshold_array(array: np.ndarray | pd.Series, threshold: float = 0) -> np.ndarray:
+    return np.where(np.array(array) > threshold, 1, 0)
+
+
 def threshold_label(
     labels: np.ndarray | pd.Series,
     predictions: np.ndarray | pd.Series,
@@ -184,8 +188,8 @@ def threshold_label(
     -------
         tuple[np.ndarray]: Tuple containing thresholded labels and thresholded predictions.
     """
-    thresholded_labels = np.where(np.array(labels) > threshold, 1, 0)
-    thresholded_preds = np.where(np.array(predictions) > threshold, 1, 0)
+    thresholded_labels = threshold_array(labels, threshold)
+    thresholded_preds = threshold_array(predictions, threshold)
     return thresholded_labels, thresholded_preds
 
 
