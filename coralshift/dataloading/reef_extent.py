@@ -166,6 +166,9 @@ def process_coral_gt_tifs(tif_dir_name=None, target_resolution_d: float = None):
 
 
 def generate_coral_shp(gdf_coral: gpd.GeoDataFrame) -> None:
+    # create folder for saving reef extent tifs
+    directories.get_gt_files_dir()
+
     save_path = directories.get_reef_baseline_dir() / "coral_algae_gt.shp"
     if not save_path.is_file():
         gdf_coral.to_file(save_path, driver="ESRI Shapefile")
