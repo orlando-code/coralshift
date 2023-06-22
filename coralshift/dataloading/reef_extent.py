@@ -185,3 +185,41 @@ def process_reef_extent_tifs():
     gt_tif_dict = spatial_data.tifs_to_xa_array_dict(gt_tif_files)
     # save dictionary of tifs to nc, if files not already existing
     file_ops.save_dict_xa_ds_to_nc(gt_tif_dict, directories.get_gt_files_dir())
+
+
+# def process_nc_dir_coral_gt_tifs(tif_dir_name=None, target_resolution_d:float=None):
+#     if not tif_dir_name:
+#         tif_dir = directories.get_reef_baseline_dir()
+#     else:
+#         tif_dir = directories.get_reef_baseline_dir() / tif_dir_name
+
+#     nc_dir = file_ops.guarantee_existence(tif_dir / "gt_nc_dir")
+#     # save tifs to ncs in new dir
+#     tif_paths = tifs_to_ncs(nc_dir, target_resolution_d)
+#     # get list of nc paths in dir
+#     xa_arrays_list = [tif_to_xa_array(tif_path) for tif_path in tif_paths]
+#     # merge ncs into one mega nc file
+#     if len(xa_arrays_list) > 1:
+#         concatted = xa.concat(xa_arrays_list, dim=["latitude","longitude"])
+#     else:
+#         concatted = xa_arrays_list[0]
+#     file_ops.save_nc(nc_dir, f"concatenated_{target_resolution_d:.05f}_degree", concatted)
+
+
+# def tifs_to_ncs(nc_dir: Path | list[str], target_resolution_d: float=None) -> None:
+
+#     tif_dir = nc_dir.parent
+#     tif_paths = file_ops.return_list_filepaths(tif_dir, ".tif")
+#     xa_array_dict = {}
+#     for tif_path in tqdm(tif_paths, total=len(tif_paths), desc="Writing tifs to nc files"):
+#         # filename = str(file_ops.get_n_last_subparts_path(tif, 1))
+#         filename = tif_path.stem
+#         tif_array = tif_to_xa_array(tif_path)
+#         # xa_array_dict[filename] = tif_array.rename(filename)
+#         if target_resolution_d:
+#             tif_array = spatial_data.upsample_xarray_to_target(xa_array=tif_array, target_resolution=target_resolution_d)
+#         # save array to nc file
+#         file_ops.save_nc(tif_dir, filename, tif_array)
+
+#     return tif_paths
+#     print(f"All tifs converted to xarrays and stored as .nc files in {nc_dir}.")
