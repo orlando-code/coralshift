@@ -15,7 +15,10 @@ from coralshift.utils import file_ops, utils
 
 
 def upsample_xarray_to_target(
-    xa_array: xa.DataArray | xa.Dataset, target_resolution: float
+    xa_array: xa.DataArray | xa.Dataset,
+    target_resolution: float,
+    method=rasterio.enums.Resampling.bilinear,
+    name: str = "",
 ) -> xa.Dataset:
     """
     Upsamples an xarray DataArray or Dataset to a target resolution.
@@ -41,14 +44,18 @@ def upsample_xarray_to_target(
     # TODO: enable flexible upsampling by time also
     lat_lims = xarray_coord_limits(xa_array, "latitude")
     lon_lims = xarray_coord_limits(xa_array, "longitude")
-    # get requested degree resolution
-    lat_scale = int((xa_array.latitude.size / np.diff(lat_lims)) * target_resolution)
-    lon_scale = int((xa_array.longitude.size / np.diff(lon_lims)) * target_resolution)
 
-    # Coarsen the dataset
-    return xa_array.coarsen(
-        latitude=lat_scale, longitude=lon_scale, boundary="pad"
-    ).mean()
+    dummy_xa = generate_dummy_xa(target_resolution, lat_lims, lon_lims)
+
+    return upsample_xa_d_to_other(xa_array, dummy_xa, method=method, name=name)
+    # # get requested degree resolution
+    # lat_scale = int((xa_array.latitude.size / np.diff(lat_lims)) * target_resolution)
+    # lon_scale = int((xa_array.longitude.size / np.diff(lon_lims)) * target_resolution)
+
+    # # Coarsen the dataset
+    # return xa_array.coarsen(
+    #     latitude=lat_scale, longitude=lon_scale, boundary="pad"
+    # ).mean()
 
 
 def generate_dummy_xa(
