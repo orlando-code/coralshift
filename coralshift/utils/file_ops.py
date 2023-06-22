@@ -85,6 +85,7 @@ def save_nc(
     if not save_path.is_file():
         print(f"Writing {filename} to file at {save_path}")
         spatial_data.process_xa_d(xa_d).to_netcdf(save_path)
+        print("Writing complete.")
     else:
         print(f"{filename} already exists in {save_dir}")
 
@@ -723,6 +724,12 @@ def tif_to_xa_array(tif_path) -> xa.DataArray:
     return spatial_data.process_xa_d(rio.open_rasterio(rasterio.open(tif_path)))
 
 
-def save_dict_xa_ds_to_nc(xa_d_dict: dict, save_dir: Path | str) -> None:
-    for filename, array in xa_d_dict.items():
+def save_dict_xa_ds_to_nc(
+    xa_d_dict: dict, save_dir: Path | str, target_resolution: float = None
+) -> None:
+    for filename, array in tqdm(xa_d_dict.items(), desc="Writing tifs to nc files"):
+        if target_resolution:
+            spatial_data.upsample_xarray_to_target(
+                xa_array=array, target_resolution=target_resolution
+            )
         save_nc(save_dir, filename, array)
