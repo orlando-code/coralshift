@@ -304,8 +304,8 @@ def tifs_to_xa_array_dict(tif_paths: list[Path] | list[str]) -> dict:
     xa_array_dict = {}
     for tif in tif_paths:
         filename = tif.stem
-        tif_array = rio.open_rasterio(rasterio.open(tif))
-        xa_array_dict[filename] = process_xa_d(tif_array).rename(filename)
+        tif_array = file_ops.tif_to_xa_array(tif)
+        xa_array_dict[filename] = tif_array.rename(filename)
 
     return xa_array_dict
 
