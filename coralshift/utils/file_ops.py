@@ -721,3 +721,8 @@ def tifs_to_ncs(nc_dir: Path | list[str], target_resolution_d: float = None) -> 
 
 def tif_to_xa_array(tif_path) -> xa.DataArray:
     return spatial_data.process_xa_d(rio.open_rasterio(rasterio.open(tif_path)))
+
+
+def save_dict_xa_ds_to_nc(xa_d_dict: dict, save_dir: Path | str) -> None:
+    for filename, array in xa_d_dict.items():
+        save_nc(save_dir, filename, array)
