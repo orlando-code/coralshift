@@ -174,3 +174,14 @@ def generate_coral_shp(gdf_coral: gpd.GeoDataFrame) -> None:
         gdf_coral.to_file(save_path, driver="ESRI Shapefile")
     else:
         print(f"File at {save_path} already exists.")
+
+
+def process_reef_extent_tifs():
+    # fetch list of ground truth tifs
+    gt_tif_files = file_ops.return_list_filepaths(
+        directories.get_gt_files_dir(), ".tif"
+    )
+    # generate dictionary of file names and arrays: {filename: xarray.DataArray, ...}
+    gt_tif_dict = spatial_data.tifs_to_xa_array_dict(gt_tif_files)
+    # save dictionary of tifs to nc, if files not already existing
+    file_ops.save_dict_xa_ds_to_nc(gt_tif_dict, directories.get_gt_files_dir())
