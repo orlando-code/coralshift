@@ -29,6 +29,11 @@ def get_reef_baseline_dir() -> Path:
     return guarantee_existence(get_datasets_dir() / "reef_baseline")
 
 
+def get_gt_files_dir() -> Path:
+    """./data/datasets/reef_baseline/gt_files"""
+    return guarantee_existence(get_reef_baseline_dir() / "gt_files")
+
+
 def get_cmems_dir() -> Path:
     """./data/datasets/global_ocean_reanalysis"""
     return guarantee_existence(get_datasets_dir() / "global_ocean_reanalysis")
