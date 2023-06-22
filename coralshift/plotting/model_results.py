@@ -1,13 +1,7 @@
 import seaborn as sns
 import xarray as xa
-import matplotlib as plt
-from matplotlib.axes import Axes
 import numpy as np
-import sklearn.metrics as sklmetrics
-import pandas as pd
-import pickle
-from pathlib import Path
-from coralshift.plotting import spatial_plots
+from matplotlib.axes import Axes
 
 
 def spatial_confusion_matrix_da(
@@ -21,7 +15,7 @@ def spatial_confusion_matrix_da(
     ground_truth (xa.DataArray): Ground truth values.
 
     Returns
-    -------
+    -------    -------
     tuple[xa.DataArray, dict]: Spatial confusion matrix and dictionary of integer: description pairs
 
     Notes
@@ -66,7 +60,7 @@ def plot_spatial_confusion(
         predicted_var (str): Name of the predicted variable in the dataset.
 
     Returns
-    -------
+    -------    -------
         xarray.Dataset: Updated xarray dataset with the "comparison" variable added.
     """
     # calculate spatial confusion values and assign to new variable in Dataset
@@ -89,135 +83,29 @@ def plot_spatial_confusion(
     colorbar.set_ticklabels(list(vals_dict.keys()))
 
 
-def investigate_label_thresholds(
-    thresholds: list[float],
-    y_test: np.ndarray | pd.Series,
-    y_predictions: np.ndarray | pd.Series,
-    figsize=[7, 7],
-):
-    """Plot ROC curves with multiple lines for different label thresholds.
+def format_roc(ax: Axes, title: str = "Receiver Operating Characteristic (ROC) Curve"):
+    """
+    Format the ROC plot axes.
 
     Parameters
     ----------
-        thresholds (list[float]): List of label thresholds.
-        y_test (np.ndarray or pd.Series): True labels.
-        y_predictions (np.ndarray or pd.Series): Predicted labels.
-        figsize (list, optional): Figure size for the plot. Default is [7, 7].
+        ax (Axes): The matplotlib axes object.
+        title (optional): The title of the ROC plot. Defaults to "Receiver Operating Characteristic (ROC) Curve".
 
     Returns
     -------
         None
     """
-    f, ax = plt.subplots(figsize=figsize)
-    # prepare colour assignment
-    color_map = spatial_plots.get_cbar("seq")
-    num_colors = len(thresholds)
-    colors = [color_map(i / num_colors) for i in range(num_colors)]
-
-    # plot ROC curves
-    for c, thresh in enumerate(thresholds):
-        binary_y_labels, binary_predictions = threshold_label(
-            y_test, y_predictions, thresh
-        )
-        fpr, tpr, _ = sklmetrics.roc_curve(
-            binary_y_labels, binary_predictions, drop_intermediate=False
-        )
-        roc_auc = sklmetrics.auc(fpr, tpr)
-
-        label = f"{thresh:.01f} | {roc_auc:.02f}"
-        ax.plot(fpr, tpr, label=label, color=colors[c])
-
-    # format
-    format_roc(
-        ax=ax,
-        title="Receiver Operating Characteristic (ROC) Curve\nfor several coral presence/absence thresholds",
-    )
-    ax.legend(title="threshold value | auc")
-
-
-def format_roc(ax=Axes, title: str = "Receiver Operating Characteristic (ROC) Curve"):
+    ax.set_title(title)
     ax.set_xlabel("false positive rate")
     ax.set_ylabel("true positive rate")
-    ax.set_aspect("square")
+    ax.set_aspect("equal", "box")
     ax.set_xlim([0, 1])
     ax.set_ylim([0, 1])
 
-
-def evaluate_model(y_test: np.ndarray | pd.Series, predictions: np.ndarray):
-    """
-    Evaluate a model's performance using regression and classification metrics.
-
-    Parameters
-    ----------
-        y_test (np.ndarray or pd.Series): True labels.
-        predictions (np.ndarray or pd.Series): Predicted labels.
-
-    Returns
-    -------
-        tuple[float, float]: Tuple containing the mean squared error (regression metric) and binary cross-entropy
-            (classification metric).
-    """
-    # calculate regression (mean-squared error) metric
-    mse = sklmetrics.mean_squared_error(y_test, predictions)
-
-    # calculate classification (binary cross-entropy/log_loss) metric
-    y_thresh, y_pred_thresh = threshold_label(y_test, predictions)
-    bce = sklmetrics.log_loss(y_thresh, y_pred_thresh)
-
-    return mse, bce
-
-
-def threshold_array(array: np.ndarray | pd.Series, threshold: float = 0) -> np.ndarray:
-    return np.where(np.array(array) > threshold, 1, 0)
-
-
-def threshold_label(
-    labels: np.ndarray | pd.Series,
-    predictions: np.ndarray | pd.Series,
-    threshold: float,
-) -> tuple[np.ndarray]:
-    """Apply thresholding to labels and predictions.
-
-    Parameters
-    ----------
-        labels (np.ndarray or pd.Series): True labels.
-        predictions (np.ndarray or pd.Series): Predicted labels.
-        threshold (float): Threshold value for binary classification.
-
-    Returns
-    -------
-        tuple[np.ndarray]: Tuple containing thresholded labels and thresholded predictions.
-    """
-    thresholded_labels = threshold_array(labels, threshold)
-    thresholded_preds = threshold_array(predictions, threshold)
-    return thresholded_labels, thresholded_preds
-
-
-def save_sklearn_model(model, savedir: Path | str, filename: str) -> None:
-    """
-    Save a scikit-learn model to a file using pickle.
-
-    Parameters
-    ----------
-    model : object
-        The scikit-learn model object to be saved.
-    savedir : Union[pathlib.Path, str]
-        The directory path where the model file should be saved.
-    filename : str
-        The name of the model file.
-
-    Returns
-    -------
-    None
-    """
-
-    save_path = (Path(savedir) / filename).with_suffix(".pickle")
-
-    if not save_path.is_file():
-        with open(save_path, "wb") as f:
-            pickle.dump(model, f)
-        print(f"Saved model to {save_path}.")
-    else:
-        print(f"{save_path} already exists.")
-
-    return save_path
+    # plot "random" line for comparison (y=x)
+    ax.plot([0, 1], [0, 1], color="gray", linestyle=(5, (10, 3)))
+    # Plot the grid
+    ax.grid(color="lightgray", linestyle=":", linewidth=0.5)
+    ax.set_xticks(np.arange(0, 1.2, 0.2))
+    ax.set_yticks(np.arange(0, 1.2, 0.2))

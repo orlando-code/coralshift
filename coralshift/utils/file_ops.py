@@ -12,7 +12,7 @@ import rioxarray as rio
 import numpy as np
 
 from coralshift.processing import spatial_data
-from coralshift.utils import utils
+from coralshift.utils import utils, directories
 
 
 def guarantee_existence(path: Path | str) -> Path:
@@ -733,3 +733,107 @@ def save_dict_xa_ds_to_nc(
                 xa_array=array, target_resolution=target_resolution
             )
         save_nc(save_dir, filename, array)
+
+
+def resample_list_xa_ds_to_target_res_and_save(
+    xa_das: list[xa.DataArray],
+    target_resolution_d: float,
+    unit: str = "m",
+    lat_lims: tuple[float] = (-10, -17),
+    lon_lims: tuple[float] = (142, 147),
+) -> None:
+    """
+    Resamples a list of xarray DataArrays to a target resolution, and saves the resampled DataArrays to NetCDF files.
+
+    Parameters
+    ----------
+        xa_das (list[xa.DataArray]): A list of xarray DataArrays to be resampled.
+        target_resolution_d (float): The target resolution in degrees or meters, depending on the unit specified.
+        unit (str, optional): The unit of the target resolution. Defaults to "m".
+        lat_lims (tuple[float], optional): Latitude limits for the dummy DataArray used for resampling.
+            Defaults to (-10, -17).
+        lon_lims (tuple[float], optional): Longitude limits for the dummy DataArray used for resampling.
+            Defaults to (142, 147).
+
+    Returns
+    -------
+        None
+    """
+
+    dummy_xa = spatial_data.generate_dummy_xa(target_resolution_d, lat_lims, lon_lims)
+
+    save_dir = generate_filepath(
+        (
+            directories.get_comparison_dir()
+            / utils.replace_dot_with_dash(f"{target_resolution_d:.05f}d_arrays")
+        )
+    )
+
+    for xa_da in tqdm(
+        xa_das,
+        desc=f"Resampling xarray DataArrays to {target_resolution_d:.05f}d",
+        position=1,
+        leave=True,
+    ):
+        filename = utils.replace_dot_with_dash(
+            f"{xa_da.name}_{target_resolution_d:.05f}d"
+        )
+        save_path = (save_dir / filename).with_suffix(".nc")
+
+        if not save_path.is_file():
+            xa_resampled = spatial_data.process_xa_d(
+                spatial_data.upsample_xa_d_to_other(
+                    spatial_data.process_xa_d(xa_da), dummy_xa, name=xa_da.name
+                )
+            )
+            # causes problems with saving
+            if "grid_mapping" in xa_resampled.attrs:
+                del xa_resampled.attrs["grid_mapping"]
+
+            xa_resampled.to_netcdf(save_path)
+        else:
+            print(f"{filename} already exists in {save_dir}")
+
+
+def resample_list_xa_ds_to_target_res_list_and_save(
+    xa_das: list[xa.DataArray],
+    target_resolutions: list[float],
+    units: list[str],
+    lat_lims: tuple[float] = (-10, -17),
+    lon_lims: tuple[float] = (142, 147),
+) -> None:
+    """
+    Resamples a list of xarray DataArrays to multiple target resolutions specified in a list, and saves the resampled
+    DataArrays to NetCDF files.
+
+    Parameters
+    ----------
+        xa_das (list[xa.DataArray]): A list of xarray DataArrays to be resampled.
+        target_resolutions (list[float]): A list of target resolutions in degrees or meters, depending on the units
+            specified.
+        units (list[str]): A list of units corresponding to the target resolutions.
+        lat_lims (tuple[float], optional): Latitude limits for the dummy DataArray used for resampling.
+            Defaults to (-10, -17).
+        lon_lims (tuple[float], optional): Longitude limits for the dummy DataArray used for resampling. Defaults to
+            (142, 147).
+
+    Returns
+    -------
+        None
+    """
+
+    target_resolutions = [
+        spatial_data.choose_resolution(number, string)[1]
+        for number, string in zip(target_resolutions, units)
+    ]
+    for i, resolution in tqdm(
+        enumerate(target_resolutions),
+        desc="Progress through resolutions",
+        position=0,
+        leave=True,
+        total=len(target_resolutions),
+    ):
+        unit = units[i]
+        spatial_data.resample_list_xa_ds_to_target_res_and_save(
+            xa_das, resolution, unit
+        )

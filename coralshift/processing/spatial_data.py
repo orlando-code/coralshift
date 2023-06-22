@@ -2146,3 +2146,110 @@ def generate_chunk_json(
         info_dict = info_dict.update(additional_info)
 
     return info_dict
+
+
+def find_coord_indices(
+    xa_da: xa.Dataset | xa.DataArray, lat: float, lon: float
+) -> tuple[int, int]:
+    # Get the latitude and longitude spacing
+
+    lat_values = list(xa_da.latitude.values)
+    lon_values = list(xa_da.longitude.values)
+
+    lat_index = np.where(np.isclose(lat_values, lat))[0][0]
+    lon_index = np.where(np.isclose(lon_values, lon))[0][0]
+
+    return lat_index, lon_index
+
+
+def generate_coordinate_pairs(
+    xa_da: xa.DataArray, split_ratio: float, random_seed: int = None
+) -> tuple[list, list]:
+    """
+    Generate two lists of coordinate pairs from an xarray DataArray in the specified split ratio.
+
+    Parameters
+    ----------
+        xa_da (xa.DataArray): The xarray DataArray.
+        split_ratio (float): The split ratio for dividing the coordinates.
+
+    Returns
+    -------
+        tuple[list, list]: A tuple containing the two lists of coordinate pairs.
+    """
+    # TODO: could omit nans from test/train
+    if random_seed:
+        # set random seed
+        np.random.seed(random_seed)
+
+    spatial_coords = (
+        xa_da.drop_dims("time").drop(["spatial_ref", "depth", "band"]).coords
+    )
+
+    # Get the total number of samples
+    num_samples = len(spatial_coords["latitude"]) * len(spatial_coords["longitude"])
+
+    # Calculate the split sizes
+    test_size = int(num_samples * split_ratio)
+    train_size = num_samples - test_size
+
+    # Split the coordinates into two lists based on the split sizes
+    coordinates_list = spatial_coords.to_index().tolist()  # Convert to a list of tuples
+    # Shuffle the coordinates randomly
+    np.random.shuffle(coordinates_list)
+
+    train_coordinates = coordinates_list[:train_size]
+    test_coordinates = coordinates_list[train_size : train_size + test_size]  # noqa
+
+    return train_coordinates, test_coordinates
+
+
+def generate_var_mask(
+    xa_d: xa.Dataset | xa.DataArray,
+    var_name: str = "bathymetry_A",
+    limits: tuple[float] = [-100, 0],
+    sub_val: float = np.nan,
+) -> xa.DataArray:
+    if isinstance(xa_d, xa.DataArray):
+        return (xa_d >= max(limits)) & (xa_d <= min(limits))
+    elif isinstance(xa_d, xa.Dataset):
+        return (xa_d[var_name] <= max(limits)) & (xa_d[var_name] >= min(limits))
+    else:
+        raise TypeError(
+            f"xa_d was neither an xarray Dataset nor a DataArray. Instead type: {type(xa_d)}."
+        )
+
+
+def resample_list_xa_ds_to_target_resolution_and_merge(
+    xa_das: list[xa.DataArray],
+    target_resolution: float,
+    unit: str = "m",
+    lat_lims: tuple[float] = (-10, -17),
+    lon_lims: tuple[float] = (142, 147),
+) -> dict:
+    """
+    Resample a list of xarray DataArrays to the target resolution and merge them.
+
+    Parameters
+    ----------
+        xa_das (list[xa.DataArray]): A list of xarray DataArrays to be resampled and merged.
+        target_resolution (float): The target resolution for resampling.
+        unit (str, defaults to "m"): The unit of the target resolution.
+        interp_method: (str, defaults to "linear") The interpolation method for resampling.
+
+    Returns
+    -------
+        A dictionary containing the resampled xarray DataArrays merged by their names.
+    """
+    # TODO: will probably need to save to individual files/folders and combine at test/train time
+    # may need to go to target array here
+    target_resolution_d = choose_resolution(target_resolution, unit)[1]
+    dummy_xa = generate_dummy_xa(target_resolution_d, lat_lims, lon_lims)
+
+    resampled_xa_das_dict = {}
+    for xa_da in tqdm(xa_das, desc="Resampling xarray DataArrays"):
+        xa_resampled = upsample_xa_d_to_other(xa_da, dummy_xa, name=xa_da.name)
+
+        resampled_xa_das_dict[xa_da.name] = xa_resampled
+
+    return resampled_xa_das_dict

@@ -217,7 +217,8 @@ def process_reef_extent_tifs():
 #         tif_array = tif_to_xa_array(tif_path)
 #         # xa_array_dict[filename] = tif_array.rename(filename)
 #         if target_resolution_d:
-#             tif_array = spatial_data.upsample_xarray_to_target(xa_array=tif_array, target_resolution=target_resolution_d)
+#             tif_array = spatial_data.upsample_xarray_to_target
+#   xa_array=tif_array, target_resolution=target_resolution_d)
 #         # save array to nc file
 #         file_ops.save_nc(tif_dir, filename, tif_array)
 

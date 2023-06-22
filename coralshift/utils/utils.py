@@ -137,10 +137,12 @@ def replace_dot_with_dash(string: str) -> str:
     """
     Replace all occurrences of "." with "-" in a string.
 
-    Args:
+    Parameters
+    ----------
         string (str): The input string.
 
-    Returns:
+    Returns
+    -------
         str: The modified string with "." replaced by "-".
     """
     return string.replace(".", "-")
@@ -169,3 +171,24 @@ def pad_number_with_zeros(number: str | int, resulting_len: str = 2) -> str:
         number = "".join(("0", number))
 
     return number
+
+
+def select_df_rows_by_coords(df: pd.DataFrame, coordinates: list) -> pd.DataFrame:
+    """
+    Select rows from a Pandas DataFrame based on matching latitude and longitude values.
+
+    Parameters
+    ----------
+        dataframe (pd.DataFrame): The Pandas DataFrame.
+        coordinates (list): List of tuples containing latitude and longitude values.
+
+    Returns
+    -------
+        pd.DataFrame: The selected subset of the DataFrame.
+    """
+    # indices = list(zip(dataframe.index.get_level_values(0), dataframe.index.get_level_values(1)))
+    # row_inds = [index for index, item in enumerate(indices) if item in coordinates]
+    coord_set = set(coordinates)
+    matching_rows = df.index.isin(coord_set)
+
+    return df.iloc[matching_rows]
