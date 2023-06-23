@@ -75,6 +75,7 @@ class ReefAreas:
                 dataset["name"] == name
                 or dataset["short_name"] == name
                 or dataset["file_name"] == name
+                or dataset["short_file_name"] == name
             ):
                 return dataset["name"]
         raise ValueError(f"'{name}' not a dataset.")
