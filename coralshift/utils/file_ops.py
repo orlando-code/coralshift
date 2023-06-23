@@ -873,4 +873,4 @@ def extract_variable(xa_d: xa.Dataset | xa.DataArray, name=None):
                 variable = None
         return variable
     else:
-        return None
+        return xa_d
