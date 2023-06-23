@@ -148,10 +148,11 @@ def generate_name_dict(
 
 def download_reanalysis(
     download_dir: str | Path,
+    region: str,
     final_filename: str = None,
     variables: list[str] = ["mlotst", "bottomT", "uo", "so", "zos", "thetao", "vo"],
     date_lims: tuple[str, str] = ("1992-12-31", "2021-12-31"),
-    depth_lims: tuple[str, str] = (0.494, 21.599),
+    depth_lims: tuple[str, str] = (0.3, 1),
     lon_lims: tuple[str, str] = (142, 147),
     lat_lims: tuple[str, str] = (-17, -10),
     product_type: str = "my",
@@ -176,8 +177,13 @@ def download_reanalysis(
     Returns
     -------
     xa.Dataset: dataset merged from individual files
+
+    Notes
+    -----
+    Currently taking only topmost depth (TODO: make full use of profile)
+
     """
-    download_dir = file_ops.guarantee_existence(download_dir)
+    download_dir = file_ops.guarantee_existence(Path(download_dir) / region)
 
     # User credentials
     # username = input("Enter your username: ")
