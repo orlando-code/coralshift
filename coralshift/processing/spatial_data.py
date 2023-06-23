@@ -18,7 +18,7 @@ def upsample_xarray_to_target(
     xa_array: xa.DataArray | xa.Dataset,
     target_resolution: float,
     method=rasterio.enums.Resampling.bilinear,
-    name: str = "",
+    name: str = None,
 ) -> xa.Dataset:
     """
     Upsamples an xarray DataArray or Dataset to a target resolution.
@@ -48,14 +48,6 @@ def upsample_xarray_to_target(
     dummy_xa = generate_dummy_xa(target_resolution, lat_lims, lon_lims)
 
     return upsample_xa_d_to_other(xa_array, dummy_xa, method=method, name=name)
-    # # get requested degree resolution
-    # lat_scale = int((xa_array.latitude.size / np.diff(lat_lims)) * target_resolution)
-    # lon_scale = int((xa_array.longitude.size / np.diff(lon_lims)) * target_resolution)
-
-    # # Coarsen the dataset
-    # return xa_array.coarsen(
-    #     latitude=lat_scale, longitude=lon_scale, boundary="pad"
-    # ).mean()
 
 
 def generate_dummy_xa(
@@ -105,13 +97,15 @@ def downsample_interp(
     """
     Downsample and interpolate an xarray DataArray or Dataset along the latitude and longitude dimensions.
 
-    Args:
+    Parameters
+    ----------
         xa_d (xa.DataArray | xa.Dataset): The xarray DataArray or Dataset to be downsampled and interpolated.
         lat_vals (tuple[float]): A tuple of latitude values to downsample and interpolate to.
         lon_vals (tuple[float]): A tuple of longitude values to downsample and interpolate to.
         interp_method (str): The interpolation method to use. Supported methods are 'linear', 'nearest', 'cubic'.
 
-    Returns:
+    Returns
+    -------
         xa.DataArray | xa.Dataset: The downsampled and interpolated xarray DataArray or Dataset.
     """
     return xa_d.interp(latitude=lat_vals, longitude=lon_vals, method=interp_method)
@@ -121,7 +115,8 @@ def upsample_xa_d_to_other(
     xa_d: xa.DataArray | xa.Dataset,
     target_xa_d: xa.DataArray | xa.Dataset,
     method=rasterio.enums.Resampling.bilinear,
-    name: str = "",
+    name: str = None,
+    var_name: str = None,
 ) -> xa.DataArray | xa.Dataset:
     """
     Upsample a given xarray DataArray or Dataset to match the spatial characteristics of another DataArray or Dataset.
@@ -140,9 +135,13 @@ def upsample_xa_d_to_other(
     -------
     xarray.DataArray or xarray.Dataset: The upsampled xarray object with matching spatial characteristics as the target.
     """
-    return process_xa_d(
-        xa_d.rio.reproject_match(target_xa_d, resampling=method)
-    ).rename(name)
+    xa_da = file_ops.extract_variable(xa_d, var_name)
+    xa_resampled = xa_da.rio.reproject_match(target_xa_d, resampling=method)
+    xa_processed = process_xa_d(xa_resampled)
+    if name:
+        return xa_processed.rename(name)
+    else:
+        return xa_processed
 
 
 def upsample_xarray_by_factor(
@@ -178,6 +177,7 @@ def upsample_and_save_xa_a(
     target_xa_d: xa.DataArray | xa.Dataset = None,
     method=None,
     name: str = None,
+    crs: str = "EPSG:4326",
 ) -> tuple[xa.DataArray, str]:
     """
     Upsample an xarray dataset or data array and save the upsampled data.
@@ -197,6 +197,7 @@ def upsample_and_save_xa_a(
         tuple[xa.DataArray, str]: A tuple containing the filepath and the saved array of the upsampled data.
     """
     # TODO: shift upsampling to after checking file exists
+    xa_d.rio.write_crs(crs, inplace=True)
     if target_resolution_d:
         xa_upsampled = upsample_xarray_to_target(
             xa_d, target_resolution=target_resolution_d
@@ -1196,12 +1197,6 @@ def process_xa_d(
         xa.Dataset or xa.DataArray: The processed xarray Dataset or DataArray.
 
     """
-
-    # standardise coordinate names
-    # temp_xa_d = xa_d.rename(
-    #     {"lat": "latitude", "lon": "longitude", "x": "longitude", "y": "latitude"}
-    # )
-
     temp_xa_d = xa_d.copy()
 
     for coord, new_coord in rename_mapping.items():

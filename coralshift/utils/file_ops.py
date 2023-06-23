@@ -83,7 +83,6 @@ def save_nc(
     filename = remove_suffix(utils.replace_dot_with_dash(filename))
     save_path = (Path(save_dir) / filename).with_suffix(".nc")
     if not save_path.is_file():
-
         if "grid_mapping" in xa_d.attrs:
             del xa_d.attrs["grid_mapping"]
         print(f"Writing {filename} to file at {save_path}")
@@ -840,3 +839,33 @@ def resample_list_xa_ds_to_target_res_list_and_save(
         spatial_data.resample_list_xa_ds_to_target_res_and_save(
             xa_das, resolution, unit
         )
+
+
+def extract_variable(xa_d: xa.Dataset | xa.DataArray, name=None):
+    """
+    Extract the first data variable from an xarray dataset that isn't "spatial_ref".
+
+    Args:
+        xa_d (xa.Dataset or xa.DataArray): Input xarray dataset or data array.
+        name (str, optional): Name of the specific variable to extract. Defaults to None.
+
+    Returns:
+        xa.DataArray or None: The extracted data array or None if the input object is not an xarray dataset.
+    """
+    if isinstance(xa_d, xa.Dataset):
+        if name:
+            variable = xa_d[name]
+        else:
+            # Find the first variable that isn't "spatial_ref"
+            variables = [
+                var_name
+                for var_name in list(xa_d.data_vars)
+                if var_name != "spatial_ref"
+            ]
+            if variables:
+                variable = xa_d[variables[0]]
+            else:
+                variable = None
+        return variable
+    else:
+        return None
