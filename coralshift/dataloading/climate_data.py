@@ -331,7 +331,7 @@ def save_nc(
         if "grid_mapping" in xa_d.attrs:
             del xa_d.attrs["grid_mapping"]
         print(f"Writing {filename} to file at {save_path}")
-        spatial_data.spatial_data.process_xa_d(xa_d).to_netcdf(save_path)
+        spatial_data.process_xa_d(xa_d).to_netcdf(save_path)
         print("Writing complete.")
     else:
         print(f"{filename} already exists in {save_dir}")
