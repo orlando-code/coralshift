@@ -1,7 +1,8 @@
 import importlib
 import inspect
 from pathlib import Path
-from setuptools import setup, find_packages
+
+# from setuptools import setup, find_packages
 
 
 def get_coralshift_dir():
@@ -10,4 +11,4 @@ def get_coralshift_dir():
     return (coralshift_dir / "..").resolve()
 
 
-setup(name="coralshift", version="0.1.0", packages=find_packages())
+# setup(name="coralshift", version="0.1.0", packages=find_packages())
