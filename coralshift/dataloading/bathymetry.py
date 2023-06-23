@@ -224,6 +224,8 @@ def generate_bathymetry_xa_da(area_name: str):
         reef_areas.get_xarray_name(area_name),
     )
 
+    xa_bath.rio.write_crs("EPSG:4326", inplace=True)
+
     resolution = np.mean(spatial_data.calculate_spatial_resolution(xa_bath))
 
     bath_name = f"{reef_areas.get_xarray_name(area_name)}_{resolution:.05f}d"
