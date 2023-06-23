@@ -83,6 +83,9 @@ def save_nc(
     filename = remove_suffix(utils.replace_dot_with_dash(filename))
     save_path = (Path(save_dir) / filename).with_suffix(".nc")
     if not save_path.is_file():
+
+        if "grid_mapping" in xa_d.attrs:
+            del xa_d.attrs["grid_mapping"]
         print(f"Writing {filename} to file at {save_path}")
         spatial_data.process_xa_d(xa_d).to_netcdf(save_path)
         print("Writing complete.")
