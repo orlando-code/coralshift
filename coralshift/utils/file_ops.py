@@ -291,7 +291,9 @@ def merge_nc_files_in_dir(
     if not merged_save_path.is_file():
         print(f"Merging {format} files into {merged_save_path}")
         merged_ds = spatial_data.process_xa_d(
-            xa.open_mfdataset(filepaths, concat_dim=concat_dim, combine="nested")
+            xa.open_mfdataset(
+                filepaths, concat_dim=concat_dim, combine="nested", drop_variables=['depth']
+            )
         )
         merged_ds.to_netcdf(merged_save_path)
     else:
