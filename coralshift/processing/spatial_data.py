@@ -1215,6 +1215,8 @@ def process_xa_d(
     else:
         temp_xa_d = temp_xa_d.transpose("latitude", "longitude")
 
+    if "grid_mapping" in xa_d.attrs:
+        del xa_d.attrs["grid_mapping"]
     # add crs
     temp_xa_d.rio.write_crs(crs, inplace=True)
     chunked_xa_d = chunk_as_necessary(temp_xa_d, chunk_dict)

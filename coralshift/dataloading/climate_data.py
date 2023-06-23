@@ -151,7 +151,7 @@ def download_reanalysis(
     region: str,
     final_filename: str = None,
     variables: list[str] = ["mlotst", "bottomT", "uo", "so", "zos", "thetao", "vo"],
-    date_lims: tuple[str, str] = ("1992-12-31", "2021-12-31"),
+    date_lims: tuple[str, str] = ("1992-12-31", "2020-12-16"),
     depth_lims: tuple[str, str] = (0.3, 1),
     lon_lims: tuple[str, str] = (142, 147),
     lat_lims: tuple[str, str] = (-17, -10),
@@ -184,6 +184,7 @@ def download_reanalysis(
 
     """
     download_dir = file_ops.guarantee_existence(Path(download_dir) / region)
+    merged_download_dir = file_ops.guarantee_existence(download_dir / "merged_vars")
 
     # User credentials
     # username = input("Enter your username: ")
@@ -256,18 +257,42 @@ def download_reanalysis(
         )
         date_merged_name = generate_spatiotemporal_var_filename_from_dict(var_name_dict)
         # merge files by time
-        merged_path = file_ops.merge_nc_files_in_dir(save_dir, date_merged_name)
+        merged_path = file_ops.merge_nc_files_in_dir(
+            save_dir,
+            date_merged_name,
+            merged_save_path=(merged_download_dir / date_merged_name).with_suffix(
+                ".nc"
+            ),
+        )
+
+        # generate metadata if necessary
+        if not (merged_download_dir / date_merged_name).with_suffix(".json").is_file():
+            generate_metadata(
+                merged_download_dir,
+                date_merged_name,
+                [var],
+                date_lims,
+                lon_lims,
+                lat_lims,
+                depth_lims,
+            )
+
         date_merged_xas.append(merged_path)
 
     # concatenate variables
     arrays = [
-        (spatial_data.process_xa_d(date_merged_xa))
+        (
+            spatial_data.process_xa_d(
+                xa.open_dataset(date_merged_xa, decode_coords="all")
+            )
+        )
         for date_merged_xa in date_merged_xas
     ]
     all_merged = xa.merge(arrays)
 
-    all_merged.to_netcdf(save_path)
-    # generate accompnaying metadata
+    save_nc(download_dir, final_filename, all_merged)
+    # all_merged.to_netcdf(save_path)
+    # generate accompanying metadata
     generate_metadata(
         download_dir,
         final_filename,
@@ -277,9 +302,44 @@ def download_reanalysis(
         lat_lims,
         depth_lims,
     )
-    print(f"Combined nc file written to {save_path}.")
-
     return all_merged, save_path
+
+
+def save_nc(
+    save_dir: Path | str,
+    filename: str,
+    xa_d: xa.DataArray | xa.Dataset,
+    return_array: bool = False,
+) -> xa.DataArray | xa.Dataset:
+    """
+    Save the given xarray DataArray or Dataset to a NetCDF file iff no file with the same
+    name already exists in the directory.
+    # TODO: issues when suffix provided
+    Parameters
+    ----------
+        save_dir (Path or str): The directory path to save the NetCDF file.
+        filename (str): The name of the NetCDF file.
+        xa_d (xarray.DataArray or xarray.Dataset): The xarray DataArray or Dataset to be saved.
+
+    Returns
+    -------
+        xarray.DataArray or xarray.Dataset: The input xarray object.
+    """
+    filename = file_ops.remove_suffix(utils.replace_dot_with_dash(filename))
+    save_path = (Path(save_dir) / filename).with_suffix(".nc")
+    if not save_path.is_file():
+        if "grid_mapping" in xa_d.attrs:
+            del xa_d.attrs["grid_mapping"]
+        print(f"Writing {filename} to file at {save_path}")
+        spatial_data.spatial_data.process_xa_d(xa_d).to_netcdf(save_path)
+        print("Writing complete.")
+    else:
+        print(f"{filename} already exists in {save_dir}")
+
+    if return_array:
+        return save_path, xa.open_dataset(save_path)
+    else:
+        return save_path
 
 
 def execute_motu_query(
