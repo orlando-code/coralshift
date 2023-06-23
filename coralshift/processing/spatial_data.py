@@ -1211,7 +1211,7 @@ def process_xa_d(
         temp_xa_d = temp_xa_d.squeeze(squeeze_coords)
 
     if "time" in temp_xa_d.dims:
-        temp_xa_d = temp_xa_d.transpose("time", "latitude", "longitude")
+        temp_xa_d = temp_xa_d.transpose("time", "latitude", "longitude", ...)
     else:
         temp_xa_d = temp_xa_d.transpose("latitude", "longitude")
 
