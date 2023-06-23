@@ -27,7 +27,7 @@ def generate_area_geojson(area_class, area_name: str, save_dir: Path | str) -> N
         output_path (Path): Path to GeoJSON file.
     """
     # Save the GeoJSON data to a file
-    name = area_class.get_name_from_names(area_name)
+    name = area_class.get_short_filename(area_name)
 
     filename = f"{name}.geojson"
     output_path = save_dir / filename
