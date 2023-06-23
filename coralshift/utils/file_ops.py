@@ -92,7 +92,7 @@ def save_nc(
         print(f"{filename} already exists in {save_dir}")
 
     if return_array:
-        return save_path, xa.open_dataset(save_path)
+        return save_path, xa.open_dataset(save_path, decode_coords="all")
     else:
         return save_path
 
@@ -292,7 +292,10 @@ def merge_nc_files_in_dir(
         print(f"Merging {format} files into {merged_save_path}")
         merged_ds = spatial_data.process_xa_d(
             xa.open_mfdataset(
-                filepaths, concat_dim=concat_dim, combine="nested", drop_variables=['depth']
+                filepaths,
+                concat_dim=concat_dim,
+                combine="nested",
+                drop_variables=["depth"],
             )
         )
         merged_ds.to_netcdf(merged_save_path)
