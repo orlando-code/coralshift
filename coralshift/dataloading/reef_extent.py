@@ -5,7 +5,7 @@ import numpy as np
 import rasterio
 import xarray as xa
 
-from pathlib import Path
+# from pathlib import Path
 from tqdm import tqdm
 
 from coralshift.processing import spatial_data
@@ -166,11 +166,12 @@ def process_coral_gt_tifs(tif_dir_name=None, target_resolution_d: float = None):
     )
 
 
-def generate_coral_shp(gdf_coral: gpd.GeoDataFrame) -> None:
+def generate_coral_shp(gdf_coral: gpd.GeoDataFrame, file_name: str) -> None:
     # create folder for saving reef extent tifs
-    directories.get_gt_files_dir()
+    # directories.get_gt_files_dir()
+    save_dir = directories.get_reef_baseline_dir() / file_name
+    save_path = save_dir / f"{file_name}_coral_gt.shp"
 
-    save_path = directories.get_reef_baseline_dir() / "coral_algae_gt.shp"
     if not save_path.is_file():
         gdf_coral.to_file(save_path, driver="ESRI Shapefile")
     else:
