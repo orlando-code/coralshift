@@ -41,13 +41,19 @@ def upsample_xarray_to_target(
         - The resampling is performed by coarsening the dataset using a mean operation.
     """
     # N.B. not perfect at getting starts/ends matching up It works fine when not trying to match the coords of another
+    # write crs
+    xa_array.rio.write_crs("EPSG:4326", inplace=True)
+    return process_xa_d(
+        xa_array.rio.reproject("EPSG:4326", target_resolution, method=method)
+    )
+
     # TODO: enable flexible upsampling by time also
-    lat_lims = xarray_coord_limits(xa_array, "latitude")
-    lon_lims = xarray_coord_limits(xa_array, "longitude")
+    # lat_lims = xarray_coord_limits(xa_array, "latitude")
+    # lon_lims = xarray_coord_limits(xa_array, "longitude")
 
-    dummy_xa = generate_dummy_xa(target_resolution, lat_lims, lon_lims)
+    # dummy_xa = generate_dummy_xa(target_resolution, lat_lims, lon_lims)
 
-    return upsample_xa_d_to_other(xa_array, dummy_xa, method=method, name=name)
+    # return upsample_xa_d_to_other(xa_array, dummy_xa, method=method, name=name)
 
 
 def generate_dummy_xa(
