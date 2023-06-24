@@ -135,8 +135,10 @@ def upsample_xa_d_to_other(
     -------
     xarray.DataArray or xarray.Dataset: The upsampled xarray object with matching spatial characteristics as the target.
     """
-    xa_da = file_ops.extract_variable(xa_d, var_name)
-    xa_resampled = xa_da.rio.reproject_match(target_xa_d, resampling=method)
+    # xa_da = file_ops.extract_variable(xa_d, var_name)
+    # xa_resampled = xa_da.rio.reproject_match(target_xa_d, resampling=method)
+    xa_resampled = xa_d.rio.reproject_match(target_xa_d, resampling=method)
+
     xa_processed = process_xa_d(xa_resampled)
     if name:
         return xa_processed.rename(name)
