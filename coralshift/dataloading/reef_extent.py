@@ -28,6 +28,7 @@ def generate_area_geojson(area_class, area_name: str, save_dir: Path | str) -> N
     """
     # Save the GeoJSON data to a file
     name = area_class.get_short_filename(area_name)
+    save_dir = file_ops.guarantee_existence(directories.get_reef_baseline_dir() / name)
 
     filename = f"{name}.geojson"
     output_path = save_dir / filename
