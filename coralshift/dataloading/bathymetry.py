@@ -94,6 +94,13 @@ class ReefAreas:
             return dataset["short_file_name"]
         return None
 
+    def get_letter(self, name):
+        name = self.get_name_from_names(name)
+        dataset = self.get_dataset(name)
+        if dataset:
+            return dataset["short_name"]
+        return None
+
     def get_xarray_name(self, name):
         name = self.get_name_from_names(name)
         dataset = self.get_dataset(name)
