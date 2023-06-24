@@ -12,7 +12,7 @@ from coralshift.processing import spatial_data
 from coralshift.utils import directories, file_ops
 
 
-def generate_area_geojson(area_class, area_name: str, save_dir: Path | str) -> None:
+def generate_area_geojson(area_class, area_name: str) -> None:
     """
     Generate a GeoJSON file representing a specific area.
 
