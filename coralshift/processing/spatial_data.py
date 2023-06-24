@@ -44,7 +44,7 @@ def upsample_xarray_to_target(
     # write crs
     xa_array.rio.write_crs("EPSG:4326", inplace=True)
     return process_xa_d(
-        xa_array.rio.reproject("EPSG:4326", target_resolution, method=method)
+        xa_array.rio.reproject("EPSG:4326", target_resolution, resampling=method)
     )
 
     # TODO: enable flexible upsampling by time also
