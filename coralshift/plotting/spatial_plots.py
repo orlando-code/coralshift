@@ -715,4 +715,4 @@ def plot_reef_areas(region: list[str] = None):
             zorder=10,
         )
 
-    plt.title("Selected regions of interest")
+    plt.title("Selected region(s) of interest")
