@@ -441,7 +441,7 @@ def remove_suffix(filename: str) -> str:
 
 
 def return_list_filepaths(
-    files_dir: Path | str, suffix: str, incl_subdirs: bool = True
+    files_dir: Path | str, suffix: str, incl_subdirs: bool = False
 ) -> list[Path]:
     """Return a list of file paths in the specified directory that have the given suffix.
 
