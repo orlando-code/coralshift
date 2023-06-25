@@ -679,6 +679,8 @@ def generate_era5_data(
         download_dest_dir=save_dir,
         weather_params=weather_params,
         years=years,
+        lat_lims=lat_lims,
+        lon_lims=lon_lims,
         format="netcdf",
     )
 
