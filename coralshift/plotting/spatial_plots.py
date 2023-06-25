@@ -17,6 +17,7 @@ import numpy as np
 from tqdm import tqdm
 
 from coralshift.processing import spatial_data
+from coralshift.dataloading import bathymetry
 from coralshift.utils import file_ops
 
 
@@ -209,7 +210,7 @@ def format_spatial_plot(
     # ax.coastlines(resolution="10m", color="red", linewidth=1)
     ax.add_feature(
         cfeature.NaturalEarthFeature(
-            "physical", "land", "10m", edgecolor=edgecolor, facecolor="#cccccc"
+            "physical", "land", "10m", edgecolor=edgecolor, facecolor="#d2ccc4"
         )
     )
     ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True)
@@ -617,3 +618,101 @@ def visualise_variable_in_region(
     ax[1].set_xlabel("time")
 
     return spatial_mean
+
+
+def plot_reef_areas(region: list[str] = None):
+    reef_areas = bathymetry.ReefAreas()
+    lats, lons, rectangles, names = [], [], [], []
+
+    if region:
+        for region_name in region:
+            name = reef_areas.get_letter(region_name)
+            dataset = reef_areas.get_dataset(name)
+            if dataset:
+                lat_pair, lon_pair = dataset["lat_range"], dataset["lon_range"]
+                lats.append(lat_pair)
+                lons.append(lon_pair)
+
+                # Add a rectangle at the specified coordinates (in front of overlay)
+                rect = plt.Rectangle(
+                    (min(lon_pair), min(lat_pair)),
+                    abs(max(lon_pair) - min(lon_pair)),
+                    abs(max(lat_pair) - min(lat_pair)),
+                    edgecolor="#f90202",
+                    facecolor="none",
+                    zorder=10,
+                )
+                rectangles.append(rect)
+                names.append(name)
+    else:
+        for region_ds in reef_areas.datasets:
+            name = reef_areas.get_letter(region_ds["short_name"])
+            (lat_pair, lon_pair) = reef_areas.get_lat_lon_limits(name)
+            lats.append(lat_pair)
+            lons.append(lon_pair)
+
+            # Add a rectangle at the specified coordinates (in front of overlay)
+            rect = plt.Rectangle(
+                (min(lon_pair), min(lat_pair)),
+                abs(max(lon_pair) - min(lon_pair)),
+                abs(max(lat_pair) - min(lat_pair)),
+                edgecolor="#f90202",
+                facecolor="none",
+                zorder=10,
+            )
+            rectangles.append(rect)
+            names.append(name)
+
+    # Create a GeoAxes with desired projection
+    projection = ccrs.PlateCarree()
+    fig, ax = plt.subplots(figsize=(10, 8), subplot_kw=dict(projection=projection))
+
+    # Set the extent of the map depending on areas included (with some padding)
+    ax.set_extent(
+        [
+            min(lons, key=lambda x: x[0])[0] - 0.5,
+            max(lons, key=lambda x: x[0])[1] + 0.5,
+            min(lats, key=lambda x: x[0])[1] - 2,
+            max(lats, key=lambda x: x[0])[0] + 2,
+        ],
+        crs=projection,
+    )
+
+    # plot and format underlay
+    # add land feature (colours map those used in report)
+    ax.add_feature(
+        cfeature.NaturalEarthFeature(
+            "physical", "land", "10m", edgecolor="black", facecolor="#d2ccc4"
+        )
+    )
+    ax.gridlines(draw_labels=True, linestyle="-", linewidth=0.5, color="gray")
+
+    for rect, name in zip(rectangles, names):
+        ax.add_patch(rect)
+        rect_center = rect.get_bbox().get_points().mean(axis=0)
+
+        # Add a small white square behind the letter
+        square_size = 1.0  # 1 degree side length
+        square = plt.Rectangle(
+            (rect_center[0] - square_size / 2, rect_center[1] - square_size / 2),
+            square_size,
+            square_size,
+            edgecolor="none",
+            facecolor="white",
+            alpha=1,
+            zorder=9,
+        )
+        ax.add_patch(square)
+
+        ax.text(
+            rect_center[0],
+            rect_center[1],
+            name,
+            ha="center",
+            va="center",
+            fontsize=1.5 * plt.rcParams["font.size"],
+            fontweight="bold",
+            zorder=10,
+        )
+
+    plt.title("Selected regions of interest")
