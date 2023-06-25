@@ -672,6 +672,7 @@ def generate_era5_data(
     save_dir = directories.get_era5_data_dir()
     if region:
         save_dir = save_dir / bathymetry.ReefAreas().get_short_filename(region)
+        (lat_lims, lon_lims) = bathymetry.ReefAreas().get_lat_lon_limits(region)
 
     # download data to appropriate folder(s)
     fetch_weather_data(
