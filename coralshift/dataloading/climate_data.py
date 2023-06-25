@@ -15,6 +15,7 @@ from pandas._libs.tslibs.timestamps import Timestamp
 
 from coralshift.utils import utils, file_ops, directories
 from coralshift.processing import spatial_data
+from coralshift.dataloading import bathymetry
 
 
 def generate_spatiotemporal_var_filename_from_dict(
@@ -649,6 +650,7 @@ def generate_era5_data(
         "surface_net_solar_radiation",
         "surface_pressure",
     ],
+    region: str = None,
     years: list[int] = np.arange(1993, 2021),
     lat_lims: tuple[float] = (-10, -17),
     lon_lims: tuple = (142, 147),
@@ -667,8 +669,9 @@ def generate_era5_data(
     -------
     None
     """
-    # fetch era5 diirectory for saving
     save_dir = directories.get_era5_data_dir()
+    if region:
+        save_dir = save_dir / bathymetry.ReefAreas().get_short_filename(region)
 
     # download data to appropriate folder(s)
     fetch_weather_data(
