@@ -742,6 +742,44 @@ def save_dict_xa_ds_to_nc(
         save_nc(save_dir, filename, array)
 
 
+def resample_list_xa_ds_into_dict(
+    xa_das: list[xa.DataArray],
+    target_resolution: float,
+    unit: str = "m",
+    lat_lims: tuple[float] = (-10, -17),
+    lon_lims: tuple[float] = (142, 147),
+) -> dict:
+    """
+    Resample a list of xarray DataArrays to the target resolution and merge them.
+
+    Parameters
+    ----------
+        xa_das (list[xa.DataArray]): A list of xarray DataArrays to be resampled and merged.
+        target_resolution (float): The target resolution for resampling.
+        unit (str, defaults to "m"): The unit of the target resolution.
+        interp_method: (str, defaults to "linear") The interpolation method for resampling.
+
+    Returns
+    -------
+        A dictionary containing the resampled xarray DataArrays merged by their names.
+    """
+    # TODO: will probably need to save to individual files/folders and combine at test/train time
+    # may need to go to target array here
+    target_resolution_d = spatial_data.choose_resolution(target_resolution, unit)[1]
+
+    target_xa_d = spatial_data.generate_dummy_xa(
+        target_resolution_d, lat_lims, lon_lims
+    )
+
+    resampled_xa_das_dict = {}
+    for xa_da in tqdm(xa_das, desc="Resampling xarray DataArrays"):
+        # xa_resampled = resample_xa_d_to_other(xa_da, dummy_xa, name=xa_da.name)
+        xa_resampled = spatial_data.resample_xa_d_to_other(xa_da, target_xa_d)
+        resampled_xa_das_dict[xa_da.name] = xa_resampled
+
+    return resampled_xa_das_dict
+
+
 def resample_list_xa_ds_to_target_res_and_save(
     xa_das: list[xa.DataArray],
     target_resolution_d: float,
@@ -802,48 +840,42 @@ def resample_list_xa_ds_to_target_res_and_save(
             print(f"{filename} already exists in {save_dir}")
 
 
-def resample_list_xa_ds_to_target_res_list_and_save(
-    xa_das: list[xa.DataArray],
-    target_resolutions: list[float],
-    units: list[str],
-    lat_lims: tuple[float] = (-10, -17),
-    lon_lims: tuple[float] = (142, 147),
-) -> None:
-    """
-    Resamples a list of xarray DataArrays to multiple target resolutions specified in a list, and saves the resampled
-    DataArrays to NetCDF files.
+# def resample_list_xa_ds_to_target_resolution_and_merge(
+#     xa_das: list[xa.DataArray],
+#     target_resolution: float,
+#     unit: str = "m",
+#     lat_lims: tuple[float] = (-10, -17),
+#     lon_lims: tuple[float] = (142, 147),
+# ) -> dict:
+#     """
+#     Resample a list of xarray DataArrays to the target resolution and merge them.
 
-    Parameters
-    ----------
-        xa_das (list[xa.DataArray]): A list of xarray DataArrays to be resampled.
-        target_resolutions (list[float]): A list of target resolutions in degrees or meters, depending on the units
-            specified.
-        units (list[str]): A list of units corresponding to the target resolutions.
-        lat_lims (tuple[float], optional): Latitude limits for the dummy DataArray used for resampling.
-            Defaults to (-10, -17).
-        lon_lims (tuple[float], optional): Longitude limits for the dummy DataArray used for resampling. Defaults to
-            (142, 147).
+#     Parameters
+#     ----------
+#         xa_das (list[xa.DataArray]): A list of xarray DataArrays to be resampled and merged.
+#         target_resolution (float): The target resolution for resampling.
+#         unit (str, defaults to "m"): The unit of the target resolution.
+#         interp_method: (str, defaults to "linear") The interpolation method for resampling.
 
-    Returns
-    -------
-        None
-    """
+#     Returns
+#     -------
+#         A dictionary containing the resampled xarray DataArrays merged by their names.
+#     """
+#     # TODO: will probably need to save to individual files/folders and combine at test/train time
+#     # may need to go to target array here
+#     target_resolution_d = spatial_data.choose_resolution(target_resolution, unit)[1]
 
-    target_resolutions = [
-        spatial_data.choose_resolution(number, string)[1]
-        for number, string in zip(target_resolutions, units)
-    ]
-    for i, resolution in tqdm(
-        enumerate(target_resolutions),
-        desc="Progress through resolutions",
-        position=0,
-        leave=True,
-        total=len(target_resolutions),
-    ):
-        unit = units[i]
-        spatial_data.resample_list_xa_ds_to_target_res_and_save(
-            xa_das, resolution, unit
-        )
+#     dummy_xa = spatial_data.generate_dummy_xa(target_resolution_d, lat_lims, lon_lims)
+
+#     resampled_xa_das_dict = {}
+#     for xa_da in tqdm(xa_das, desc="Resampling xarray DataArrays"):
+#         xa_resampled = spatial_data.resample_xa_d_to_other(
+#             xa_da, dummy_xa, name=xa_da.name
+#         )
+#         # xa_resampled = spatial_data.upsample_xarray_to_target(xa_da, target_resolution_d)
+#         resampled_xa_das_dict[xa_da.name] = xa_resampled
+
+#     return resampled_xa_das_dict, unit
 
 
 def extract_variable(xa_d: xa.Dataset | xa.DataArray, name=None):
