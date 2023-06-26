@@ -1173,11 +1173,17 @@ def train_tune_across_models(model_types: list[str], d_resolution: float = 0.036
     # return all_model_outcomes
 
 
-def get_comparison_xa_ds(d_resolution: float = 0.03691):
-    res_string = utils.replace_dot_with_dash(f"{d_resolution:.05f}d")
-    all_data_dir = directories.get_comparison_dir() / f"{res_string}_arrays"
-    all_data_name = f"all_{res_string}_comparative"
-    return xa.open_dataset((all_data_dir / all_data_name).with_suffix(".nc"))
+def get_comparison_xa_ds(region_list: list=["A","B","C","D"], d_resolution: float = 0.0368):
+    res_string = utils.replace_dot_with_dash(f"{d_resolution:.04f}d")
+
+    xa_dss = []
+    for region in region_list:
+        region_name = bathymetry.ReefAreas().get_short_filename(region)
+        all_data_dir = directories.get_comparison_dir() / f"{region_name}/{res_string}_arrays"
+        all_data_name = f"all_{res_string}_comparative"
+        xa_dss.append(xa.open_dataset((all_data_dir / all_data_name).with_suffix(".nc"), decode_coords="all"))
+
+    return xa_dss
 
 
 def generate_reproducing_metrics_for_regions(
