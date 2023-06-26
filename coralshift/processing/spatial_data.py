@@ -53,7 +53,7 @@ def upsample_xarray_to_target(
 
     # dummy_xa = generate_dummy_xa(target_resolution, lat_lims, lon_lims)
 
-    # return upsample_xa_d_to_other(xa_array, dummy_xa, method=method, name=name)
+    # return resample_xa_d_to_other(xa_array, dummy_xa, method=method, name=name)
 
 
 def generate_dummy_xa(
@@ -117,7 +117,7 @@ def downsample_interp(
     return xa_d.interp(latitude=lat_vals, longitude=lon_vals, method=interp_method)
 
 
-def upsample_xa_d_to_other(
+def resample_xa_d_to_other(
     xa_d: xa.DataArray | xa.Dataset,
     target_xa_d: xa.DataArray | xa.Dataset,
     method=rasterio.enums.Resampling.bilinear,
@@ -143,7 +143,9 @@ def upsample_xa_d_to_other(
     """
     # xa_da = file_ops.extract_variable(xa_d, var_name)
     # xa_resampled = xa_da.rio.reproject_match(target_xa_d, resampling=method)
-    xa_resampled = xa_d.rio.reproject_match(target_xa_d, resampling=method)
+    xa_resampled = xa_d.rio.reproject_match(
+        target_xa_d, resampling=method, nodata=np.nan
+    )
 
     xa_processed = process_xa_d(xa_resampled)
     if name:
@@ -211,7 +213,7 @@ def upsample_and_save_xa_a(
             xa_d, target_resolution=target_resolution_d
         )
     else:
-        xa_upsampled = upsample_xa_d_to_other(xa_d, target_xa_d)
+        xa_upsampled = resample_xa_d_to_other(xa_d, target_xa_d)
         # generate target resolution for filename
         target_resolution_d = degrees_to_distances(
             np.mean(calculate_spatial_resolution(target_xa_d))
@@ -2249,12 +2251,13 @@ def resample_list_xa_ds_to_target_resolution_and_merge(
     # TODO: will probably need to save to individual files/folders and combine at test/train time
     # may need to go to target array here
     target_resolution_d = choose_resolution(target_resolution, unit)[1]
-    dummy_xa = generate_dummy_xa(target_resolution_d, lat_lims, lon_lims)
+
+    # dummy_xa = generate_dummy_xa(target_resolution_d, lat_lims, lon_lims)
 
     resampled_xa_das_dict = {}
     for xa_da in tqdm(xa_das, desc="Resampling xarray DataArrays"):
-        xa_resampled = upsample_xa_d_to_other(xa_da, dummy_xa, name=xa_da.name)
-
+        # xa_resampled = resample_xa_d_to_other(xa_da, dummy_xa, name=xa_da.name)
+        xa_resampled = upsample_xarray_to_target(xa_da, target_resolution_d)
         resampled_xa_das_dict[xa_da.name] = xa_resampled
 
     return resampled_xa_das_dict
