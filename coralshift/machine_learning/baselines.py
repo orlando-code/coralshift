@@ -548,15 +548,13 @@ def save_sklearn_model(model, savedir: Path | str, filename: str) -> None:
     -------
     None
     """
-
     save_path = (Path(savedir) / filename).with_suffix(".pickle")
-
-    if not save_path.is_file():
+    if save_path.is_file():
+        save_path = (Path(savedir) / f"{filename}_new").with_suffix(".pickle")
         with open(save_path, "wb") as f:
             pickle.dump(model, f)
-        print(f"Saved model to {save_path}.")
-    else:
-        print(f"{save_path} already exists.")
+        print(f"Model at {save_path} already exists.")
+    print(f"Saved model to {save_path}.")
 
     return save_path
 
@@ -1318,8 +1316,9 @@ def load_and_process_reproducing_xa_das(
     # solar_radiation_daily = solar_radiation.resample(time="1D").mean(dim="time")
 
 
-def load_model(model_name: Path | str, model_dir: Path | str = directories.get_best_model_dir()):
-
+def load_model(
+    model_name: Path | str, model_dir: Path | str = directories.get_best_model_dir()
+):
     if model_name.is_file():
         model = pickle.load(open(model_name, "rb"))
     else:
