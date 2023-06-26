@@ -23,6 +23,7 @@ from sklearn import metrics as sklmetrics
 from coralshift.utils import utils, directories, file_ops
 from coralshift.processing import spatial_data
 from coralshift.plotting import spatial_plots, model_results
+from coralshift.dataloading import bathymetry
 
 
 def generate_test_train_coordinates(
@@ -716,7 +717,7 @@ def calc_timeseries_params(xa_da_daily_means: xa.DataArray, period: str, param: 
 
 
 def generate_reproducing_metrics(
-    resampled_xa_das_dict: dict, target_resolution: float = None
+    resampled_xa_das_dict: dict, target_resolution_d: float = None, region: str = None
 ) -> xa.Dataset:
     """
     Generate metrics used in Couce et al (2013, 2023) based on the upsampled xarray DataArrays.
@@ -729,17 +730,25 @@ def generate_reproducing_metrics(
     -------
         xa.Dataset: An xarray Dataset containing the reproduced metrics.
     """
-    if target_resolution:
-        resolution = target_resolution
+    if target_resolution_d:
+        resolution = target_resolution_d
     else:
         resolution = np.mean(
-            spatial_data.calculate_spatial_resolution(resampled_xa_das_dict["ssr"])
+            spatial_data.calculate_spatial_resolution(resampled_xa_das_dict["thetao"])
         )
 
-    res_string = f"{resolution:.05f}d"
-    filename = utils.replace_dot_with_dash(
-        f"{res_string}_arrays/all_{res_string}_comparative"
-    )
+    res_string = utils.replace_dot_with_dash(f"{resolution:.04f}d")
+
+    if not region:
+        filename = f"{res_string}_arrays/all_{res_string}_comparative"
+    else:
+        region_dir = file_ops.guarantee_existence(
+            directories.get_comparison_dir()
+            / f"{bathymetry.ReefAreas().get_short_filename(region)}/{res_string}_arrays"
+        )
+        # region_letter = bathymetry.ReefAreas().get_letter(region)
+        filename = region_dir / f"all_{res_string}_comparative"
+
     save_path = (directories.get_comparison_dir() / filename).with_suffix(".nc")
 
     if not save_path.is_file():
@@ -774,9 +783,11 @@ def generate_reproducing_metrics(
             salinity_daily, "y", "salinity"
         )
         # monthly min, monthly max
-        (_, _, (salinity_monthly_min, salinity_monthly_max)) = calc_timeseries_params(
-            salinity_daily, "m", "salinity"
-        )
+        (
+            _,
+            _,
+            (salinity_monthly_min, salinity_monthly_max),
+        ) = calc_timeseries_params(salinity_daily, "m", "salinity")
         print("Generated so data")
 
         # CURRENT
@@ -786,16 +797,18 @@ def generate_reproducing_metrics(
             current_daily, "y", "current"
         )
         # monthly min, monthly max
-        (_, _, (current_monthly_min, current_monthly_max)) = calc_timeseries_params(
-            current_daily, "m", "current"
-        )
+        (
+            _,
+            _,
+            (current_monthly_min, current_monthly_max),
+        ) = calc_timeseries_params(current_daily, "m", "current")
         print("Generated current data")
 
         # BATHYMETRY
         bathymetry_climate_res = resampled_xa_das_dict["bathymetry"]
         print("Generated bathymetry data")
 
-        # ERA5
+        # # ERA5
         solar_daily = resampled_xa_das_dict["ssr"]
         # annual average
         solar_annual_average, _, _ = calc_timeseries_params(
@@ -835,13 +848,13 @@ def generate_reproducing_metrics(
             if "grid_mapping" in xa_da.attrs:
                 del xa_da.attrs["grid_mapping"]
         # MERGE
-        merged = xa.merge(merge_list)
+        merged = xa.merge(merge_list).astype(np.float64)
         merged.to_netcdf(save_path)
         return merged
 
     else:
         print(f"{save_path} already exists.")
-        return xa.open_dataset(save_path)
+        return xa.open_dataset(save_path, decode_coords="all")
 
 
 def return_time_grouping_offset(period: str):
@@ -1134,3 +1147,111 @@ def get_comparison_xa_ds(d_resolution: float = 0.03691):
     all_data_dir = directories.get_comparison_dir() / f"{res_string}_arrays"
     all_data_name = f"all_{res_string}_comparative"
     return xa.open_dataset((all_data_dir / all_data_name).with_suffix(".nc"))
+
+
+def generate_reproducing_metrics_for_regions(
+    regions_list: list = ["A", "B", "C", "D"], target_resolution_d: float = None
+):
+    for region in regions_list:
+        lat_lims = bathymetry.ReefAreas().get_lat_lon_limits(region)[0]
+        lon_lims = bathymetry.ReefAreas().get_lat_lon_limits(region)[1]
+
+        # create list of xarray dataarrays
+        reproduction_xa_list = load_and_process_reproducing_xa_das(region)
+        # create dictionary of xa arrays, resampled to correct resolution
+        resampled_xa_das_dict = (
+            spatial_data.resample_list_xa_ds_to_target_resolution_and_merge(
+                reproduction_xa_list,
+                target_resolution=4000,
+                unit="m",
+                lat_lims=lat_lims,
+                lon_lims=lon_lims,
+            )
+        )
+        # generate and save comparison metrics
+        generate_reproducing_metrics(resampled_xa_das_dict, region=region)
+
+
+def load_and_process_reproducing_xa_das(
+    region: str, chunk_dict: dict = {"latitude": 100, "longitude": 100, "time": 100}
+) -> list[xa.DataArray]:
+    """
+    Load and process xarray data arrays for reproducing metrics.
+
+    Returns
+    -------
+        list[xa.DataArray]: A list containing the processed xarray data arrays.
+    """
+    region_name = bathymetry.ReefAreas().get_short_filename(region)
+    region_letter = bathymetry.ReefAreas().get_letter(region)
+
+    # load in daily sea water potential temp
+    # thetao_daily = xa.open_dataarray(directories.get_processed_dir() / "arrays/thetao.nc")
+
+    dailies_array = xa.open_dataset(
+        directories.get_daily_cmems_dir()
+        / f"{region_name}/cmems_gopr_daily_{region_letter}.nc",
+        decode_coords="all",
+        chunks=chunk_dict,
+    ).isel(depth=0)
+
+    # load in daily sea water potential temp
+    thetao_daily = dailies_array["thetao"]
+    # load in daily sea water salinity means
+    salinity_daily = dailies_array["so"]
+    # calculate current magnitude
+    current_daily = calculate_magnitude(
+        dailies_array["uo"].compute(), dailies_array["vo"].compute()
+    ).rename("current")
+    # TODO: download ERA5 files
+    # load bathymetry file TODO: separate function for this
+    bath_file = list(
+        directories.get_bathymetry_datasets_dir().glob(f"{region_name}_*.nc")
+    )[0]
+    bath = xa.open_dataarray(bath_file, decode_coords="all", chunks=chunk_dict).rename(
+        "bathymetry"
+    )
+    # Load in ERA5 surface net solar radiation
+    net_solar_file = list(
+        (directories.get_era5_data_dir() / f"{region_name}/weather_parameters/").glob(
+            "*surface_net_solar_radiation_*.nc"
+        )
+    )[0]
+    solar_daily = xa.open_dataarray(
+        net_solar_file, decode_coords="all", chunks=chunk_dict
+    )
+    # Load in ground truth coral data
+    gt = xa.open_dataarray(
+        directories.get_gt_files_dir() / f"coral_region_{region_letter}_1000m.nc",
+        decode_coords="all",
+        chunks=chunk_dict,
+    ).rename("gt")
+
+    # load in daily sea water salinity means
+    # salinity_daily = xa.open_dataarray(directories.get_processed_dir() / "arrays/so.nc")
+
+    # load in daily latitudinal and longitudinal currents
+    # uo_daily = xa.open_dataarray(directories.get_processed_dir() / "arrays/uo.nc")
+    # vo_daily = xa.open_dataarray(directories.get_processed_dir() / "arrays/vo.nc")
+    # calculate current magnitude
+    # current_daily = calculate_magnitude(uo_daily, vo_daily).rename("current")
+
+    # bathymetry = xa.open_dataset(
+    #     directories.get_bathymetry_datasets_dir() / "bathymetry_A_0-00030d.nc"
+    # ).rio.write_crs("EPSG:4326")["bathymetry_A"]
+
+    # fetch resolution
+    # correct bathymetry file
+    # bathymetry = xa.open_dataset(directories.get_bathymetry_datasets_dir() / "bathymetry_A_0-00030d.nc")
+
+    # Load in ERA5 surface net solar radiation and upscale to climate variable resolution
+    # solar_radiation = xa.open_dataarray(
+    #     directories.get_era5_data_dir() / "weather_parameters/VAR_surface_net_solar_radiation_LATS_-10_-17_LONS_142_147_YEAR_1993-2020.nc" # noqa
+    #     ).rio.write_crs("EPSG:4326")
+    # solar_radiation = xa.open_dataarray(
+    #     directories.get_era5_data_dir() / "weather_parameters/VAR_surface_net_solar_radiation_LATS_-10_-17_LONS_142_147_YEAR_1993-2020.nc" # noqa
+    #     )
+    # average solar_radiation daily
+    # solar_radiation_daily = solar_radiation.resample(time="1D").mean(dim="time")
+
+    return [thetao_daily, salinity_daily, current_daily, solar_daily, bath, gt]
