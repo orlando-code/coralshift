@@ -877,6 +877,7 @@ def generate_reproducing_metrics(
                 del xa_da.attrs["grid_mapping"]
         # MERGE
         merged = xa.merge(merge_list).astype(np.float64)
+        merged.attrs["region"] = region
         with np.errstate(divide="ignore", invalid="ignore"):
             merged.to_netcdf(save_path)
             return merged
@@ -1022,15 +1023,25 @@ def initialise_model(model_type: str, random_state: int = 42):
 
     # discrete models
     elif model_type == "maxent":
-        model = LogisticRegression(verbose=1, random_state=random_state)
+        model = LogisticRegression(
+            class_weight="balanced", verbose=1, random_state=random_state
+        )
         data_type = "discrete"
         search_grid = maximum_entropy_search_grid()
     elif model_type == "rf_cla":
-        model = RandomForestClassifier(verbose=1, random_state=random_state)
+        model = RandomForestClassifier(
+            class_weight="balanced", verbose=1, random_state=random_state
+        )
         data_type = "discrete"
         search_grid = rf_search_grid()
 
     return model, data_type, search_grid
+
+
+def calculate_class_weight(label_array: np.ndarray):
+    unique_values, counts = np.unique(label_array, return_counts=True)
+    occurrence_dict = dict(zip(unique_values, counts))
+    return occurrence_dict
 
 
 def train_tune(
@@ -1066,7 +1077,6 @@ def train_tune(
         ), model_results.threshold_array(y_test)
 
     # register_ray()
-
     start_time = time.time()
     model_random = RandomizedSearchCV(
         estimator=model,
@@ -1106,16 +1116,16 @@ def train_tune(
         features=list(all_data.data_vars),
         resolution=resolution,
     )
-    # test
-    run_outcomes = n_random_runs_preds(
-        model=model_random,
-        data_type=data_type,
-        runs_n=10,
-        xa_ds=all_data,
-        test_fraction=test_fraction,
-    )
+    # # test
+    # run_outcomes = n_random_runs_preds(
+    #     model=model_random,
+    #     data_type=data_type,
+    #     runs_n=10,
+    #     xa_ds=all_data,
+    #     test_fraction=test_fraction,
+    # )
 
-    return run_outcomes
+    # return run_outcomes
 
 
 def train_tune_across_resolutions(
@@ -1146,7 +1156,7 @@ def train_tune_across_resolutions(
     return resolutions_dict
 
 
-def train_test_across_models(model_types: list[str], d_resolution: float = 0.03691):
+def train_tune_across_models(model_types: list[str], d_resolution: float = 0.03691):
     model_comp_dir = file_ops.guarantee_existence(
         directories.get_datasets_dir() / "model_params/best_models"
     )
@@ -1157,7 +1167,7 @@ def train_test_across_models(model_types: list[str], d_resolution: float = 0.036
     for model in tqdm(
         model_types, total=len(model_types), desc="Fitting each model via random search"
     ):
-        run_outcomes = train_tune(
+        train_tune(
             all_data=all_data,
             model_type=model,
             save_dir=model_comp_dir,
@@ -1165,9 +1175,9 @@ def train_test_across_models(model_types: list[str], d_resolution: float = 0.036
             runs_n=10,
             test_fraction=0.25,
         )
-        all_model_outcomes.append(run_outcomes)
+        # all_model_outcomes.append(run_outcomes)
 
-    return all_model_outcomes
+    # return all_model_outcomes
 
 
 def get_comparison_xa_ds(d_resolution: float = 0.03691):
