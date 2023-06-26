@@ -1094,9 +1094,7 @@ def train_tune(
     end_time = time.time()
     fit_time = end_time - start_time
 
-    # resolution = np.mean(spatial_data.calculate_spatial_resolution(all_data))
-
-    # save best parameters
+    # save best parameter model and metadata
     if not save_dir:
         save_dir = file_ops.guarantee_existence(
             directories.get_datasets_dir() / "model_params"
@@ -1318,3 +1316,12 @@ def load_and_process_reproducing_xa_das(
     #     )
     # average solar_radiation daily
     # solar_radiation_daily = solar_radiation.resample(time="1D").mean(dim="time")
+
+
+def load_model(model_name: Path | str, model_dir: Path | str = directories.get_best_model_dir()):
+
+    if model_name.is_file():
+        model = pickle.load(open(model_name, "rb"))
+    else:
+        model = pickle.load(open(model_dir / model_name, "rb"))
+    print(model.best_params_)
