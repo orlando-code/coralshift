@@ -1217,9 +1217,11 @@ def load_and_process_reproducing_xa_das(
             "*surface_net_solar_radiation_*.nc"
         )
     )[0]
-    solar_daily = xa.open_dataarray(
+    net_solar = xa.open_dataarray(
         net_solar_file, decode_coords="all", chunks=chunk_dict
     )
+    net_solar = net_solar.resample(time="1D").mean(dim="time")
+
     # Load in ground truth coral data
     gt = xa.open_dataarray(
         directories.get_gt_files_dir() / f"coral_region_{region_letter}_1000m.nc",
@@ -1254,4 +1256,4 @@ def load_and_process_reproducing_xa_das(
     # average solar_radiation daily
     # solar_radiation_daily = solar_radiation.resample(time="1D").mean(dim="time")
 
-    return [thetao_daily, salinity_daily, current_daily, solar_daily, bath, gt]
+    return [thetao_daily, salinity_daily, current_daily, net_solar, bath, gt]
