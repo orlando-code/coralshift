@@ -426,13 +426,13 @@ def maximum_entropy_search_grid(
         "dual": dual,
         "tol": tol,
         "C": C,
-        "fit_intercept": fit_intercept,
-        "intercept_scaling": intercept_scaling,
-        "solver": solver,
-        "max_iter": max_iter,
-        "multi_class": multi_class,
-        "verbose": verbose,
-        "warm_start": warm_start,
+        # "fit_intercept": fit_intercept,
+        # "intercept_scaling": intercept_scaling,
+        # "solver": solver,
+        # "max_iter": max_iter,
+        # "multi_class": multi_class,
+        # "verbose": verbose,
+        # "warm_start": warm_start,
     }
 
     return random_grid
