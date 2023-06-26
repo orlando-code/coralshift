@@ -60,7 +60,7 @@ def generate_test_train_coordinates(
 
     if split_type == "pixel":
         # have to handle time: make sure sampling spatially rather than spatiotempoorally
-        train_coordinates, test_coordinates = utils.generate_coordinate_pairs(
+        train_coordinates, test_coordinates = spatial_data.generate_coordinate_pairs(
             xa_ds, test_fraction
         )
 
@@ -77,8 +77,8 @@ def generate_test_train_coordinates(
             train_xa = xa_ds.isel({"latitude": slice(0, train_size)})
             test_xa = xa_ds.isel({"latitude": slice(train_size, num_lats)})
 
-            train_coordinates, _ = utils.generate_coordinate_pairs(train_xa, 0)
-            test_coordinates, _ = utils.generate_coordinate_pairs(test_xa, 0)
+            train_coordinates, _ = spatial_data.generate_coordinate_pairs(train_xa, 0)
+            test_coordinates, _ = spatial_data.generate_coordinate_pairs(test_xa, 0)
 
         # if specific latitude/longitude boundary specified, cut out test region and train on all else
         else:
@@ -88,9 +88,9 @@ def generate_test_train_coordinates(
                     "longitude": slice(test_lons[0], test_lons[1]),
                 }
             )
-            all_coordinates = utils.generate_coordinate_pairs(xa_ds)
+            all_coordinates = spatial_data.generate_coordinate_pairs(xa_ds)
 
-            test_coordinates = utils.generate_coordinate_pairs(test_xa)
+            test_coordinates = spatial_data.generate_coordinate_pairs(test_xa)
             train_coordinates = list(set(all_coordinates - set(test_coordinates)))
 
     return train_coordinates, test_coordinates
@@ -158,6 +158,34 @@ def generate_test_train_coordinates_multiple_areas(
     # # merge dfs
     # train_coords = pd.concat(train_coords_dfs, ignore_index=True)
     # test_coords = pd.concat(test_coords_dfs, ignore_index=True)
+
+
+def xa_dss_to_df(
+    xa_dss: list[xa.Dataset],
+    split_type: str = "pixel",
+    test_lats: tuple[float] = None,
+    test_lons: tuple[float] = None,
+    test_fraction: float = 0.2,
+    bath_mask: bool = True,
+):
+    train_coords, test_coords = [], []
+    for xa_ds in xa_dss:
+        train_coordinates, test_coordinates = generate_test_train_coordinates(
+            xa_ds, split_type, test_lats, test_lons, test_fraction, bath_mask
+        )
+        train_coords.extend(train_coordinates)
+        test_coords.extend(test_coordinates)
+
+    # flatten dataset for row indexing and model training
+    # compute out dasked chunks, fill Nan values with 0, drop columns which would confuse model
+    return (
+        xa_ds.stack(points=("latitude", "longitude", "time"))
+        .compute()
+        .to_dataframe()
+        .fillna(0)
+        .drop(["time", "spatial_ref", "band", "depth"], axis=1)
+        .astype("float32")
+    )
 
 
 def spatial_split_train_test(
@@ -1157,7 +1185,7 @@ def generate_reproducing_metrics_for_regions(
         total=len(regions_list),
         position=0,
         leave=False,
-        desc=" Processing regions:",
+        desc=" Processing regions",
     ):
         lat_lims = bathymetry.ReefAreas().get_lat_lon_limits(region)[0]
         lon_lims = bathymetry.ReefAreas().get_lat_lon_limits(region)[1]
@@ -1174,7 +1202,7 @@ def generate_reproducing_metrics_for_regions(
         )
         # generate and save reproducing metrics from merged dict
         generate_reproducing_metrics(resampled_xa_das_dict, region=region)
-        return resampled_xa_das_dict
+        # return resampled_xa_das_dict
 
 
 def load_and_process_reproducing_xa_das(
