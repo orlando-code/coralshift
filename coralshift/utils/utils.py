@@ -195,4 +195,4 @@ def select_df_rows_by_coords(df: pd.DataFrame, coordinates: list) -> pd.DataFram
 
 
 def list_if_not_already(anything):
-    return [item if isinstance(item, list) else [item] for item in anything]
+    return [item if isinstance(anything, list) else [item] for item in anything]
