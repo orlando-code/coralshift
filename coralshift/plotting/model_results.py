@@ -118,7 +118,7 @@ def visualise_region_class_imbalance(region_imbalance_dict: dict):
     df = pd.DataFrame.from_dict(
         region_imbalance_dict,
         orient="index",
-        columns=["Total Grid Cells", "Coral Presence"],
+        columns=["Total Grid Cells", "Fractional Coral Presence"],
     )
     df = df.reset_index().rename(columns={"index": "Region"})
 
@@ -128,7 +128,7 @@ def visualise_region_class_imbalance(region_imbalance_dict: dict):
     plt.figure(figsize=(10, 6))
 
     ax = sns.barplot(
-        x=xs, y=y1s, data=df, color=colors[0], label="total reef presence grid cells"
+        x=xs, y=y1s, data=df, color=colors[0], label="total grid cells containing coral"
     )
     ax2 = ax.twinx()
     sns.barplot(
@@ -136,7 +136,7 @@ def visualise_region_class_imbalance(region_imbalance_dict: dict):
         y=y2s,
         data=df,
         color=colors[1],
-        label="fraction of coral presence grid cells",
+        label="fraction of grid cells containing coral",
     )
 
     # format bar widths
