@@ -192,3 +192,7 @@ def select_df_rows_by_coords(df: pd.DataFrame, coordinates: list) -> pd.DataFram
     matching_rows = df.index.isin(coord_set)
 
     return df.iloc[matching_rows]
+
+
+def list_if_not_already(anything):
+    return [item if isinstance(item, list) else [item] for item in anything]
