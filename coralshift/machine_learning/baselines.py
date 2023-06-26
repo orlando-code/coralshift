@@ -183,7 +183,6 @@ def xa_dss_to_df(
         .compute()
         .to_dataframe()
         .fillna(0)
-        .drop(["time", "spatial_ref", "band", "depth"], axis=1)
         .astype("float32")
     )
 
@@ -1038,7 +1037,7 @@ def calculate_class_weight(label_array: np.ndarray):
 
 
 def train_tune(
-    all_data: xa.Dataset,
+    all_data: list[xa.Dataset],
     model_type: str,
     name: str = "_",
     runs_n: int = 10,
@@ -1173,15 +1172,23 @@ def train_tune_across_models(model_types: list[str], d_resolution: float = 0.036
     # return all_model_outcomes
 
 
-def get_comparison_xa_ds(region_list: list=["A","B","C","D"], d_resolution: float = 0.0368):
+def get_comparison_xa_ds(
+    region_list: list = ["A", "B", "C", "D"], d_resolution: float = 0.0368
+):
     res_string = utils.replace_dot_with_dash(f"{d_resolution:.04f}d")
 
     xa_dss = []
     for region in region_list:
         region_name = bathymetry.ReefAreas().get_short_filename(region)
-        all_data_dir = directories.get_comparison_dir() / f"{region_name}/{res_string}_arrays"
+        all_data_dir = (
+            directories.get_comparison_dir() / f"{region_name}/{res_string}_arrays"
+        )
         all_data_name = f"all_{res_string}_comparative"
-        xa_dss.append(xa.open_dataset((all_data_dir / all_data_name).with_suffix(".nc"), decode_coords="all"))
+        xa_dss.append(
+            xa.open_dataset(
+                (all_data_dir / all_data_name).with_suffix(".nc"), decode_coords="all"
+            )
+        )
 
     return xa_dss
 
