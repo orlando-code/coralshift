@@ -701,19 +701,19 @@ def calc_timeseries_params(xa_da_daily_means: xa.DataArray, period: str, param: 
         .rio.write_crs(crs, inplace=True)
     )
     # max and min
-    min = (
+    min_val = (
         xa_da_daily_means.min(dim="time", skipna=True)
         .rename(base_name + "min")
         .rio.write_crs(crs, inplace=True)
     )
-    max = (
+    max_val = (
         xa_da_daily_means.max(dim="time", skipna=True)
         .rename(base_name + "max")
         .rio.write_crs(crs, inplace=True)
     )
 
     # Return the weighted average
-    return weighted_av, stdev, (min, max)
+    return weighted_av, stdev, (min_val, max_val)
 
 
 def generate_reproducing_metrics(
@@ -774,7 +774,7 @@ def generate_reproducing_metrics(
         _, _, (thetao_weekly_min, thetao_weekly_max) = calc_timeseries_params(
             thetao_daily, "w", "thetao"
         )
-        print("Generated thetao data.")
+        print("Generated thetao data")
 
         # SALINITY
         salinity_daily = resampled_xa_das_dict["so"]
@@ -849,8 +849,9 @@ def generate_reproducing_metrics(
                 del xa_da.attrs["grid_mapping"]
         # MERGE
         merged = xa.merge(merge_list).astype(np.float64)
-        merged.to_netcdf(save_path)
-        return merged
+        with np.errstate(divide="ignore", invalid="ignore"):
+            merged.to_netcdf(save_path)
+            return merged
 
     else:
         print(f"{save_path} already exists.")
@@ -870,7 +871,6 @@ def return_time_grouping_offset(period: str):
     group (str): The time grouping for the given period.
     offset (str): The offset for the given period.
     """
-
     if period.lower() in ["year", "y", "annual"]:
         group = "time.year"
         offset = "AS"
@@ -878,8 +878,8 @@ def return_time_grouping_offset(period: str):
         group = "time.month"
         offset = "MS"
     elif period.lower() in ["week", "w"]:
-        group = "time.isocalendar().week"
-        offset = "W"
+        group = "time.week"
+        offset = pd.offsets.Week()
 
     return group, offset
 
@@ -1153,7 +1153,11 @@ def generate_reproducing_metrics_for_regions(
     regions_list: list = ["A", "B", "C", "D"], target_resolution_d: float = None
 ) -> None:
     for region in tqdm(
-        regions_list, total=len(regions_list), desc=" Processing regions:"
+        regions_list,
+        total=len(regions_list),
+        position=0,
+        leave=False,
+        desc=" Processing regions:",
     ):
         lat_lims = bathymetry.ReefAreas().get_lat_lon_limits(region)[0]
         lon_lims = bathymetry.ReefAreas().get_lat_lon_limits(region)[1]
@@ -1161,17 +1165,16 @@ def generate_reproducing_metrics_for_regions(
         # create list of xarray dataarrays
         reproduction_xa_list = load_and_process_reproducing_xa_das(region)
         # create dictionary of xa arrays, resampled to correct resolution
-        resampled_xa_das_dict = (
-            spatial_data.resample_list_xa_ds_to_target_resolution_and_merge(
-                reproduction_xa_list,
-                target_resolution=4000,
-                unit="m",
-                lat_lims=lat_lims,
-                lon_lims=lon_lims,
-            )
+        resampled_xa_das_dict = file_ops.resample_list_xa_ds_into_dict(
+            reproduction_xa_list,
+            target_resolution=4000,
+            unit="m",
+            lat_lims=lat_lims,
+            lon_lims=lon_lims,
         )
-        # generate and save comparison metrics
-        generate_reproducing_metrics(resampled_xa_das_dict, region=region)
+        # generate and save reproducing metrics from merged dict
+        # generate_reproducing_metrics(resampled_xa_das_dict, region=region)
+        return resampled_xa_das_dict
 
 
 def load_and_process_reproducing_xa_das(
@@ -1219,8 +1222,8 @@ def load_and_process_reproducing_xa_das(
             "*surface_net_solar_radiation_*.nc"
         )
     )[0]
-    net_solar = xa.open_dataarray(
-        net_solar_file, decode_coords="all", chunks=chunk_dict
+    net_solar = spatial_data.process_xa_d(
+        xa.open_dataarray(net_solar_file, decode_coords="all", chunks=chunk_dict)
     )
     net_solar = net_solar.resample(time="1D").mean(dim="time")
 
@@ -1230,6 +1233,8 @@ def load_and_process_reproducing_xa_das(
         decode_coords="all",
         chunks=chunk_dict,
     ).rename("gt")
+
+    return [thetao_daily, salinity_daily, current_daily, net_solar, bath, gt]
 
     # load in daily sea water salinity means
     # salinity_daily = xa.open_dataarray(directories.get_processed_dir() / "arrays/so.nc")
@@ -1257,5 +1262,3 @@ def load_and_process_reproducing_xa_das(
     #     )
     # average solar_radiation daily
     # solar_radiation_daily = solar_radiation.resample(time="1D").mean(dim="time")
-
-    return [thetao_daily, salinity_daily, current_daily, net_solar, bath, gt]
