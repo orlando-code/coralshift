@@ -72,3 +72,8 @@ def get_era5_data_dir() -> Path:
 def get_comparison_dir() -> Path:
     """./datasets/comparison"""
     return file_ops.guarantee_existence(get_datasets_dir() / "comparison_resolutions")
+
+
+def get_best_model_dir() -> Path:
+    """./datasets/model_params/best_params"""
+    return file_ops.guarantee_existence(get_datasets_dir() / "model_params/best_params")
