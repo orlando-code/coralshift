@@ -878,7 +878,7 @@ def return_time_grouping_offset(period: str):
         group = "time.month"
         offset = "MS"
     elif period.lower() in ["week", "w"]:
-        group = "time.week"
+        group = "time.isocalendar().week"
         offset = "W"
 
     return group, offset
@@ -1151,8 +1151,10 @@ def get_comparison_xa_ds(d_resolution: float = 0.03691):
 
 def generate_reproducing_metrics_for_regions(
     regions_list: list = ["A", "B", "C", "D"], target_resolution_d: float = None
-):
-    for region in regions_list:
+) -> None:
+    for region in tqdm(
+        regions_list, total=len(regions_list), desc=" Processing regions:"
+    ):
         lat_lims = bathymetry.ReefAreas().get_lat_lon_limits(region)[0]
         lon_lims = bathymetry.ReefAreas().get_lat_lon_limits(region)[1]
 
