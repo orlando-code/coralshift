@@ -167,35 +167,46 @@ def xa_dss_to_df(
     test_lons: tuple[float] = None,
     test_fraction: float = 0.2,
     bath_mask: bool = True,
+    ignore_vars: list = ["spatial_ref", "band", "depth"],
 ):
-    train_coords, test_coords = [], []
+    train_coords, test_coords, dfs = [], [], []
     for xa_ds in xa_dss:
+        # compute out dasked chunks, fill Nan values with 0, drop columns which would confuse model
+        df = (
+            xa_ds.stack(points=("latitude", "longitude", "time"))
+            .compute()
+            .astype("float32")
+            .to_dataframe()
+        )
+        df["onehotnan"] = df.isnull().any(axis=1).astype(int)
+        # fill nans with 0 and drop datetime columns
+        df = df.fillna(0).drop(
+            columns=list(df.select_dtypes(include="datetime64").columns)
+        )
+        # drop ignored vars
+        df = df.drop(columns=list(set(ignore_vars).intersection(df.columns)))
+
         train_coordinates, test_coordinates = generate_test_train_coordinates(
             xa_ds, split_type, test_lats, test_lons, test_fraction, bath_mask
         )
+
         train_coords.extend(train_coordinates)
         test_coords.extend(test_coordinates)
+        dfs.append(df)
 
     # flatten dataset for row indexing and model training
-    # compute out dasked chunks, fill Nan values with 0, drop columns which would confuse model
-    return (
-        xa_ds.stack(points=("latitude", "longitude", "time"))
-        .compute()
-        .to_dataframe()
-        .fillna(0)
-        .astype("float32")
-    )
+    return pd.concat(dfs), train_coords, test_coords
 
 
 def spatial_split_train_test(
     xa_dss: list[xa.Dataset],
     gt_label: str = "gt",
     data_type: str = "continuous",
-    ignore_vars: list = ["time", "spatial_ref", "band", "depth"],
+    ignore_vars: list = ["spatial_ref", "band", "depth"],
     split_type: str = "pixel",
     test_lats: tuple[float] = None,
     test_lons: tuple[float] = None,
-    test_fraction: float = 0.2,
+    test_fraction: float = 0.25,
     bath_mask: bool = True,
 ) -> tuple:
     """
@@ -226,7 +237,6 @@ def spatial_split_train_test(
         test_fraction=test_fraction,
         bath_mask=bath_mask,
     )
-
     # normalise data via min/max scaling
     normalised_data = (flattened_data - flattened_data.min()) / (
         flattened_data.max() - flattened_data.min()
@@ -241,7 +251,9 @@ def spatial_split_train_test(
     y_train, y_test = train_rows["gt"], test_rows["gt"]
 
     if data_type == "discrete":
-        y_train, y_test = threshold_array(y_train), threshold_array(y_test)
+        y_train, y_test = threshold_array(y_train), threshold_array(
+            y_test
+        )
 
     return X_train, X_test, y_train, y_test, train_coords, test_coords
 
@@ -1037,37 +1049,20 @@ def calculate_class_weight(label_array: np.ndarray):
 
 
 def train_tune(
-    all_data: list[xa.Dataset],
+    X_train,
+    y_train,
     model_type: str,
+    resolution: float,
     name: str = "_",
-    runs_n: int = 10,
     test_fraction: float = 0.25,
     save_dir: Path | str = None,
-    n_iter: int = 10,
+    n_iter: int = 50,
     cv: int = 3,
 ):
     model, data_type, search_grid = initialise_model(model_type)
 
-    (
-        X_train,
-        X_test,
-        y_train,
-        y_test,
-        train_coordinates,
-        test_coordinates,
-    ) = spatial_split_train_test(
-        all_data,
-        "gt",
-        data_type="discrete",
-        split_type="pixel",
-        test_fraction=test_fraction,
-    )
-
     if data_type == "discrete":
-        y_train, y_test = model_results.threshold_array(
-            y_train
-        ), model_results.threshold_array(y_test)
-
+        y_train = threshold_array(y_train)
     # register_ray()
     start_time = time.time()
     model_random = RandomizedSearchCV(
@@ -1082,13 +1077,14 @@ def train_tune(
     end_time = time.time()
     randomised_search_time = end_time - start_time
 
+    print("Fitting model with a randomized hyperparameter search...")
     # with joblib.parallel_backend("ray"):
     start_time = time.time()
     model_random.fit(X_train, y_train)
     end_time = time.time()
     fit_time = end_time - start_time
 
-    resolution = np.mean(spatial_data.calculate_spatial_resolution(all_data))
+    # resolution = np.mean(spatial_data.calculate_spatial_resolution(all_data))
 
     # save best parameters
     if not save_dir:
@@ -1105,19 +1101,9 @@ def train_tune(
         randomised_search_time=randomised_search_time,
         fit_time=fit_time,
         test_fraction=test_fraction,
-        features=list(all_data.data_vars),
+        features=list(X_train.columns),
         resolution=resolution,
     )
-    # # test
-    # run_outcomes = n_random_runs_preds(
-    #     model=model_random,
-    #     data_type=data_type,
-    #     runs_n=10,
-    #     xa_ds=all_data,
-    #     test_fraction=test_fraction,
-    # )
-
-    # return run_outcomes
 
 
 def train_tune_across_resolutions(
@@ -1148,28 +1134,39 @@ def train_tune_across_resolutions(
     return resolutions_dict
 
 
-def train_tune_across_models(model_types: list[str], d_resolution: float = 0.03691):
+def train_tune_across_models(
+    model_types: list[str],
+    d_resolution: float = 0.03691,
+    split_type: str = "pixel",
+    test_fraction: float = 0.25,
+):
     model_comp_dir = file_ops.guarantee_existence(
         directories.get_datasets_dir() / "model_params/best_models"
     )
 
     all_data = get_comparison_xa_ds(d_resolution=d_resolution)
-    res_string = utils.replace_dot_with_dash(f"{d_resolution:.05f}d")
-    # all_model_outcomes = []
+    res_string = utils.replace_dot_with_dash(f"{d_resolution:.04f}d")
+
+    # define train/test split so it's the same for all models
+    (X_train, X_test, y_train, y_test, _, _) = spatial_split_train_test(
+        utils.list_if_not_already(all_data),
+        "gt",
+        split_type=split_type,
+        test_fraction=test_fraction,
+    )
+
     for model in tqdm(
         model_types, total=len(model_types), desc="Fitting each model via random search"
     ):
         train_tune(
-            all_data=all_data,
+            X_train,
+            y_train,
             model_type=model,
+            resolution=d_resolution,
             save_dir=model_comp_dir,
             name=f"{model}_{res_string}_tuned",
-            runs_n=10,
             test_fraction=0.25,
         )
-        # all_model_outcomes.append(run_outcomes)
-
-    # return all_model_outcomes
 
 
 def get_comparison_xa_ds(
