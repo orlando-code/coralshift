@@ -183,6 +183,7 @@ def xa_dss_to_df(
         .compute()
         .to_dataframe()
         .fillna(0)
+        .drop("time")
         .astype("float32")
     )
 
