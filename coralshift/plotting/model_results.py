@@ -1,7 +1,10 @@
 import seaborn as sns
 import xarray as xa
 import numpy as np
+import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
+from matplotlib.ticker import PercentFormatter
+import pandas as pd
 
 
 def spatial_confusion_matrix_da(
@@ -109,3 +112,52 @@ def format_roc(ax: Axes, title: str = "Receiver Operating Characteristic (ROC) C
     ax.grid(color="lightgray", linestyle=":", linewidth=0.5)
     ax.set_xticks(np.arange(0, 1.2, 0.2))
     ax.set_yticks(np.arange(0, 1.2, 0.2))
+
+
+def visualise_region_class_imbalance(region_imbalance_dict: dict):
+    df = pd.DataFrame.from_dict(
+        region_imbalance_dict,
+        orient="index",
+        columns=["Total Grid Cells", "Coral Presence"],
+    )
+    df = df.reset_index().rename(columns={"index": "Region"})
+
+    xs, y1s, y2s = df.columns[0], df.columns[1], df.columns[2]
+
+    colors = ["#78B7C5", "#E1AF00"]
+    plt.figure(figsize=(10, 6))
+
+    ax = sns.barplot(
+        x=xs, y=y1s, data=df, color=colors[0], label="total reef presence grid cells"
+    )
+    ax2 = ax.twinx()
+    sns.barplot(
+        x=xs,
+        y=y2s,
+        data=df,
+        color=colors[1],
+        label="fraction of coral presence grid cells",
+    )
+
+    # format bar widths
+    width_scale = 0.45
+    for bar in ax.containers[0]:
+        bar.set_width(bar.get_width() * width_scale)
+    for bar in ax2.containers[0]:
+        x = bar.get_x()
+        w = bar.get_width()
+        bar.set_x(x + w * (1 - width_scale))
+        bar.set_width(w * width_scale)
+
+    # format legend
+    (h1, l1), (h2, l2) = ax.get_legend_handles_labels(), ax2.get_legend_handles_labels()
+    ax.legend(h1, l1, loc="upper left")
+    ax2.legend(h2, l2, loc="upper right")
+
+    # formatting
+    ax.set_xlabel("GBR Region")
+    ax.set_ylabel("Total Grid Cells")
+    ax2.set_ylabel("Coral Presence")
+    ax2.yaxis.set_major_formatter(PercentFormatter(1))
+    ax.set_ylim((0, 4500))
+    ax2.set_ylim((0, 0.2))
