@@ -189,7 +189,7 @@ def xa_dss_to_df(
 
 
 def spatial_split_train_test(
-    xa_ds: xa.Dataset,
+    xa_dss: list[xa.Dataset],
     gt_label: str = "gt",
     data_type: str = "continuous",
     ignore_vars: list = ["time", "spatial_ref", "band", "depth"],
@@ -219,20 +219,13 @@ def spatial_split_train_test(
     -------
         tuple: A tuple containing X_train, X_test, y_train, and y_test.
     """
-    # generate lists of tuples specifying coordinates to be used for training and testing
-    train_coordinates, test_coordinates = generate_test_train_coordinates(
-        xa_ds, split_type, test_lats, test_lons, test_fraction, bath_mask
-    )
-
-    # flatten dataset for row indexing and model training
-    # compute out dasked chunks, fill Nan values with 0, drop columns which would confuse model
-    flattened_data = (
-        xa_ds.stack(points=("latitude", "longitude", "time"))
-        .compute()
-        .to_dataframe()
-        .fillna(0)
-        .drop(["time", "spatial_ref", "band", "depth"], axis=1)
-        .astype("float32")
+    flattened_data, train_coords, test_coords = xa_dss_to_df(
+        xa_dss,
+        split_type=split_type,
+        test_lats=test_lats,
+        test_lons=test_lons,
+        test_fraction=test_fraction,
+        bath_mask=bath_mask,
     )
 
     # normalise data via min/max scaling
@@ -241,8 +234,8 @@ def spatial_split_train_test(
     )
 
     # return train and test rows from dataframe
-    train_rows = utils.select_df_rows_by_coords(normalised_data, train_coordinates)
-    test_rows = utils.select_df_rows_by_coords(normalised_data, test_coordinates)
+    train_rows = utils.select_df_rows_by_coords(normalised_data, train_coords)
+    test_rows = utils.select_df_rows_by_coords(normalised_data, test_coords)
 
     # assign rows to test and train features/labels
     X_train, X_test = train_rows.drop("gt", axis=1), test_rows.drop("gt", axis=1)
@@ -251,7 +244,7 @@ def spatial_split_train_test(
     if data_type == "discrete":
         y_train, y_test = threshold_array(y_train), threshold_array(y_test)
 
-    return X_train, X_test, y_train, y_test, train_coordinates, test_coordinates
+    return X_train, X_test, y_train, y_test, train_coords, test_coords
 
 
 def visualise_train_test_split(xa_ds: xa.Dataset, train_coordinates, test_coordinates):
@@ -1163,7 +1156,7 @@ def train_tune_across_models(model_types: list[str], d_resolution: float = 0.036
 
     all_data = get_comparison_xa_ds(d_resolution=d_resolution)
     res_string = utils.replace_dot_with_dash(f"{d_resolution:.05f}d")
-    all_model_outcomes = []
+    # all_model_outcomes = []
     for model in tqdm(
         model_types, total=len(model_types), desc="Fitting each model via random search"
     ):

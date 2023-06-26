@@ -161,3 +161,32 @@ def visualise_region_class_imbalance(region_imbalance_dict: dict):
     ax2.yaxis.set_major_formatter(PercentFormatter(1))
     ax.set_ylim((0, 4500))
     ax2.set_ylim((0, 0.2))
+
+
+def count_nonzero_values(xa_da: xa.DataArray):
+    non_zero_count = xa_da.where(xa_da != 0).count().item()
+    return non_zero_count
+
+
+def calculate_total_class_imbalance(
+    xa_ds: list[xa.Dataset | xa.DataArray], var_name: str = None
+):
+    non_zero_vals, total_spatial_vals = [], []
+    for xa_d in xa_ds:
+        if var_name:
+            xa_d = xa_d[var_name]
+        non_zero_vals.append(count_nonzero_values(xa_d["gt"]))
+        total_spatial_vals.append(
+            len(xa_d.latitude.values) * len(xa_d.longitude.values)
+        )
+
+    total_non_zero = sum(non_zero_vals)
+    fraction = total_non_zero / sum(total_spatial_vals)
+    return total_non_zero, fraction
+
+
+def calculate_region_class_imbalance(xa_ds_dict: dict):
+    imbalance_dict = {}
+    for k, v in xa_ds_dict.items():
+        imbalance_dict[k] = calculate_total_class_imbalance([v])
+    return imbalance_dict

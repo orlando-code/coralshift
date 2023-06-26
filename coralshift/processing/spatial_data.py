@@ -14,7 +14,7 @@ from pathlib import Path
 from coralshift.utils import file_ops, utils
 
 
-def upsample_xarray_to_target(
+def resample_xarray_to_target(
     xa_array: xa.DataArray | xa.Dataset,
     target_resolution: float,
     method=rasterio.enums.Resampling.bilinear,
@@ -209,7 +209,7 @@ def upsample_and_save_xa_a(
     # TODO: shift upsampling to after checking file exists
     xa_d.rio.write_crs(crs, inplace=True)
     if target_resolution_d:
-        xa_upsampled = upsample_xarray_to_target(
+        xa_upsampled = resample_xarray_to_target(
             xa_d, target_resolution=target_resolution_d
         )
     else:
@@ -2189,9 +2189,20 @@ def generate_coordinate_pairs(
         # set random seed
         np.random.seed(random_seed)
 
-    spatial_coords = (
-        xa_da.drop_dims("time").drop(["spatial_ref", "depth", "band"]).coords
-    )
+    # List of dimensions and variables to drop
+    dims_to_drop = ['time']
+    vars_to_drop = ['spatial_ref', 'depth', 'band']
+
+    # Drop dimensions if they exist in the DataArray
+    for dim in dims_to_drop:
+        if dim in xa_da.dims:
+            xa_da = xa_da.drop_dims(dim)
+
+    # Drop variables if they exist in the DataArray
+    for var in vars_to_drop:
+        if var in xa_da.variables:
+            xa_da = xa_da.drop_vars(var)
+    spatial_coords = xa_da.coords
 
     # Get the total number of samples
     num_samples = len(spatial_coords["latitude"]) * len(spatial_coords["longitude"])
@@ -2220,6 +2231,10 @@ def generate_var_mask(
     if isinstance(xa_d, xa.DataArray):
         return (xa_d >= max(limits)) & (xa_d <= min(limits))
     elif isinstance(xa_d, xa.Dataset):
+        matching_vars = [var for var in xa_d.variables if var.startswith("bath")]
+        if len(matching_vars) == 0:
+            raise ValueError("No variable starting with 'bath' found in the dataset.")
+        var_name = matching_vars[0]
         return (xa_d[var_name] <= max(limits)) & (xa_d[var_name] >= min(limits))
     else:
         raise TypeError(
@@ -2227,7 +2242,7 @@ def generate_var_mask(
         )
 
 
-def resample_list_xa_ds_to_target_resolution_and_merge(
+def resample_list_xa_ds_into_dict(
     xa_das: list[xa.DataArray],
     target_resolution: float,
     unit: str = "m",
@@ -2257,7 +2272,7 @@ def resample_list_xa_ds_to_target_resolution_and_merge(
     resampled_xa_das_dict = {}
     for xa_da in tqdm(xa_das, desc="Resampling xarray DataArrays"):
         # xa_resampled = resample_xa_d_to_other(xa_da, dummy_xa, name=xa_da.name)
-        xa_resampled = upsample_xarray_to_target(xa_da, target_resolution_d)
+        xa_resampled = resample_xarray_to_target(xa_da, target_resolution_d)
         resampled_xa_das_dict[xa_da.name] = xa_resampled
 
     return resampled_xa_das_dict
