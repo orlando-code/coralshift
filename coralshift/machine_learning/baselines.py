@@ -251,9 +251,7 @@ def spatial_split_train_test(
     y_train, y_test = train_rows["gt"], test_rows["gt"]
 
     if data_type == "discrete":
-        y_train, y_test = threshold_array(y_train), threshold_array(
-            y_test
-        )
+        y_train, y_test = threshold_array(y_train), threshold_array(y_test)
 
     return X_train, X_test, y_train, y_test, train_coords, test_coords
 
@@ -997,6 +995,11 @@ def create_train_metadata(
     test_fraction: float,
     features: list[str],
     resolution: float,
+    n_iter: int,
+    cv: int,
+    param_distributions: dict,
+    random_state: int,
+    n_jobs: int,
 ) -> None:
     metadata = {
         "model name": name,
@@ -1008,7 +1011,14 @@ def create_train_metadata(
         "test fraction": test_fraction,
         "features": features,
         "approximate spatial resolution": resolution,
+        "number of fit iterations": n_iter,
+        "cross validation fold size": cv,
+        "random_state": 42,
+        "n_jobs": -1,
     }
+    # update metadata with parameter search grid
+    metadata.update(param_distributions)
+
     out_path = Path(model_path).parent / f"{name}_metadata.json"
     out_file = open(out_path, "w")
     json.dump(metadata, out_file, indent=4)
@@ -1103,6 +1113,11 @@ def train_tune(
         test_fraction=test_fraction,
         features=list(X_train.columns),
         resolution=resolution,
+        n_iter=n_iter,
+        cv=cv,
+        param_distributions=search_grid,
+        random_state=42,
+        n_jobs=-1,
     )
 
 
