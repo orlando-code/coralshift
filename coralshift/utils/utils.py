@@ -188,7 +188,7 @@ def select_df_rows_by_coords(df: pd.DataFrame, coordinates: list) -> pd.DataFram
     """
 
     # cast to list of tuples in order to write into a set
-    coord_set = set(tuple(coord) for coord in coords)
+    coord_set = set(tuple(coord) for coord in coordinates)
     matching_rows = df.index.isin(coord_set)
 
     return df.iloc[matching_rows]
