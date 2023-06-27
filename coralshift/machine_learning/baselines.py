@@ -1123,26 +1123,39 @@ def train_tune_across_resolutions(
     runs_n: int = 10,
     test_fraction: float = 0.25,
 ):
-    resolutions_dict = {}
-    for res in tqdm(d_resolutions, desc="Training models at different resolutions"):
+    # TODO: finish this
+    for res in tqdm(
+        d_resolutions,
+        total=len(d_resolutions),
+        desc="Training models at different resolutions",
+    ):
         # load in correct-resolution dataset
-        res_string = utils.replace_dot_with_dash(f"{res:.05f}d")
+        res_string = utils.replace_dot_with_dash(f"{res:.04f}d")
+
         dir = directories.get_comparison_dir() / f"{res_string}_arrays"
         filename = f"all_{res_string}_comparative"
-        comparison_file = (dir / filename).with_suffix(".nc")
-        all_data = xa.open_dataset(comparison_file)
 
-        run_outcomes = train_tune(
-            all_data,
-            model_type=model_type,
-            name=f"{model_type}_{res_string}",
-            runs_n=runs_n,
+        all_data = xa.open_dataset(comparison_file_path, decode_coords="all")
+
+        # define train/test split so it's the same for all models
+        (X_train, X_test, y_train, y_test, _, _) = spatial_split_train_test(
+            utils.list_if_not_already(all_data),
+            "gt",
+            split_type=split_type,
             test_fraction=test_fraction,
         )
 
-        resolutions_dict[f"{res:.05f}"] = run_outcomes
+        comparison_file_path = (dir / filename).with_suffix(".nc")
 
-    return resolutions_dict
+        train_tune(
+            X_train,
+            y_train,
+            model_type=model,
+            resolution=d_resolution,
+            save_dir=model_comp_dir,
+            name=f"{model}_{res_string}_tuned",
+            test_fraction=0.25,
+        )
 
 
 def train_tune_across_models(
@@ -1150,6 +1163,8 @@ def train_tune_across_models(
     d_resolution: float = 0.03691,
     split_type: str = "pixel",
     test_fraction: float = 0.25,
+    cv: int = 3,
+    n_iter: int = 10,
 ):
     model_comp_dir = file_ops.guarantee_existence(
         directories.get_datasets_dir() / "model_params/best_models"
@@ -1177,6 +1192,8 @@ def train_tune_across_models(
             save_dir=model_comp_dir,
             name=f"{model}_{res_string}_tuned",
             test_fraction=0.25,
+            cv=3,
+            n_iter=10,
         )
 
 
