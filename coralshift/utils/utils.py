@@ -26,6 +26,11 @@ def is_type_or_list_of_type(obj, target_type) -> bool:
     return False
 
 
+def cast_to_list(obj):
+    if not is_type_or_list_of_type(obj, list):
+        return isinstance(obj, list)
+
+
 def round_list_tuples(
     tuple_list: list[tuple[float, ...]], decimal_places: int = 2
 ) -> list[tuple]:
