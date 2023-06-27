@@ -7,7 +7,8 @@ import xarray as xa
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
+
+# from matplotlib.axes import Axes
 from pathlib import Path
 from tqdm import tqdm
 
@@ -32,7 +33,6 @@ def generate_test_train_coordinates(
     test_lats: tuple[float] = None,
     test_lons: tuple[float] = None,
     test_fraction: float = 0.2,
-    bath_mask: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Generate test and train coordinates for a given dataset.
@@ -53,10 +53,6 @@ def generate_test_train_coordinates(
             DataFrames.
     """
     # if chosen to restrict to shallow regions only, set all values outside of threshold to nan
-    if bath_mask:
-        xa_ds = xa_ds.compute()
-        bath_mask = spatial_data.generate_var_mask(xa_ds)
-        xa_ds = xa_ds.where(bath_mask, np.nan)
 
     if split_type == "pixel":
         # have to handle time: make sure sampling spatially rather than spatiotempoorally
@@ -196,6 +192,181 @@ def generate_test_train_coordinates_multiple_areas(
 
 #     # flatten dataset for row indexing and model training
 #     return pd.concat(dfs), train_coords, test_coords
+
+
+def generate_test_train_coords_from_df(
+    df: pd.DataFrame,
+    test_fraction: float = 0.25,
+    split_type: str = "pixel",
+    test_lats: tuple[float] = None,
+    test_lons: tuple[float] = None,
+    random_seed: int = 42,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    # num datapoints
+    num_samples = len(df)
+    # Calculate the split sizes
+    test_size = int(num_samples * test_fraction)
+    train_size = num_samples - test_size
+
+    if split_type == "pixel":
+        # Shuffle the filtered DataFrame randomly
+        df_shuffled = df.sample(frac=1, random_state=random_seed)
+
+        # Split the coordinates into two lists based on the split sizes
+        train_coordinates = (
+            df_shuffled[["latitude", "longitude"]].values[:train_size].tolist()
+        )
+        test_coordinates = (
+            df_shuffled[["latitude", "longitude"]]
+            .values[train_size : train_size + test_size]  # noqa
+            .tolist()
+        )
+
+    else:
+        print(f"Unrecognised split type {split_type}.")
+    # elif split_type == "spatial":
+    #     lat_condition =
+    # (min() <= df.index.get_level_values('latitude')) & (df.index.get_level_values('latitude') <= -10)
+
+    #     selected_rows =
+    # df.loc[(-16 <= df.index.get_level_values('latitude')) & (df.index.get_level_values('latitude') <= -10) &
+    #        (142 <= df.index.get_level_values('longitude')) & (df.index.get_level_values('longitude') <= 144)]
+
+    return train_coordinates, test_coordinates
+
+
+def generate_test_train_coords_from_dfs(
+    dfs: list[pd.DataFrame],
+    test_fraction: float = 0.25,
+    split_type: str = "pixel",
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    train_coords_list, test_coords_list = [], []
+    for df in dfs:
+        lists = generate_test_train_coords_from_df(df, test_fraction, split_type)
+        train_coords_list.append(lists[0])
+        test_coords_list.append(lists[1])
+
+    return train_coords_list, test_coords_list
+
+
+def process_df_for_ml(
+    df: pd.DataFrame, ignore_vars: list[str], drop_all_nans: bool = True
+) -> pd.DataFrame:
+    # drop ignored vars
+    df = df.drop(columns=list(set(ignore_vars).intersection(df.columns)))
+
+    if drop_all_nans:
+        # remove rows which are all nans
+        df = utils.drop_nan_rows(df)
+    # onehot encoode any remaining nans
+    df["onehotnan"] = df.isnull().any(axis=1).astype(int)
+    # fill nans with 0
+    df = df.fillna(0)
+
+    # flatten dataset for row indexing and model training
+    return df
+
+
+def xa_dss_to_df(
+    xa_dss: list[xa.Dataset],
+    bath_mask: bool = True,
+    ignore_vars: list = ["spatial_ref", "band", "depth"],
+    drop_all_nans: bool = True,
+):
+    dfs = []
+    for xa_ds in xa_dss:
+        if bath_mask:
+            # set all values outside of the shallow water region to nan for future omission
+            shallow_mask = spatial_data.generate_var_mask(xa_ds)
+            xa_ds = xa_ds.where(shallow_mask, np.nan)
+
+        # compute out dasked chunks, send type to float32, stack into df, drop any datetime columns
+        df = (
+            xa_ds.stack(points=("latitude", "longitude"))
+            .compute()
+            .astype("float32")
+            .to_dataframe()
+        )
+        # drop temporal columns
+        df = df.drop(columns=list(df.select_dtypes(include="datetime64").columns))
+        df = process_df_for_ml(df, ignore_vars=ignore_vars, drop_all_nans=drop_all_nans)
+
+        # # generate train_test_coordinates
+        # train_coordinates, test_coordinates = generate_test_train_coordinates(
+        #     xa_ds, split_type, test_lats, test_lons, test_fraction, bath_mask
+        # )
+
+        # train_coords.append(train_coordinates)
+        # test_coords.append(test_coordinates)
+        dfs.append(df)
+    return dfs
+
+
+def spatial_split_train_test(
+    xa_dss: list[xa.Dataset],
+    gt_label: str = "gt",
+    data_type: str = "continuous",
+    ignore_vars: list = ["spatial_ref", "band", "depth"],
+    split_type: str = "pixel",
+    test_fraction: float = 0.25,
+    bath_mask: bool = True,
+) -> tuple:
+    """
+    Split the input dataset into train and test sets based on spatial coordinates.
+
+    Parameters
+    ----------
+        xa_ds (xa.Dataset): The input xarray Dataset.
+        gt_label: The ground truth label.
+        ignore_vars (list): A list of variables to ignore during splitting. Default is
+            ["time", "spatial_ref", "band", "depth"].
+        split_type (str): The split type, either "pixel" or "region". Default is "pixel".
+        test_lats (tuple[float]): The latitude range for the test region. Required for "region" split type.
+            Default is None.
+        test_lons (tuple[float]): The longitude range for the test region. Required for "region" split type.
+            Default is None.
+        test_fraction (float): The fraction of data to be used for the test set. Default is 0.2.
+
+    Returns
+    -------
+        tuple: A tuple containing X_train, X_test, y_train, and y_test.
+    """
+    # send input to list if not already
+    xa_dss = utils.list_if_not_already(xa_dss)
+    # flatten datasets to pandas dataframes and process
+    flattened_data_dfs = xa_dss_to_df(xa_dss, bath_mask=bath_mask)
+    # generate training and testing coordinates
+    train_coords_list, test_coords_list = generate_test_train_coords_from_dfs(
+        flattened_data_dfs, test_fraction=test_fraction
+    )
+
+    # normalise dataframe via min/max scaling
+    normalised_dfs = [
+        (flattened_data - flattened_data.min())
+        / (flattened_data.max() - flattened_data.min())
+        for flattened_data in flattened_data_dfs
+    ]
+
+    train_rows, test_rows = [], []
+    X_trains, X_tests, y_trains, y_tests = [], [], [], []
+    for i in range(len(flattened_data_dfs)):
+        # return train and test data rows from dataframe
+        train_rows = utils.select_df_rows_by_coords(
+            normalised_dfs[i], train_coords_list[i]
+        )
+        test_rows = utils.select_df_rows_by_coords(
+            normalised_dfs[i], test_coords_list[i]
+        )
+        # determine the corresponding labels
+        y_train, y_test = train_rows["gt"], test_rows["gt"]
+        if data_type == "discrete":
+            y_train, y_test = threshold_array(y_train), threshold_array(y_test)
+        # append everything to where it needs to be
+        X_trains.append(train_rows.drop("gt", axis=1))
+        X_tests.append(test_rows.drop("gt", axis=1))
+        y_trains.append(y_train), y_tests.append(y_test)
+
+    return X_trains, X_tests, y_trains, y_tests, train_coords_list, test_coords_list
 
 
 # def spatial_split_train_test(

@@ -51,6 +51,15 @@ def spatial_confusion_matrix_da(
     return category_variable, vals_dict
 
 
+def generate_confusion_ds():
+    confusion_values, vals_dict = model_results.spatial_confusion_matrix_da(
+        xa_ds[predicted_var], xa_ds[ground_truth_var]
+    )
+    xa_ds["comparison"] = confusion_values
+
+    return xa_ds
+
+
 def plot_spatial_confusion(
     xa_ds: xa.Dataset, ground_truth_var: str, predicted_var: str
 ) -> xa.Dataset:

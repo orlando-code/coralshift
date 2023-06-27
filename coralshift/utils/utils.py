@@ -196,3 +196,15 @@ def select_df_rows_by_coords(df: pd.DataFrame, coordinates: list) -> pd.DataFram
 
 def list_if_not_already(anything):
     return [item if isinstance(anything, list) else [item] for item in anything]
+
+
+def drop_nan_rows(
+    df: pd.DataFrame, ignore_columns: list[str] = ["latitude", "longitude"]
+):
+    # Get the columns to consider for dropping rows
+    columns_to_check = df.columns.difference(ignore_columns)
+
+    # Drop rows where all columns (excluding the specified ones) contain np.nan
+    df_dropped = df.dropna(subset=columns_to_check, how="all")
+
+    return df_dropped

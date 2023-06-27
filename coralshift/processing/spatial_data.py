@@ -2169,64 +2169,33 @@ def find_coord_indices(
     return lat_index, lon_index
 
 
-def generate_coordinate_pairs(
-    xa_da: xa.DataArray, split_ratio: float, random_seed: int = None
-) -> tuple[list, list]:
-    """
-    Generate two lists of coordinate pairs from an xarray DataArray in the specified split ratio.
-
-    Parameters
-    ----------
-        xa_da (xa.DataArray): The xarray DataArray.
-        split_ratio (float): The split ratio for dividing the coordinates.
-
-    Returns
-    -------
-        tuple[list, list]: A tuple containing the two lists of coordinate pairs.
-    """
-    # TODO: could omit nans from test/train
-    if random_seed:
-        # set random seed
-        np.random.seed(random_seed)
-
-    # List of dimensions and variables to drop
-    dims_to_drop = ['time']
-    vars_to_drop = ['spatial_ref', 'depth', 'band']
-
-    # Drop dimensions if they exist in the DataArray
-    for dim in dims_to_drop:
-        if dim in xa_da.dims:
-            xa_da = xa_da.drop_dims(dim)
+def drop_xa_variables(
+    xa_d: xa.DataArray | xa.Dataset,
+    dim_drops: list[str] = ["time"],
+    var_drops: list[str] = ["spatial_ref", "depth", "band"],
+) -> xa.Dataset:
+    # Drop dimensions if they exist in the Dataset
+    for dim in dim_drops:
+        if dim in xa_d.dims:
+            xa_d = xa_d.drop_dims(dim)
 
     # Drop variables if they exist in the DataArray
-    for var in vars_to_drop:
-        if var in xa_da.variables:
-            xa_da = xa_da.drop_vars(var)
-    spatial_coords = xa_da.coords
-
-    # Get the total number of samples
-    num_samples = len(spatial_coords["latitude"]) * len(spatial_coords["longitude"])
-
-    # Calculate the split sizes
-    test_size = int(num_samples * split_ratio)
-    train_size = num_samples - test_size
-
-    # Split the coordinates into two lists based on the split sizes
-    coordinates_list = spatial_coords.to_index().tolist()  # Convert to a list of tuples
-    # Shuffle the coordinates randomly
-    np.random.shuffle(coordinates_list)
-
-    train_coordinates = coordinates_list[:train_size]
-    test_coordinates = coordinates_list[train_size : train_size + test_size]  # noqa
-
-    return train_coordinates, test_coordinates
+    for var in var_drops:
+        if isinstance(xa_d, xa.DataArray):
+            raise TypeError(
+                f"Object is a DataArray and therefore cannot drop variables {var_drops}."
+            )
+        else:
+            if var in xa_d.variables:
+                xa_d = xa_d.drop_vars(var)
+    return xa_d
 
 
 def generate_var_mask(
     xa_d: xa.Dataset | xa.DataArray,
-    var_name: str = "bathymetry_A",
-    limits: tuple[float] = [-100, 0],
-    sub_val: float = np.nan,
+    # var_name: str = "bathymetry_A",
+    limits: tuple[float] = [-2000, 0],
+    # sub_val: float = np.nan,
 ) -> xa.DataArray:
     if isinstance(xa_d, xa.DataArray):
         return (xa_d >= max(limits)) & (xa_d <= min(limits))
