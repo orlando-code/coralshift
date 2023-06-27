@@ -75,7 +75,7 @@ def plot_spatial_confusion(
     # from Wes Anderson: https://github.com/karthik/wesanderson/blob/master/R/colors.R
     cmap = ["#EEEEEE", "#3B9AB2", "#78B7C5", "#F21A00", "#E1AF00"]
     ax = sns.heatmap(confusion_values, cmap=cmap, vmin=0, vmax=5)
-
+    ax.set_aspect("equal")
     # format colourbar
     colorbar = ax.collections[0].colorbar
     num_ticks = len(cmap)
