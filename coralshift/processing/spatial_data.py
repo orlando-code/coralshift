@@ -841,8 +841,14 @@ def degrees_to_distances(
         haversine.haversine(start_coord, lat_end_coord, unit=haversine.Unit.METERS),
         haversine.haversine(start_coord, lon_end_coord, unit=haversine.Unit.METERS),
         np.mean(
-            haversine.haversine(start_coord, lat_end_coord, unit=haversine.Unit.METERS),
-            haversine.haversine(start_coord, lon_end_coord, unit=haversine.Unit.METERS),
+            (
+                haversine.haversine(
+                    start_coord, lat_end_coord, unit=haversine.Unit.METERS
+                ),
+                haversine.haversine(
+                    start_coord, lon_end_coord, unit=haversine.Unit.METERS
+                ),
+            )
         ),
     )
 
