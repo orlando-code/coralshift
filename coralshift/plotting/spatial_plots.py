@@ -179,7 +179,7 @@ def plot_spatial(
     # nicely format spatial plot
     format_spatial_plot(
         image=im,
-        figure=fig,
+        fig=fig,
         ax=ax,
         title=title,
         name=name,
