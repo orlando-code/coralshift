@@ -1191,9 +1191,9 @@ def train_tune_across_models(
             resolution=d_resolution,
             save_dir=model_comp_dir,
             name=f"{model}_{res_string}_tuned",
-            test_fraction=0.25,
-            cv=3,
-            n_iter=10,
+            test_fraction=test_fraction,
+            cv=cv,
+            n_iter=n_iter,
         )
 
 
