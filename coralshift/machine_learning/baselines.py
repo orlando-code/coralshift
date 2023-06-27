@@ -513,7 +513,7 @@ def rocs_n_runs(
     f, ax = plt.subplots(figsize=figsize)
     for c, outcome in enumerate(run_outcomes):
         # cast regression to binary classification for plotting
-        binary_y_labels, binary_predictions = model_results.threshold_label(
+        binary_y_labels, binary_predictions = threshold_label(
             outcome[0], outcome[1], binarize_threshold
         )
 
