@@ -108,6 +108,8 @@ def get_cbar(cbar_type: str = "seq"):
         return get_continuous_cmap(
             ["#3B9AB2", "#78B7C5", "#FFFFFF", "#E1AF00", "#F21A00"]
         )
+    elif cbar_type == "lim":
+        return get_continuous_cmap(["#78B7C5", "#FFFFFF", "#E1AF00"])
     else:
         raise ValueError(f"{cbar_type} not recognised.")
 
