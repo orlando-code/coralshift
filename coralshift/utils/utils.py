@@ -28,7 +28,9 @@ def is_type_or_list_of_type(obj, target_type) -> bool:
 
 def cast_to_list(obj):
     if not is_type_or_list_of_type(obj, list):
-        return isinstance(obj, list)
+        return [obj]
+    else:
+        return obj
 
 
 def round_list_tuples(
