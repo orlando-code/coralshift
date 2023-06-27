@@ -517,7 +517,7 @@ def rocs_n_runs(
             outcome[0], outcome[1], binarize_threshold
         )
 
-        fpr, tpr, _ = sklmetrics.roc_curve(
+        fpr, tpr, _ = sklmetrics.curve(
             binary_y_labels, binary_predictions, drop_intermediate=False
         )
         roc_auc = sklmetrics.auc(fpr, tpr)
@@ -600,7 +600,7 @@ def investigate_label_thresholds(
         ax.plot(fpr, tpr, label=label, color=colors[c])
 
     # format
-    format_roc(
+    model_results.format_roc(
         ax=ax,
         title="Receiver Operating Characteristic (ROC) Curve\nfor several coral presence/absence thresholds",
     )
@@ -632,7 +632,11 @@ def evaluate_model(y_test: np.ndarray | pd.Series, predictions: np.ndarray):
 
 
 def threshold_array(array: np.ndarray | pd.Series, threshold: float = 0) -> np.ndarray:
-    return np.where(np.array(array) > threshold, 1, 0)
+    result = np.where(np.array(array) > threshold, 1, 0)
+    if isinstance(array, pd.Series):
+        return pd.Series(result, index=array.index)
+    else:
+        return pd.Series(result)
 
 
 def threshold_label(
@@ -1163,17 +1167,20 @@ def train_tune(
 def train_tune_across_resolutions(
     model_type: str,
     d_resolutions: list[float],
+    split_type: str = "pixel",
+    test_lats: tuple[float] = None,
+    test_lons: tuple[float] = None,
     runs_n: int = 10,
     test_fraction: float = 0.25,
 ):
     # TODO: finish this
-    for res in tqdm(
+    for d_res in tqdm(
         d_resolutions,
         total=len(d_resolutions),
         desc="Training models at different resolutions",
     ):
         # load in correct-resolution dataset
-        res_string = utils.replace_dot_with_dash(f"{res:.04f}d")
+        res_string = utils.replace_dot_with_dash(f"{d_res:.04f}d")
 
         dir = directories.get_comparison_dir() / f"{res_string}_arrays"
         filename = f"all_{res_string}_comparative"
@@ -1182,7 +1189,7 @@ def train_tune_across_resolutions(
 
         # define train/test split so it's the same for all models
         (X_train, X_test, y_train, y_test, _, _) = spatial_split_train_test(
-            utils.list_if_not_already(all_data),
+            all_data,
             "gt",
             split_type=split_type,
             test_fraction=test_fraction,
@@ -1193,10 +1200,10 @@ def train_tune_across_resolutions(
         train_tune(
             X_train,
             y_train,
-            model_type=model,
-            resolution=d_resolution,
+            model_type=model_type,
+            resolution=d_res,
             save_dir=model_comp_dir,
-            name=f"{model}_{res_string}_tuned",
+            name=f"{model_type}_{res_string}_tuned",
             test_fraction=0.25,
         )
 
@@ -1205,6 +1212,8 @@ def train_tune_across_models(
     model_types: list[str],
     d_resolution: float = 0.03691,
     split_type: str = "pixel",
+    test_lats: tuple[float] = None,
+    test_lons: tuple[float] = None,
     test_fraction: float = 0.25,
     cv: int = 3,
     n_iter: int = 10,
