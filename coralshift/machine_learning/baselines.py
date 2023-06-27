@@ -160,102 +160,102 @@ def generate_test_train_coordinates_multiple_areas(
     # test_coords = pd.concat(test_coords_dfs, ignore_index=True)
 
 
-def xa_dss_to_df(
-    xa_dss: list[xa.Dataset],
-    split_type: str = "pixel",
-    test_lats: tuple[float] = None,
-    test_lons: tuple[float] = None,
-    test_fraction: float = 0.2,
-    bath_mask: bool = True,
-    ignore_vars: list = ["spatial_ref", "band", "depth"],
-):
-    train_coords, test_coords, dfs = [], [], []
-    for xa_ds in xa_dss:
-        # compute out dasked chunks, fill Nan values with 0, drop columns which would confuse model
-        df = (
-            xa_ds.stack(points=("latitude", "longitude", "time"))
-            .compute()
-            .astype("float32")
-            .to_dataframe()
-        )
-        df["onehotnan"] = df.isnull().any(axis=1).astype(int)
-        # fill nans with 0 and drop datetime columns
-        df = df.fillna(0).drop(
-            columns=list(df.select_dtypes(include="datetime64").columns)
-        )
-        # drop ignored vars
-        df = df.drop(columns=list(set(ignore_vars).intersection(df.columns)))
+# def xa_dss_to_df(
+#     xa_dss: list[xa.Dataset],
+#     split_type: str = "pixel",
+#     test_lats: tuple[float] = None,
+#     test_lons: tuple[float] = None,
+#     test_fraction: float = 0.2,
+#     bath_mask: bool = True,
+#     ignore_vars: list = ["spatial_ref", "band", "depth"],
+# ):
+#     train_coords, test_coords, dfs = [], [], []
+#     for xa_ds in xa_dss:
+#         # compute out dasked chunks, fill Nan values with 0, drop columns which would confuse model
+#         df = (
+#             xa_ds.stack(points=("latitude", "longitude", "time"))
+#             .compute()
+#             .astype("float32")
+#             .to_dataframe()
+#         )
+#         df["onehotnan"] = df.isnull().any(axis=1).astype(int)
+#         # fill nans with 0 and drop datetime columns
+#         df = df.fillna(0).drop(
+#             columns=list(df.select_dtypes(include="datetime64").columns)
+#         )
+#         # drop ignored vars
+#         df = df.drop(columns=list(set(ignore_vars).intersection(df.columns)))
 
-        train_coordinates, test_coordinates = generate_test_train_coordinates(
-            xa_ds, split_type, test_lats, test_lons, test_fraction, bath_mask
-        )
+#         train_coordinates, test_coordinates = generate_test_train_coordinates(
+#             xa_ds, split_type, test_lats, test_lons, test_fraction, bath_mask
+#         )
 
-        train_coords.extend(train_coordinates)
-        test_coords.extend(test_coordinates)
-        dfs.append(df)
+#         train_coords.extend(train_coordinates)
+#         test_coords.extend(test_coordinates)
+#         dfs.append(df)
 
-    # flatten dataset for row indexing and model training
-    return pd.concat(dfs), train_coords, test_coords
+#     # flatten dataset for row indexing and model training
+#     return pd.concat(dfs), train_coords, test_coords
 
 
-def spatial_split_train_test(
-    xa_dss: list[xa.Dataset],
-    gt_label: str = "gt",
-    data_type: str = "continuous",
-    ignore_vars: list = ["spatial_ref", "band", "depth"],
-    split_type: str = "pixel",
-    test_lats: tuple[float] = None,
-    test_lons: tuple[float] = None,
-    test_fraction: float = 0.25,
-    bath_mask: bool = True,
-) -> tuple:
-    """
-    Split the input dataset into train and test sets based on spatial coordinates.
+# def spatial_split_train_test(
+#     xa_dss: list[xa.Dataset],
+#     gt_label: str = "gt",
+#     data_type: str = "continuous",
+#     ignore_vars: list = ["spatial_ref", "band", "depth"],
+#     split_type: str = "pixel",
+#     test_lats: tuple[float] = None,
+#     test_lons: tuple[float] = None,
+#     test_fraction: float = 0.25,
+#     bath_mask: bool = True,
+# ) -> tuple:
+#     """
+#     Split the input dataset into train and test sets based on spatial coordinates.
 
-    Parameters
-    ----------
-        xa_ds (xa.Dataset): The input xarray Dataset.
-        gt_label: The ground truth label.
-        ignore_vars (list): A list of variables to ignore during splitting. Default is
-            ["time", "spatial_ref", "band", "depth"].
-        split_type (str): The split type, either "pixel" or "region". Default is "pixel".
-        test_lats (tuple[float]): The latitude range for the test region. Required for "region" split type.
-            Default is None.
-        test_lons (tuple[float]): The longitude range for the test region. Required for "region" split type.
-            Default is None.
-        test_fraction (float): The fraction of data to be used for the test set. Default is 0.2.
+#     Parameters
+#     ----------
+#         xa_ds (xa.Dataset): The input xarray Dataset.
+#         gt_label: The ground truth label.
+#         ignore_vars (list): A list of variables to ignore during splitting. Default is
+#             ["time", "spatial_ref", "band", "depth"].
+#         split_type (str): The split type, either "pixel" or "region". Default is "pixel".
+#         test_lats (tuple[float]): The latitude range for the test region. Required for "region" split type.
+#             Default is None.
+#         test_lons (tuple[float]): The longitude range for the test region. Required for "region" split type.
+#             Default is None.
+#         test_fraction (float): The fraction of data to be used for the test set. Default is 0.2.
 
-    Returns
-    -------
-        tuple: A tuple containing X_train, X_test, y_train, and y_test.
-    """
-    # send input to list if not already
-    xa_dss = utils.list_if_not_already(xa_dss)
-    flattened_data, train_coords, test_coords = xa_dss_to_df(
-        xa_dss,
-        split_type=split_type,
-        test_lats=test_lats,
-        test_lons=test_lons,
-        test_fraction=test_fraction,
-        bath_mask=bath_mask,
-    )
-    # normalise data via min/max scaling
-    normalised_data = (flattened_data - flattened_data.min()) / (
-        flattened_data.max() - flattened_data.min()
-    )
+#     Returns
+#     -------
+#         tuple: A tuple containing X_train, X_test, y_train, and y_test.
+#     """
+#     # send input to list if not already
+#     xa_dss = utils.list_if_not_already(xa_dss)
+#     flattened_data, train_coords, test_coords = xa_dss_to_df(
+#         xa_dss,
+#         split_type=split_type,
+#         test_lats=test_lats,
+#         test_lons=test_lons,
+#         test_fraction=test_fraction,
+#         bath_mask=bath_mask,
+#     )
+#     # normalise data via min/max scaling
+#     normalised_data = (flattened_data - flattened_data.min()) / (
+#         flattened_data.max() - flattened_data.min()
+#     )
 
-    # return train and test rows from dataframe
-    train_rows = utils.select_df_rows_by_coords(normalised_data, train_coords)
-    test_rows = utils.select_df_rows_by_coords(normalised_data, test_coords)
+#     # return train and test rows from dataframe
+#     train_rows = utils.select_df_rows_by_coords(normalised_data, train_coords)
+#     test_rows = utils.select_df_rows_by_coords(normalised_data, test_coords)
 
-    # assign rows to test and train features/labels
-    X_train, X_test = train_rows.drop("gt", axis=1), test_rows.drop("gt", axis=1)
-    y_train, y_test = train_rows["gt"], test_rows["gt"]
+#     # assign rows to test and train features/labels
+#     X_train, X_test = train_rows.drop("gt", axis=1), test_rows.drop("gt", axis=1)
+#     y_train, y_test = train_rows["gt"], test_rows["gt"]
 
-    if data_type == "discrete":
-        y_train, y_test = threshold_array(y_train), threshold_array(y_test)
+#     if data_type == "discrete":
+#         y_train, y_test = threshold_array(y_train), threshold_array(y_test)
 
-    return X_train, X_test, y_train, y_test, train_coords, test_coords
+#     return X_train, X_test, y_train, y_test, train_coords, test_coords
 
 
 def visualise_train_test_split(xa_ds: xa.Dataset, train_coordinates, test_coordinates):
@@ -527,7 +527,7 @@ def rocs_n_runs(
 
     n_runs = len(run_outcomes)
     # format
-    format_roc(
+    model_results.format_roc(
         ax=ax,
         title=f"Receiver Operating Characteristic (ROC) Curve\n for {n_runs} randomly initialised test datasets.",
     )
@@ -851,20 +851,20 @@ def generate_reproducing_metrics(
         print("Generated ground truth data")
 
         merge_list = [
-            thetao_annual_average,
+            thetao_annual_average.mean(dim="time"),
             thetao_annual_range,
             thetao_monthly_min,
             thetao_monthly_max,
             thetao_monthly_stdev,
             thetao_weekly_min,
             thetao_weekly_max,
-            salinity_annual_average,
+            salinity_annual_average.mean(dim="time"),
             salinity_monthly_min,
             salinity_monthly_max,
-            current_annual_average,
+            current_annual_average.mean(dim="time"),
             current_monthly_min,
             current_monthly_max,
-            solar_annual_average,
+            solar_annual_average.mean(dim="time"),
             solar_monthly_min,
             solar_monthly_max,
             gt_climate_res,
