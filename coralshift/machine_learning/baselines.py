@@ -1218,9 +1218,8 @@ def get_comparison_xa_ds(
     return xa_dss
 
 
-rom coralshift.machine_learning import baselines
 def generate_reproducing_metrics_for_regions(
-    regions_list: list = ["A", "B", "C", "D"], target_resolution_d: float = 1/27
+    regions_list: list = ["A", "B", "C", "D"], target_resolution_d: float = 1 / 27
 ) -> None:
     for region in tqdm(
         regions_list,
@@ -1233,7 +1232,7 @@ def generate_reproducing_metrics_for_regions(
         lon_lims = bathymetry.ReefAreas().get_lat_lon_limits(region)[1]
 
         # create list of xarray dataarrays
-        reproduction_xa_list = baselines.load_and_process_reproducing_xa_das(region)
+        reproduction_xa_list = load_and_process_reproducing_xa_das(region)
         # create dictionary of xa arrays, resampled to correct resolution
         resampled_xa_das_dict = file_ops.resample_list_xa_ds_into_dict(
             reproduction_xa_list,
@@ -1243,7 +1242,7 @@ def generate_reproducing_metrics_for_regions(
             lon_lims=lon_lims,
         )
         # generate and save reproducing metrics from merged dict
-        baselines.generate_reproducing_metrics(resampled_xa_das_dict, region=region)
+        generate_reproducing_metrics(resampled_xa_das_dict, region=region)
 
 
 def load_and_process_reproducing_xa_das(
