@@ -607,15 +607,6 @@ def investigate_label_thresholds(
     ax.legend(title="threshold value | auc")
 
 
-def format_roc(ax=Axes, title: str = "Receiver Operating Characteristic (ROC) Curve"):
-    ax.set_xlabel("false positive rate")
-    ax.set_ylabel("true positive rate")
-    ax.set_title(title)
-    ax.set_aspect("equal")
-    ax.set_xlim([0, 1])
-    ax.set_ylim([0, 1])
-
-
 def evaluate_model(y_test: np.ndarray | pd.Series, predictions: np.ndarray):
     """
     Evaluate a model's performance using regression and classification metrics.
@@ -1026,31 +1017,80 @@ def create_train_metadata(
     print(f"{name} metadata saved to {out_path}")
 
 
+class ModelInitializer:
+    def __init__(self, random_state: int = 42):
+        self.random_state = random_state
+        # self.data_type = None
+        # self.model = None
+        # self.search_grid = None
+
+        self.model_info = [
+            # continuous model
+            {
+                "model_type": "rf_reg",
+                "data_type": "continuous",
+                "model": RandomForestRegressor(
+                    verbose=1, random_state=self.random_state
+                ),
+                "search_grid": rf_search_grid(),
+            },
+            {
+                "model_type": "brt",
+                "data_type": "continuous",
+                "model": GradientBoostingRegressor(
+                    verbose=1, random_state=self.random_state
+                ),
+                "search_grid": boosted_regression_search_grid(),
+            },
+            # discrete models
+            {
+                "model_type": "rf_cla",
+                "data_type": "discrete",
+                "model": RandomForestClassifier(
+                    class_weight="balanced", verbose=1, random_state=self.random_state
+                ),
+                "search_grid": rf_search_grid(),
+            },
+            {
+                "model_type": "rf_reg",
+                "data_type": "discrete",
+                "model": LogisticRegression(
+                    class_weight="balanced", verbose=1, random_state=self.random_state
+                ),
+                "search_grid": maximum_entropy_search_grid(),
+            },
+        ]
+
+    def get_data_type(self, model_type):
+        for m in self.model_info:
+            if m["model_type"] == model_type:
+                return m["data_type"]
+        else:
+            raise ValueError(f"'{model_type}' not a valid model.")
+
+    def get_model(self, model_type):
+        for m in self.model_info:
+            if m["model_type"] == model_type:
+                return m["model"]
+        else:
+            raise ValueError(f"'{model_type}' not a valid model.")
+
+    def get_search_grid(self, model_type):
+        for m in self.model_info:
+            if m["model_type"] == model_type:
+                return m["search_grid"]
+        else:
+            raise ValueError(f"'{model_type}' not a valid model.")
+
+
 def initialise_model(model_type: str, random_state: int = 42):
-    # continuous models
-    data_type = "continuous"
-    if model_type == "rf_reg":
-        model = RandomForestRegressor(verbose=1, random_state=random_state)
-        search_grid = rf_search_grid()
-    elif model_type == "brt":
-        model = GradientBoostingRegressor(verbose=1, random_state=random_state)
-        search_grid = boosted_regression_search_grid()
+    model_instance = ModelInitializer(random_state=random_state)
 
-    # discrete models
-    elif model_type == "maxent":
-        model = LogisticRegression(
-            class_weight="balanced", verbose=1, random_state=random_state
-        )
-        data_type = "discrete"
-        search_grid = maximum_entropy_search_grid()
-    elif model_type == "rf_cla":
-        model = RandomForestClassifier(
-            class_weight="balanced", verbose=1, random_state=random_state
-        )
-        data_type = "discrete"
-        search_grid = rf_search_grid()
-
-    return model, data_type, search_grid
+    return (
+        model_instance.get_model(model_type),
+        model_instance.get_data_type(model_type),
+        model_instance.get_search_grid(model_type),
+    )
 
 
 def calculate_class_weight(label_array: np.ndarray):
