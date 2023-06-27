@@ -34,7 +34,10 @@ def cast_to_list(obj):
 
 
 def flatten_list(nested_list: list[list]) -> list:
-    return [element for sublist in nested_list for element in sublist]
+    if len(nested_list) == 1:
+        return nested_list[0]
+    else:
+        return [element for sublist in nested_list for element in sublist]
 
 
 def round_list_tuples(
