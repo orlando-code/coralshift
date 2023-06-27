@@ -122,6 +122,7 @@ def plot_spatial(
     cmap_type: str = "seq",
     symmetric: bool = False,
     edgecolor: str = "black",
+    cbar: bool = True,
     orient_colorbar: str = "vertical",
 ) -> tuple[Figure, Axes]:
     """
@@ -176,7 +177,16 @@ def plot_spatial(
 
     im = xa_da.plot(ax=ax, cmap=cmap, vmin=vmin, vmax=vmax, add_colorbar=False)
     # nicely format spatial plot
-    format_spatial_plot(im, fig, ax, title, name, orient_colorbar, edgecolor)
+    format_spatial_plot(
+        image=im,
+        figure=fig,
+        ax=ax,
+        title=title,
+        name=name,
+        cbar=cbar,
+        orient_colorbar=orient_colorbar,
+        edgecolor=edgecolor,
+    )
 
     return fig, ax, im
 
