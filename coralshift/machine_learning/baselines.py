@@ -722,9 +722,9 @@ def save_sklearn_model(model, savedir: Path | str, filename: str) -> None:
     None
     """
     save_path = (Path(savedir) / filename).with_suffix(".pickle")
-    # if save_path.is_file():
-    #     save_path = (Path(savedir) / f"{filename}_new").with_suffix(".pickle")
-    #     print(f"Model at {save_path} already exists.")
+    if save_path.is_file():
+        save_path = (Path(savedir) / f"{filename}_new").with_suffix(".pickle")
+        print(f"Model at {save_path} already exists.")
     # save model
     with open(save_path, "wb") as f:
         pickle.dump(model, f)
@@ -1188,9 +1188,9 @@ def create_train_metadata(
 
     filename = f"{name}_metadata"
     save_path = (Path(model_path).parent / filename).with_suffix(".json")
-    # if save_path.is_file():
-    #     save_path = (Path(model_path).parent / f"{filename}_new").with_suffix(".json")
-    #     print(f"Metadata at {save_path} already exists.")
+    if save_path.is_file():
+        save_path = (Path(model_path).parent / f"{filename}_new").with_suffix(".json")
+        print(f"Metadata at {save_path} already exists.")
     out_file = open(save_path, "w")
     json.dump(metadata, out_file, indent=4)
     print(f"{name} metadata saved to {save_path}")
