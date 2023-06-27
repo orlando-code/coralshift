@@ -33,6 +33,10 @@ def cast_to_list(obj):
         return obj
 
 
+def flatten_list(nested_list: list[list]) -> list:
+    return [element for sublist in nested_list for element in sublist]
+
+
 def round_list_tuples(
     tuple_list: list[tuple[float, ...]], decimal_places: int = 2
 ) -> list[tuple]:
