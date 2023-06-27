@@ -375,6 +375,17 @@ def min_max_of_coords(
     return return_min_of_coord(xa_array, coord), return_max_of_coord(xa_array, coord)
 
 
+def min_max_of_all_spatial_coords(
+    xa_ds_list: list[xa.DataArray, xa.Dataset]
+) -> tuple[float]:
+    lats, lons = [], []
+    for xa_d in xa_ds_list:
+        lats.append(min_max_of_coords(xa_d, "latitude"))
+        lons.append(min_max_of_coords(xa_d, "longitude"))
+
+    return lats.min(), lats.max(), lons.min(), lons.max()
+
+
 def return_pixels_closest_to_value(
     array: np.ndarray,
     central_value: float,
