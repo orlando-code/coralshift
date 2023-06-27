@@ -1052,7 +1052,7 @@ class ModelInitializer:
                 "search_grid": rf_search_grid(),
             },
             {
-                "model_type": "rf_reg",
+                "model_type": "maxent",
                 "data_type": "discrete",
                 "model": LogisticRegression(
                     class_weight="balanced", verbose=1, random_state=self.random_state
