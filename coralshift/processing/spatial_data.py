@@ -2256,3 +2256,48 @@ def resample_list_xa_ds_into_dict(
         resampled_xa_das_dict[xa_da.name] = xa_resampled
 
     return resampled_xa_das_dict
+
+
+def combine_ds_tiles(
+    xa_d_list: list[xa.DataArray | xa.Dataset], resolution_d: float
+) -> xa.DataArray | xa.Dataset:
+    """
+    Combine a list of datasets using the combine_first() function.
+
+    Parameters
+    ----------
+    datasets : list of xarray.Dataset
+        List of datasets to be combined.
+
+    Returns
+    -------
+    xarray.Dataset
+        Combined dataset.
+    """
+    if len(xa_d_list) == 1:
+        print("Single object provided. No combination necessary")
+        return xa_d_list[0]
+
+    # initialise a dummy dataarray across total region to combine to allow reprojection
+    (lat_lims), (lon_lims) = min_max_of_all_spatial_coords(xa_d_list)
+    dummy_xa = generate_dummy_xa(resolution_d, lat_lims, lon_lims).rename(
+        {"latitude": "y", "longitude": "x"}
+    )
+
+    processed_list = []
+    for i, ds in tqdm(
+        enumerate(xa_d_list),
+        total=len(xa_d_list[1:]),
+        desc="Pre-processing xarray objects",
+    ):
+        ds = ds.rename({"latitude": "y", "longitude": "x"})
+        processed_list.append(ds.rio.reproject_match(dummy_xa))
+
+    # Initialize the combined dataset with the first dataset in the list
+    combined_ds = processed_list[0]
+
+    # Iterate over the remaining datasets and combine them with the combined dataset
+    for ds in tqdm(processed_list[1:], total=len(processed_list[1:])):
+        combined_ds = combined_ds.combine_first(ds)
+
+    return process_xa_d(combined_ds)
