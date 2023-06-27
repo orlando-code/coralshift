@@ -551,11 +551,11 @@ def save_sklearn_model(model, savedir: Path | str, filename: str) -> None:
     save_path = (Path(savedir) / filename).with_suffix(".pickle")
     if save_path.is_file():
         save_path = (Path(savedir) / f"{filename}_new").with_suffix(".pickle")
-        with open(save_path, "wb") as f:
-            pickle.dump(model, f)
         print(f"Model at {save_path} already exists.")
+    # save model
+    with open(save_path, "wb") as f:
+        pickle.dump(model, f)
     print(f"Saved model to {save_path}.")
-
     return save_path
 
 
