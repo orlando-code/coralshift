@@ -229,6 +229,8 @@ def spatial_split_train_test(
     -------
         tuple: A tuple containing X_train, X_test, y_train, and y_test.
     """
+    # send input to list if not already
+    xa_dss = utils.list_if_not_already(xa_dss)
     flattened_data, train_coords, test_coords = xa_dss_to_df(
         xa_dss,
         split_type=split_type,
@@ -1175,7 +1177,7 @@ def train_tune_across_models(
 
     # define train/test split so it's the same for all models
     (X_train, X_test, y_train, y_test, _, _) = spatial_split_train_test(
-        utils.list_if_not_already(all_data),
+        all_data,
         "gt",
         split_type=split_type,
         test_fraction=test_fraction,
@@ -1340,3 +1342,4 @@ def load_model(
     else:
         model = pickle.load(open(Path(model_dir) / model_name, "rb"))
     print(model.best_params_)
+    return model
