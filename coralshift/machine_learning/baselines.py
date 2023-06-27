@@ -1469,7 +1469,11 @@ def generate_reproducing_metrics_for_regions(
             lon_lims=lon_lims,
         )
         # generate and save reproducing metrics from merged dict
-        generate_reproducing_metrics(resampled_xa_das_dict, region=region)
+        generate_reproducing_metrics(
+            resampled_xa_das_dict,
+            region=region,
+            target_resolution_d=target_resolution_d,
+        )
 
 
 def load_and_process_reproducing_xa_das(
