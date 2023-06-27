@@ -1186,10 +1186,14 @@ def create_train_metadata(
     # update metadata with parameter search grid
     metadata.update(param_distributions)
 
-    out_path = Path(model_path).parent / f"{name}_metadata.json"
-    out_file = open(out_path, "w")
+    filename = f"{name}_metadata"
+    save_path = (Path(model_path).parent / filename).with_suffix(".json")
+    if save_path.is_file():
+        save_path = (Path(model_path).parent / f"{filename}_new").with_suffix(".json")
+        print(f"Metadata at {save_path} already exists.")
+    out_file = open(save_path, "w")
     json.dump(metadata, out_file, indent=4)
-    print(f"{name} metadata saved to {out_path}")
+    print(f"{name} metadata saved to {save_path}")
 
 
 class ModelInitializer:
