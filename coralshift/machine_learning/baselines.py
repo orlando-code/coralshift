@@ -332,7 +332,7 @@ def spatial_split_train_test(
         tuple: A tuple containing X_train, X_test, y_train, and y_test.
     """
     # send input to list if not already
-    xa_dss = utils.list_if_not_already(xa_dss)
+    xa_dss = utils.cast_to_list(xa_dss)
     # flatten datasets to pandas dataframes and process
     flattened_data_dfs = xa_dss_to_df(xa_dss, bath_mask=bath_mask)
     # generate training and testing coordinates
@@ -1397,7 +1397,7 @@ def train_tune_across_models(
     res_string = utils.replace_dot_with_dash(f"{d_resolution:.04f}d")
 
     # define train/test split so it's the same for all models
-    (X_train, X_test, y_train, y_test, _, _) = spatial_split_train_test(
+    (X_trains, X_tests, y_trains, y_tests, _, _) = spatial_split_train_test(
         all_data,
         "gt",
         split_type=split_type,
