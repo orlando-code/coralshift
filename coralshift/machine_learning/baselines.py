@@ -610,7 +610,7 @@ def investigate_label_thresholds(
 def format_roc(ax=Axes, title: str = "Receiver Operating Characteristic (ROC) Curve"):
     ax.set_xlabel("false positive rate")
     ax.set_ylabel("true positive rate")
-    ax.set_aspect("square")
+    ax.set_aspect("equal")
     ax.set_xlim([0, 1])
     ax.set_ylim([0, 1])
 
