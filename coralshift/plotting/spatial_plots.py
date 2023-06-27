@@ -185,10 +185,11 @@ def format_spatial_plot(
     image: xa.DataArray,
     fig: Figure,
     ax: Axes,
-    title: str,
-    name: str,
-    orient_colorbar: str,
-    edgecolor: str,
+    title: str = "",
+    name: str = "",
+    cbar: bool = True,
+    orient_colorbar: str = "horizontal",
+    edgecolor: str = "black",
 ) -> tuple[Figure, Axes]:
     """Format a spatial plot with a colorbar, title, coastlines and landmasses, and gridlines.
 
@@ -203,9 +204,10 @@ def format_spatial_plot(
     -------
         Figure, Axes
     """
-    plt.colorbar(
-        image, orientation=orient_colorbar, label=name, pad=0.1, fraction=0.046
-    )
+    if cbar:
+        plt.colorbar(
+            image, orientation=orient_colorbar, label=name, pad=0.1, fraction=0.046
+        )
     ax.set_title(title)
     # ax.coastlines(resolution="10m", color="red", linewidth=1)
     ax.add_feature(
