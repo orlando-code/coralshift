@@ -20,7 +20,7 @@ def resample_xarray_to_target(
     lat_lims: tuple[float] = None,
     lon_lims: tuple[float] = None,
     method=rasterio.enums.Resampling.bilinear,
-    name: str = "blank",
+    name: str = None,
 ) -> xa.Dataset:
     """
     Upsamples an xarray DataArray or Dataset to a target resolution.
