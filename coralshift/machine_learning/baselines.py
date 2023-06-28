@@ -198,20 +198,19 @@ def generate_test_train_coords_from_df(
     df: pd.DataFrame,
     test_fraction: float = 0.25,
     split_type: str = "pixel",
-    test_lats: tuple[float] = None,
-    test_lons: tuple[float] = None,
+    train_test_lat_divide: int = float,
+    train_direction: str = "N",
     random_seed: int = 42,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    # num datapoints
-    num_samples = len(df)
-    # Calculate the split sizes
-    test_size = int(num_samples * test_fraction)
-    train_size = num_samples - test_size
+    # Shuffle the filtered DataFrame randomly
+    df_shuffled = df.sample(frac=1, random_state=random_seed)
 
     if split_type == "pixel":
-        # Shuffle the filtered DataFrame randomly
-        df_shuffled = df.sample(frac=1, random_state=random_seed)
-
+        # num datapoints
+        num_samples = len(df)
+        # Calculate the split sizes
+        test_size = int(num_samples * test_fraction)
+        train_size = num_samples - test_size
         # Split the coordinates into two lists based on the split sizes
         train_coordinates = (
             df_shuffled[["latitude", "longitude"]].values[:train_size].tolist()
@@ -221,28 +220,79 @@ def generate_test_train_coords_from_df(
             .values[train_size : train_size + test_size]  # noqa
             .tolist()
         )
+    elif split_type == "spatial":
+        if train_direction == "S":
+            train_rows = df_shuffled.loc[
+                (
+                    train_test_lat_divide
+                    >= df_shuffled.index.get_level_values("latitude")
+                )
+            ]
+            test_rows = df_shuffled.loc[
+                (
+                    train_test_lat_divide
+                    <= df_shuffled.index.get_level_values("latitude")
+                )
+            ]
+        elif train_direction == "N":
+            train_rows = df_shuffled.loc[
+                (
+                    train_test_lat_divide
+                    <= df_shuffled.index.get_level_values("latitude")
+                )
+            ]
+            test_rows = df_shuffled.loc[
+                (
+                    train_test_lat_divide
+                    >= df_shuffled.index.get_level_values("latitude")
+                )
+            ]
+        else:
+            raise ValueError(f"Train direction: {train_direction} not recognised.")
 
+        train_coordinates = train_rows[["latitude", "longitude"]].values.tolist()
+        test_coordinates = test_rows[["latitude", "longitude"]].values.tolist()
     else:
         print(f"Unrecognised split type {split_type}.")
-    # elif split_type == "spatial":
-    #     lat_condition =
-    # (min() <= df.index.get_level_values('latitude')) & (df.index.get_level_values('latitude') <= -10)
-
-    #     selected_rows =
-    # df.loc[(-16 <= df.index.get_level_values('latitude')) & (df.index.get_level_values('latitude') <= -10) &
-    #        (142 <= df.index.get_level_values('longitude')) & (df.index.get_level_values('longitude') <= 144)]
 
     return train_coordinates, test_coordinates
+
+
+def vary_train_test_lat(
+    df: pd.DataFrame,
+    num_vals: int = 10,
+    train_direction: str = "N",
+    random_seed: int = 42,
+) -> list[tuple[float, float]]:
+    lat_min, lat_max = df.index["latitude"].min(), df.index["latitude"].max()
+    lat_dividers = np.linspace(lat_min, lat_max, num_vals)
+
+    train_coords_list, test_coords_list = [], []
+    for lat_divide in lat_dividers:
+        train_coords, test_coords = generate_test_train_coords_from_df(
+            df=df,
+            split_type="pixel",
+            train_test_lat_divide=lat_divide,
+            train_direction=train_direction,
+            random_seed=random_seed,
+        )
+        train_coords_list.append(train_coords)
+        test_coords_list.append(test_coords)
+    return lat_divide, train_coords_list, test_coords_list
 
 
 def generate_test_train_coords_from_dfs(
     dfs: list[pd.DataFrame],
     test_fraction: float = 0.25,
     split_type: str = "pixel",
+    train_test_lat_divide: int = float,
+    train_direction: str = "N",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     train_coords_list, test_coords_list = [], []
     for df in dfs:
-        lists = generate_test_train_coords_from_df(df, test_fraction, split_type)
+        lists = generate_test_train_coords_from_df(
+            df, test_fraction, split_type, train_test_lat_divide, train_direction
+        )
         train_coords_list.append(lists[0])
         test_coords_list.append(lists[1])
 
@@ -309,6 +359,8 @@ def spatial_split_train_test(
     ignore_vars: list = ["spatial_ref", "band", "depth"],
     split_type: str = "pixel",
     test_fraction: float = 0.25,
+    train_test_lat_divide: int = float,
+    train_direction: str = "N",
     bath_mask: bool = True,
 ) -> tuple:
     """
