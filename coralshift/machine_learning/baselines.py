@@ -1354,6 +1354,9 @@ def generate_parameter_grid(params_dict: dict, num_samples: int = 5) -> dict:
                 round(value - step * i, 2)
                 for i in range(num_samples // 2, -num_samples // 2 - 1, -1)
             ]
+            # ensure all remains as int if they started off that way
+            if isinstance(value, int):
+                values = [int(val) for val in values]
             grid_params[key] = values
     return grid_params
 
