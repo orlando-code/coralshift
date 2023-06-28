@@ -259,7 +259,7 @@ def generate_test_train_coords_from_df(
 
 def vary_train_test_lat(
     df: pd.DataFrame,
-    num_vals: int = 10
+    num_vals: int = 10,
     train_direction: str = "N",
     random_seed: int = 42,
 ) -> list[tuple[float, float]]:
