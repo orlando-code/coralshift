@@ -98,7 +98,8 @@ def generate_dummy_xa(
 
     # Create xarray DataArray
     xa_dummy = (
-        xa.DataArray(data, coords=[lat_vals, lon_vals], dims=["latitude", "longitude"])
+        # xa.DataArray(data, coords=[lat_vals, lon_vals], dims=["latitude", "longitude"])
+        xa.DataArray(data, coords=[lat_vals, lon_vals], dims=["y", "x"])
         .rio.write_crs("EPSG:4326")
         .rename("dummy")
     )
@@ -160,6 +161,7 @@ def resample_xa_d_to_other(
     """
     # xa_da = file_ops.extract_variable(xa_d, var_name)
     # xa_resampled = xa_da.rio.reproject_match(target_xa_d, resampling=method)
+    xa_d = xa_d.rename({"latitude": "y", "longitude": "x"})
     xa_resampled = xa_d.rio.reproject_match(target_xa_d, resampling=method, nodata=0)
 
     xa_processed = process_xa_d(xa_resampled)
