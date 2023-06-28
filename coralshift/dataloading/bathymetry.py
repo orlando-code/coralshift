@@ -4,8 +4,9 @@ import xarray as xa
 import numpy as np
 from pathlib import Path
 from scipy.ndimage import gaussian_gradient_magnitude
+from tqdm import tqdm
 
-from coralshift.utils import file_ops, directories
+from coralshift.utils import file_ops, directories, utils
 from coralshift.processing import spatial_data
 
 # these two imports necessary for importing US coastal bathymetry data
@@ -179,6 +180,25 @@ def calculate_gradient_magnitude(xa_da: xa.DataArray, sigma: int = 1):
     ).chunk(chunks="auto")
 
 
+def generate_gradient_magnitude_ncs(
+    regions: list[str] = ["A", "B", "C", "D"],
+    resolution_d: float = None,
+    sigma: int = 1,
+):
+    bath_dir = directories.get_bathymetry_datasets_dir()
+
+    res_string = utils.generate_resolution_str(resolution_d=resolution_d)
+    for region in tqdm(
+        regions,
+        total=len(regions),
+        desc=f" Generating seafloor slopes nc files at {resolution_d}",
+    ):
+        region_name = ReefAreas().get_short_filename(region)
+        bath_file = list(bath_dir.glob(f"{region_name}_*{res_string[:3]}*.nc"))[0]
+        bath_da = file_ops.open_xa_file(bath_file)
+        _, _ = generate_gradient_magnitude_nc(bath_da)
+
+
 def generate_gradient_magnitude_nc(
     xa_da: xa.DataArray, resolution_d: float = None, sigma: int = 1
 ):
@@ -199,7 +219,8 @@ def generate_gradient_magnitude_nc(
     # generate savepath
     if not resolution_d:
         resolution_d = np.mean(spatial_data.calculate_spatial_resolution(xa_da))
-    filename = f"{xa_da.name}_{resolution_d:.5f}_gradients.nc"
+    res_string = utils.generate_resolution_str(resolution_d)
+    filename = f"{xa_da.name}_{res_string}_gradients.nc"
     save_path = directories.get_gradients_dir() / filename
 
     # generate/save file as necessary
