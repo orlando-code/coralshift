@@ -44,9 +44,8 @@ def resample_xarray_to_target(
     """
     # if coordinate ranges not specified, infer from present xa_d
     if not (lat_lims and lon_lims):
-        lat_lims, lon_lims = min_max_of_coords(xa_d, "latitude"), min_max_of_coords(
-            xa_d, "longitude"
-        )
+        lat_lims = min_max_of_coords(xa_d, "latitude")
+        lon_lims = min_max_of_coords(xa_d, "longitude")
 
     target_xa_d = generate_dummy_xa(
         target_resolution_d, lat_lims=lat_lims, lon_lims=lon_lims
@@ -161,9 +160,7 @@ def resample_xa_d_to_other(
     """
     # xa_da = file_ops.extract_variable(xa_d, var_name)
     # xa_resampled = xa_da.rio.reproject_match(target_xa_d, resampling=method)
-    xa_resampled = xa_d.rio.reproject_match(
-        target_xa_d, resampling=method, nodata=np.nan
-    )
+    xa_resampled = xa_d.rio.reproject_match(target_xa_d, resampling=method, nodata=0)
 
     xa_processed = process_xa_d(xa_resampled)
     if name:
