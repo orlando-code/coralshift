@@ -1387,6 +1387,7 @@ def train_tune(
     save_dir: Path | str = None,
     n_iter: int = 50,
     cv: int = 3,
+    num_samples: int = 3,
     search_type: str = "random",
     best_params_dict: dict = None,
 ):
@@ -1409,7 +1410,7 @@ def train_tune(
         print("Fitting model with a randomized hyperparameter search...")
     elif search_type == "grid":
         model_search, search_grid = initialise_grid_search(
-            model_type, best_params_dict, cv=cv, num_samples=3
+            model_type, best_params_dict, cv=cv, num_samples=num_samples
         )
         print("Fitting model with a grid hyperparameter search...")
     else:
