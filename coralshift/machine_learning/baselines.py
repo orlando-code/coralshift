@@ -418,6 +418,14 @@ def spatial_split_train_test(
         X_tests.append(test_rows.drop("gt", axis=1))
         y_trains.append(y_train), y_tests.append(y_test)
 
+    # for now, merge all lists together
+    X_trains = utils.flatten_list(X_trains)
+    X_tests = utils.flatten_list(X_tests)
+    y_trains = utils.flatten_list(y_trains)
+    y_tests = utils.flatten_list(y_tests)
+    train_coords_list = utils.flatten_list(train_coords_list)
+    test_coords_list = utils.flatten_list(test_coords_list)
+
     return X_trains, X_tests, y_trains, y_tests, train_coords_list, test_coords_list
 
 
