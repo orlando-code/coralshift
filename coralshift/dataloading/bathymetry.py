@@ -196,7 +196,7 @@ def generate_gradient_magnitude_ncs(
         region_name = ReefAreas().get_short_filename(region)
         bath_file = list(bath_dir.glob(f"{region_name}_*{res_string[:3]}*.nc"))[0]
         bath_da = file_ops.open_xa_file(bath_file)
-        _, _ = generate_gradient_magnitude_nc(bath_da)
+        _, _ = generate_gradient_magnitude_nc(bath_da, resolution_d=resolution_d)
 
 
 def generate_gradient_magnitude_nc(
