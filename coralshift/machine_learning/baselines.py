@@ -389,7 +389,11 @@ def spatial_split_train_test(
     flattened_data_dfs = xa_dss_to_df(xa_dss, bath_mask=bath_mask)
     # generate training and testing coordinates
     train_coords_list, test_coords_list = generate_test_train_coords_from_dfs(
-        flattened_data_dfs, test_fraction=test_fraction
+        flattened_data_dfs,
+        test_fraction=test_fraction,
+        split_type=split_type,
+        train_test_lat_divide=train_test_lat_divide,
+        train_direction=train_direction,
     )
 
     # normalise dataframe via min/max scaling
