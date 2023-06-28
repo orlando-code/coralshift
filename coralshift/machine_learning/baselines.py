@@ -1218,6 +1218,7 @@ def create_train_metadata(
     model_path: Path | str,
     model_type: str,
     data_type: str,
+    search_type: str,
     fit_time: float,
     test_fraction: float,
     coord_ranges: dict,
@@ -1234,14 +1235,16 @@ def create_train_metadata(
         "model path": str(model_path),
         "model type": model_type,
         "data type": data_type,
+        "search type": search_type,
         "model fit time (s)": fit_time,
         "test fraction": test_fraction,
         "features": features,
         "approximate spatial resolution": resolution,
-        "number of fit iterations": n_iter,
+        "number of fit iterations (random search)": n_iter,
         "cross validation fold size": cv,
         "random_state": 42,
         "n_jobs": -1,
+        "latitude/longitude limits of testing data (all else used in training)": " ",
     }
     metadata.update(coord_ranges)
     # update metadata with parameter search grid
@@ -1329,7 +1332,6 @@ def initialise_model(model_type: str, random_state: int = 42):
     return (
         model_instance.get_model(model_type),
         model_instance.get_data_type(model_type),
-        model_instance.get_search_grid(model_type),
     )
 
 
@@ -1339,7 +1341,7 @@ def calculate_class_weight(label_array: np.ndarray):
     return occurrence_dict
 
 
-def generate_parameter_grid(params_dict: dict) -> dict:
+def generate_parameter_grid(params_dict: dict, num_samples: int = 5) -> dict:
     grid_params = {}
     for key, value in params_dict.items():
         if key == "verbose":
@@ -1347,28 +1349,28 @@ def generate_parameter_grid(params_dict: dict) -> dict:
         elif isinstance(value, bool) or isinstance(value, str):
             grid_params[key] = [value]
         elif isinstance(value, int) or isinstance(value, float):
-            step = round(abs(value) / 3.0, 2)
-            grid_params[key] = [
-                round(value - step, 2),
-                round(value, 2),
-                round(value + step, 2),
+            step = round(abs(value) / (num_samples - 1), 2)
+            values = [
+                round(value - step * i, 2)
+                for i in range(num_samples // 2, -num_samples // 2 - 1, -1)
             ]
+            grid_params[key] = values
     return grid_params
 
 
-# def generate_gridsearch_grid(best_params_dict):
-#     parameter_ranges = generate_parameter_grid(best_params_dict)
-#     return utils.remove_duplicates_from_dict(ParameterGrid(parameter_ranges))
-
-
-def initialise_grid_search(model_type, best_params_dict, cv: int = 3):
+def initialise_grid_search(
+    model_type, best_params_dict, cv: int = 3, num_samples: int = 5
+):
     param_grid = generate_parameter_grid(best_params_dict)
     # generate_gridsearch_grid(best_params_dict)
     model_class = ModelInitializer()
     model = model_class.get_model(model_type)
 
-    return GridSearchCV(
-        estimator=model, param_grid=param_grid, cv=cv, n_jobs=-1, verbose=2
+    return (
+        GridSearchCV(
+            estimator=model, param_grid=param_grid, cv=cv, n_jobs=-1, verbose=2
+        ),
+        param_grid,
     )
 
 
@@ -1385,12 +1387,13 @@ def train_tune(
     search_type: str = "random",
     best_params_dict: dict = None,
 ):
-    model, data_type, search_grid = initialise_model(model_type)
+    model, data_type = initialise_model(model_type)
 
     if data_type == "discrete":
         y_train = threshold_array(y_train)
 
     if search_type == "random":
+        search_grid = ModelInitializer().get_search_grid(model_type)
         model_search = RandomizedSearchCV(
             estimator=model,
             param_distributions=search_grid,
@@ -1402,7 +1405,9 @@ def train_tune(
         )
         print("Fitting model with a randomized hyperparameter search...")
     elif search_type == "grid":
-        model_search = initialise_grid_search(model_type, best_params_dict, cv=cv)
+        model_search, search_grid = initialise_grid_search(
+            model_type, best_params_dict, cv=cv, num_samples=5
+        )
         print("Fitting model with a grid hyperparameter search...")
     else:
         raise ValueError(f"Search type: {search_type} not recognised.")
@@ -1424,6 +1429,7 @@ def train_tune(
         model_path=save_path,
         model_type=model_type,
         data_type=data_type,
+        search_type=search_type,
         fit_time=fit_time,
         test_fraction=test_fraction,
         coord_ranges=utils.get_multiindex_min_max(X_train),
