@@ -15,8 +15,7 @@ from tqdm import tqdm
 from sklearn.ensemble import (
     RandomForestRegressor,
     RandomForestClassifier,
-    GradientBoostingRegressor,
-)
+    GradientBoostingRegressor)
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn import metrics as sklmetrics
@@ -198,7 +197,7 @@ def generate_test_train_coords_from_df(
     df: pd.DataFrame,
     test_fraction: float = 0.25,
     split_type: str = "pixel",
-    train_test_lat_divide: int = float,
+    train_test_lat_divide: int = 18,
     train_direction: str = "N",
     random_seed: int = 42,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -260,7 +259,7 @@ def generate_test_train_coords_from_df(
 
 def vary_train_test_lat(
     df: pd.DataFrame,
-    num_vals: int = 10,
+    num_vals: int = 10
     train_direction: str = "N",
     random_seed: int = 42,
 ) -> list[tuple[float, float]]:
@@ -271,7 +270,7 @@ def vary_train_test_lat(
     for lat_divide in lat_dividers:
         train_coords, test_coords = generate_test_train_coords_from_df(
             df=df,
-            split_type="pixel",
+            split_type="spatial",
             train_test_lat_divide=lat_divide,
             train_direction=train_direction,
             random_seed=random_seed,
@@ -285,13 +284,17 @@ def generate_test_train_coords_from_dfs(
     dfs: list[pd.DataFrame],
     test_fraction: float = 0.25,
     split_type: str = "pixel",
-    train_test_lat_divide: int = float,
+    train_test_lat_divide: int = 18,
     train_direction: str = "N",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     train_coords_list, test_coords_list = [], []
     for df in dfs:
         lists = generate_test_train_coords_from_df(
-            df, test_fraction, split_type, train_test_lat_divide, train_direction
+            df=df,
+            test_fraction=test_fraction,
+            split_type=split_type,
+            train_test_lat_divide=train_test_lat_divide,
+            train_direction=train_direction,
         )
         train_coords_list.append(lists[0])
         test_coords_list.append(lists[1])
@@ -341,13 +344,6 @@ def xa_dss_to_df(
         df = df.drop(columns=list(df.select_dtypes(include="datetime64").columns))
         df = process_df_for_ml(df, ignore_vars=ignore_vars, drop_all_nans=drop_all_nans)
 
-        # # generate train_test_coordinates
-        # train_coordinates, test_coordinates = generate_test_train_coordinates(
-        #     xa_ds, split_type, test_lats, test_lons, test_fraction, bath_mask
-        # )
-
-        # train_coords.append(train_coordinates)
-        # test_coords.append(test_coordinates)
         dfs.append(df)
     return dfs
 
@@ -359,7 +355,7 @@ def spatial_split_train_test(
     ignore_vars: list = ["spatial_ref", "band", "depth"],
     split_type: str = "pixel",
     test_fraction: float = 0.25,
-    train_test_lat_divide: int = float,
+    train_test_lat_divide: int = 18,
     train_direction: str = "N",
     bath_mask: bool = True,
 ) -> tuple:
@@ -1221,9 +1217,9 @@ def create_train_metadata(
     model_path: Path | str,
     model_type: str,
     data_type: str,
-    randomised_search_time: float,
     fit_time: float,
     test_fraction: float,
+    coord_ranges: dict=utils.get_multiindex_min_max(X_train),
     features: list[str],
     resolution: float,
     n_iter: int,
@@ -1237,7 +1233,6 @@ def create_train_metadata(
         "model path": str(model_path),
         "model type": model_type,
         "data type": data_type,
-        "hyperparameter tune time": randomised_search_time,
         "model fit time (s)": fit_time,
         "test fraction": test_fraction,
         "features": features,
@@ -1247,8 +1242,10 @@ def create_train_metadata(
         "random_state": 42,
         "n_jobs": -1,
     }
+    metadata.update(coord_ranges)
     # update metadata with parameter search grid
     metadata.update(param_distributions)
+    
 
     filename = f"{name}_metadata"
     save_path = (Path(model_path).parent / filename).with_suffix(".json")
@@ -1342,6 +1339,33 @@ def calculate_class_weight(label_array: np.ndarray):
     return occurrence_dict
 
 
+def generate_parameter_grid(params_dict: dict) -> dict:
+    grid_params = {}
+    for key, value in params_dict.items():
+        if key == "verbose":
+            grid_params[key] = [value]
+        elif isinstance(value, bool) or isinstance(value, str):
+            grid_params[key] = [value]
+        elif isinstance(value, int) or isinstance(value, float):
+            step = round(abs(value) / 3.0, 2)
+            grid_params[key] = [round(value - step, 2), round(value, 2), round(value + step, 2)]
+    return grid_params
+
+
+def generate_gridsearch_grid(best_params_dict):
+    parameter_ranges = generate_parameter_grid(best_params_dict)
+    return remove_duplicates_from_dict(ParameterGrid(parameter_ranges))
+
+
+def initialise_grid_search(model_type, best_params_dict, cv: int=3):
+    param_grid = generate_gridsearch_grid(best_params_dict)
+    model_class = baselines.ModelInitializer()
+
+    model = model_class.get_model(model_type)
+
+    return GridSearchCV(estimator = model, param_grid = param_grid, cv = cv, n_jobs = -1, verbose = 2)
+
+
 def train_tune(
     X_train,
     y_train,
@@ -1352,47 +1376,48 @@ def train_tune(
     save_dir: Path | str = None,
     n_iter: int = 50,
     cv: int = 3,
+    best_params_dict: dict = None
 ):
     model, data_type, search_grid = initialise_model(model_type)
 
     if data_type == "discrete":
         y_train = threshold_array(y_train)
-    # register_ray()
-    start_time = time.time()
-    model_random = RandomizedSearchCV(
-        estimator=model,
-        param_distributions=search_grid,
-        n_iter=n_iter,
-        cv=cv,
-        verbose=2,
-        random_state=42,
-        n_jobs=-1,
-    )
-    end_time = time.time()
-    randomised_search_time = end_time - start_time
 
-    print("Fitting model with a randomized hyperparameter search...")
-    # with joblib.parallel_backend("ray"):
+    if search_type == "random":
+        model_search = RandomizedSearchCV(
+            estimator=model,
+            param_distributions=search_grid,
+            n_iter=n_iter,
+            cv=cv,
+            verbose=2,
+            random_state=42,
+            n_jobs=-1,
+        )
+        print("Fitting model with a randomized hyperparameter search...")
+    elif search_type == "grid":
+        model_search = initialise_grid_search(model_type, best_params_dict, cv=cv)
+        print("Fitting model with a grid hyperparameter search...")
+    else:
+        raise ValueError(f"Search type: {search_type} not recognised.")
+
     start_time = time.time()
-    model_random.fit(X_train, y_train)
+    model_search.fit(X_train, y_train)
     end_time = time.time()
     fit_time = end_time - start_time
 
     # save best parameter model and metadata
     if not save_dir:
-        save_dir = file_ops.guarantee_existence(
-            directories.get_datasets_dir() / "model_params"
-        )
-
-    save_path = save_sklearn_model(model_random, save_dir, name)
+        save_dir = file_ops.guarantee_existence(directories.get_datasets_dir() / "model_params")
+        
+    save_path = save_sklearn_model(model_search, save_dir, name)
     create_train_metadata(
         name=name,
         model_path=save_path,
         model_type=model_type,
         data_type=data_type,
-        randomised_search_time=randomised_search_time,
         fit_time=fit_time,
         test_fraction=test_fraction,
+        coord_ranges=utils.get_multiindex_min_max(X_train),
         features=list(X_train.columns),
         resolution=resolution,
         n_iter=n_iter,
