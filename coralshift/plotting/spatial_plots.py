@@ -126,6 +126,7 @@ def plot_spatial(
     edgecolor: str = "black",
     cbar: bool = True,
     orient_colorbar: str = "vertical",
+    cbar_pad: float = 0.1,
 ) -> tuple[Figure, Axes]:
     """
     Plot a spatial plot with colorbar, coastlines, landmasses, and gridlines.
@@ -190,6 +191,7 @@ def plot_spatial(
         name=name,
         cbar=cbar,
         orient_colorbar=orient_colorbar,
+        cbar_pad=cbar_pad,
         edgecolor=edgecolor,
     )
 
@@ -204,6 +206,7 @@ def format_spatial_plot(
     name: str = "",
     cbar: bool = True,
     orient_colorbar: str = "horizontal",
+    cbar_pad: float = 0.1,
     edgecolor: str = "black",
 ) -> tuple[Figure, Axes]:
     """Format a spatial plot with a colorbar, title, coastlines and landmasses, and gridlines.
@@ -221,7 +224,7 @@ def format_spatial_plot(
     """
     if cbar:
         plt.colorbar(
-            image, orientation=orient_colorbar, label=name, pad=0.1, fraction=0.046
+            image, orientation=orient_colorbar, label=name, cbar_pad=0.1, fraction=0.046
         )
     ax.set_title(title)
     # ax.coastlines(resolution="10m", color="red", linewidth=1)
