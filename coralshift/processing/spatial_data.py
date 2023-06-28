@@ -2307,7 +2307,9 @@ def combine_ds_tiles(
     combined_ds = processed_list[0]
 
     # Iterate over the remaining datasets and combine them with the combined dataset
-    for ds in tqdm(processed_list[1:], total=len(processed_list[1:])):
+    for ds in tqdm(
+        processed_list[1:], total=len(processed_list[1:]), desc=" Combining data"
+    ):
         combined_ds = combined_ds.combine_first(ds)
 
     return process_xa_d(combined_ds)
