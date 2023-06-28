@@ -18,7 +18,7 @@ from sklearn.ensemble import (
     GradientBoostingRegressor,
 )
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import RandomizedSearchCV, ParameterGrid, GridSearchCV
+from sklearn.model_selection import RandomizedSearchCV, GridSearchCV
 from sklearn import metrics as sklmetrics
 
 from coralshift.utils import utils, directories, file_ops
@@ -1364,7 +1364,7 @@ def generate_parameter_grid(params_dict: dict) -> dict:
 def initialise_grid_search(model_type, best_params_dict, cv: int = 3):
     param_grid = generate_parameter_grid(best_params_dict)
     # generate_gridsearch_grid(best_params_dict)
-    model_class = baselines.ModelInitializer()
+    model_class = ModelInitializer()
     model = model_class.get_model(model_type)
 
     return GridSearchCV(
