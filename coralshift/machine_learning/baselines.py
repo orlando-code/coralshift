@@ -198,7 +198,7 @@ def generate_test_train_coords_from_df(
     df: pd.DataFrame,
     test_fraction: float = 0.25,
     split_type: str = "pixel",
-    train_test_lat_divide: int = 18,
+    train_test_lat_divide: int = -18,
     train_direction: str = "N",
     random_seed: int = 42,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -285,7 +285,7 @@ def generate_test_train_coords_from_dfs(
     dfs: list[pd.DataFrame],
     test_fraction: float = 0.25,
     split_type: str = "pixel",
-    train_test_lat_divide: int = 18,
+    train_test_lat_divide: int = -18,
     train_direction: str = "N",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     train_coords_list, test_coords_list = [], []
@@ -356,7 +356,7 @@ def spatial_split_train_test(
     ignore_vars: list = ["spatial_ref", "band", "depth"],
     split_type: str = "pixel",
     test_fraction: float = 0.25,
-    train_test_lat_divide: int = 18,
+    train_test_lat_divide: int = -18,
     train_direction: str = "N",
     bath_mask: bool = True,
 ) -> tuple:
@@ -1615,7 +1615,7 @@ def load_and_process_reproducing_xa_das(
     current_daily = calculate_magnitude(
         dailies_array["uo"].compute(), dailies_array["vo"].compute()
     ).rename("current")
-    # TODO: download ERA5 files
+    # TODO: download additional ERA5 files
     # load bathymetry file TODO: separate function for this
     bath_file = list(
         directories.get_bathymetry_datasets_dir().glob(f"{region_name}_*.nc")
