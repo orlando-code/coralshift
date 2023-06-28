@@ -191,7 +191,7 @@ def generate_gradient_magnitude_ncs(
     for region in tqdm(
         regions,
         total=len(regions),
-        desc=f" Generating seafloor slopes nc files at {resolution_d}",
+        desc=f" Generating seafloor slopes nc files at {resolution_d:.04f}",
     ):
         region_name = ReefAreas().get_short_filename(region)
         bath_file = list(bath_dir.glob(f"{region_name}_*{res_string[:3]}*.nc"))[0]
