@@ -106,7 +106,7 @@ def generate_dummy_xa(
 
     # Reindex the DataArray to ensure consistent coordinate order
     xa_dummy = xa_dummy.reindex(
-        latitude=sorted(xa_dummy.latitude), longitude=sorted(xa_dummy.longitude)
+        latitude=sorted(xa_dummy.y), longitude=sorted(xa_dummy.x)
     )
 
     return xa_dummy
