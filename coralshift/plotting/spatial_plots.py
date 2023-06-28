@@ -159,9 +159,9 @@ def plot_spatial(
     resolution_m = np.mean(spatial_data.degrees_to_distances(resolution_d))
 
     # if not name:
-    try:
+    if isinstance(xa_da, xa.DataArray):
         name = xa_da.name
-    except TypeError:
+    else:
         name = list(xa_da.data_vars)[0]
     if not title:
         title = xa_da.name + " at ${:.4f}^\circ$ (~{:.0f} m) resolution".format(  # noqa
