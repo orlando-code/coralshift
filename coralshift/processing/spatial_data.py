@@ -2307,9 +2307,7 @@ def combine_ds_tiles(
 
     # initialise a dummy dataarray across total region to combine to allow reprojection
     (lat_lims), (lon_lims) = min_max_of_all_spatial_coords(xa_d_list)
-    dummy_xa = generate_dummy_xa(resolution_d, lat_lims, lon_lims).rename(
-        {"latitude": "y", "longitude": "x"}
-    )
+    dummy_xa = generate_dummy_xa(resolution_d, lat_lims, lon_lims)
 
     processed_list = []
     for i, ds in tqdm(
@@ -2317,7 +2315,7 @@ def combine_ds_tiles(
         total=len(xa_d_list[1:]),
         desc="Pre-processing xarray objects",
     ):
-        ds = ds.rename({"latitude": "y", "longitude": "x"})
+        # ds = ds.rename({"latitude": "y", "longitude": "x"})
         processed_list.append(ds.rio.reproject_match(dummy_xa))
 
     # Initialize the combined dataset with the first dataset in the list
