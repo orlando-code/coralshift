@@ -1356,15 +1356,15 @@ def generate_parameter_grid(params_dict: dict) -> dict:
     return grid_params
 
 
-def generate_gridsearch_grid(best_params_dict):
-    parameter_ranges = generate_parameter_grid(best_params_dict)
-    return utils.remove_duplicates_from_dict(ParameterGrid(parameter_ranges))
+# def generate_gridsearch_grid(best_params_dict):
+#     parameter_ranges = generate_parameter_grid(best_params_dict)
+#     return utils.remove_duplicates_from_dict(ParameterGrid(parameter_ranges))
 
 
 def initialise_grid_search(model_type, best_params_dict, cv: int = 3):
-    param_grid = generate_gridsearch_grid(best_params_dict)
-    model_class = ModelInitializer()
-
+    param_grid = generate_parameter_grid(best_params_dict)
+    # generate_gridsearch_grid(best_params_dict)
+    model_class = baselines.ModelInitializer()
     model = model_class.get_model(model_type)
 
     return GridSearchCV(
