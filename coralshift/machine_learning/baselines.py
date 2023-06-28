@@ -15,9 +15,10 @@ from tqdm import tqdm
 from sklearn.ensemble import (
     RandomForestRegressor,
     RandomForestClassifier,
-    GradientBoostingRegressor)
+    GradientBoostingRegressor,
+)
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import RandomizedSearchCV, ParameterGrid, GridSearchCV
 from sklearn import metrics as sklmetrics
 
 from coralshift.utils import utils, directories, file_ops
@@ -1219,7 +1220,7 @@ def create_train_metadata(
     data_type: str,
     fit_time: float,
     test_fraction: float,
-    coord_ranges: dict=utils.get_multiindex_min_max(X_train),
+    coord_ranges: dict,
     features: list[str],
     resolution: float,
     n_iter: int,
@@ -1245,7 +1246,6 @@ def create_train_metadata(
     metadata.update(coord_ranges)
     # update metadata with parameter search grid
     metadata.update(param_distributions)
-    
 
     filename = f"{name}_metadata"
     save_path = (Path(model_path).parent / filename).with_suffix(".json")
@@ -1348,22 +1348,28 @@ def generate_parameter_grid(params_dict: dict) -> dict:
             grid_params[key] = [value]
         elif isinstance(value, int) or isinstance(value, float):
             step = round(abs(value) / 3.0, 2)
-            grid_params[key] = [round(value - step, 2), round(value, 2), round(value + step, 2)]
+            grid_params[key] = [
+                round(value - step, 2),
+                round(value, 2),
+                round(value + step, 2),
+            ]
     return grid_params
 
 
 def generate_gridsearch_grid(best_params_dict):
     parameter_ranges = generate_parameter_grid(best_params_dict)
-    return remove_duplicates_from_dict(ParameterGrid(parameter_ranges))
+    return utils.remove_duplicates_from_dict(ParameterGrid(parameter_ranges))
 
 
-def initialise_grid_search(model_type, best_params_dict, cv: int=3):
+def initialise_grid_search(model_type, best_params_dict, cv: int = 3):
     param_grid = generate_gridsearch_grid(best_params_dict)
-    model_class = baselines.ModelInitializer()
+    model_class = ModelInitializer()
 
     model = model_class.get_model(model_type)
 
-    return GridSearchCV(estimator = model, param_grid = param_grid, cv = cv, n_jobs = -1, verbose = 2)
+    return GridSearchCV(
+        estimator=model, param_grid=param_grid, cv=cv, n_jobs=-1, verbose=2
+    )
 
 
 def train_tune(
@@ -1377,7 +1383,7 @@ def train_tune(
     n_iter: int = 50,
     cv: int = 3,
     search_type: str = "random",
-    best_params_dict: dict = None
+    best_params_dict: dict = None,
 ):
     model, data_type, search_grid = initialise_model(model_type)
 
@@ -1408,8 +1414,10 @@ def train_tune(
 
     # save best parameter model and metadata
     if not save_dir:
-        save_dir = file_ops.guarantee_existence(directories.get_datasets_dir() / "model_params")
-        
+        save_dir = file_ops.guarantee_existence(
+            directories.get_datasets_dir() / "model_params"
+        )
+
     save_path = save_sklearn_model(model_search, save_dir, name)
     create_train_metadata(
         name=name,
@@ -1502,8 +1510,8 @@ def train_tune_across_models(
         model_types, total=len(model_types), desc="Fitting each model via random search"
     ):
         train_tune(
-            X_train,
-            y_train,
+            X_train=X_trains,
+            y_train=y_trains,
             model_type=model,
             resolution=d_resolution,
             save_dir=model_comp_dir,
