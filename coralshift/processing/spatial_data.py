@@ -15,17 +15,19 @@ from coralshift.utils import file_ops, utils
 
 
 def resample_xarray_to_target(
-    xa_array: xa.DataArray | xa.Dataset,
-    target_resolution: float,
+    xa_d: xa.DataArray | xa.Dataset,
+    target_resolution_d: float,
+    lat_lims: tuple[float] = None,
+    lon_lims: tuple[float] = None,
     method=rasterio.enums.Resampling.bilinear,
-    name: str = None,
+    name: str = "blank",
 ) -> xa.Dataset:
     """
     Upsamples an xarray DataArray or Dataset to a target resolution.
 
     Parameters
     ----------
-        xa_array (xarray.DataArray or xarray.Dataset): The input xarray object to upsample.
+        xa_d (xarray.DataArray or xarray.Dataset): The input xarray object to upsample.
         target_resolution (float): The target resolution in degrees.
 
     Returns
@@ -40,20 +42,36 @@ def resample_xarray_to_target(
         resolution.
         - The resampling is performed by coarsening the dataset using a mean operation.
     """
-    # N.B. not perfect at getting starts/ends matching up It works fine when not trying to match the coords of another
-    # write crs
-    xa_array.rio.write_crs("EPSG:4326", inplace=True)
-    return process_xa_d(
-        xa_array.rio.reproject("EPSG:4326", target_resolution, resampling=method)
+    # if coordinate ranges not specified, infer from present xa_d
+    if not (lat_lims and lon_lims):
+        lat_lims, lon_lims = min_max_of_coords(xa_d, "latitude"), min_max_of_coords(
+            xa_d, "longitude"
+        )
+
+    target_xa_d = generate_dummy_xa(
+        target_resolution_d, lat_lims=lat_lims, lon_lims=lon_lims
     )
 
+    return resample_xa_d_to_other(xa_d, target_xa_d, name=name)
+    # resampled_xa_das_dict = {}
+    # for xa_da in tqdm(xa_das, desc="Resampling xarray DataArrays"):
+    #     # xa_resampled = resample_xa_d_to_other(xa_da, dummy_xa, name=xa_da.name)
+    #     xa_resampled = spatial_data.resample_xa_d_to_other(xa_da, target_xa_d)
+    #     resampled_xa_das_dict[xa_da.name] = xa_resampled
+    # # N.B. not perfect at getting starts/ends matching up It works fine when not trying to match the coords of another
+    # # write crs
+    # xa_d.rio.write_crs("EPSG:4326", inplace=True)
+    # return process_xa_d(
+    #     xa_d.rio.reproject("EPSG:4326", target_resolution, resampling=method)
+    # )
+
     # TODO: enable flexible upsampling by time also
-    # lat_lims = xarray_coord_limits(xa_array, "latitude")
-    # lon_lims = xarray_coord_limits(xa_array, "longitude")
+    # lat_lims = xarray_coord_limits(xa_d, "latitude")
+    # lon_lims = xarray_coord_limits(xa_d, "longitude")
 
     # dummy_xa = generate_dummy_xa(target_resolution, lat_lims, lon_lims)
 
-    # return resample_xa_d_to_other(xa_array, dummy_xa, method=method, name=name)
+    # return resample_xa_d_to_other(xa_d, dummy_xa, method=method, name=name)
 
 
 def generate_dummy_xa(
