@@ -20,7 +20,7 @@ def resample_xarray_to_target(
     lat_lims: tuple[float] = None,
     lon_lims: tuple[float] = None,
     method=rasterio.enums.Resampling.bilinear,
-    name: str = None,
+    name: str = " ",
 ) -> xa.Dataset:
     """
     Upsamples an xarray DataArray or Dataset to a target resolution.
@@ -165,7 +165,7 @@ def resample_xa_d_to_other(
     xa_resampled = xa_d.rio.reproject_match(target_xa_d, resampling=method, nodata=0)
 
     xa_processed = process_xa_d(xa_resampled)
-    if name:
+    if not name == " ":
         return xa_processed.rename(name)
     else:
         return xa_processed
