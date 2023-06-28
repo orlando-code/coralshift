@@ -2315,7 +2315,7 @@ def combine_ds_tiles(
         total=len(xa_d_list[1:]),
         desc="Pre-processing xarray objects",
     ):
-        # ds = ds.rename({"latitude": "y", "longitude": "x"})
+        ds = ds.rename({"latitude": "y", "longitude": "x"})
         processed_list.append(ds.rio.reproject_match(dummy_xa))
 
     # Initialize the combined dataset with the first dataset in the list
