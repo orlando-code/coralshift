@@ -1341,7 +1341,7 @@ def calculate_class_weight(label_array: np.ndarray):
     return occurrence_dict
 
 
-def generate_parameter_grid(params_dict: dict, num_samples: int = 5) -> dict:
+def generate_parameter_grid(params_dict: dict, num_samples: int = 3) -> dict:
     grid_params = {}
     for key, value in params_dict.items():
         if key == "verbose":
@@ -1362,7 +1362,7 @@ def generate_parameter_grid(params_dict: dict, num_samples: int = 5) -> dict:
 
 
 def initialise_grid_search(
-    model_type, best_params_dict, cv: int = 3, num_samples: int = 5
+    model_type, best_params_dict, cv: int = 3, num_samples: int = 3
 ):
     param_grid = generate_parameter_grid(best_params_dict)
     # generate_gridsearch_grid(best_params_dict)
@@ -1409,7 +1409,7 @@ def train_tune(
         print("Fitting model with a randomized hyperparameter search...")
     elif search_type == "grid":
         model_search, search_grid = initialise_grid_search(
-            model_type, best_params_dict, cv=cv, num_samples=5
+            model_type, best_params_dict, cv=cv, num_samples=3
         )
         print("Fitting model with a grid hyperparameter search...")
     else:
