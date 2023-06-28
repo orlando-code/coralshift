@@ -1367,8 +1367,8 @@ def initialise_grid_search(model_type, best_params_dict, cv: int=3):
 
 
 def train_tune(
-    X_train,
-    y_train,
+    X_train: pd.DataFrame,
+    y_train: np.ndarray | pd.Series,
     model_type: str,
     resolution: float,
     name: str = "_",
@@ -1376,6 +1376,7 @@ def train_tune(
     save_dir: Path | str = None,
     n_iter: int = 50,
     cv: int = 3,
+    search_type: str = "random",
     best_params_dict: dict = None
 ):
     model, data_type, search_grid = initialise_model(model_type)
