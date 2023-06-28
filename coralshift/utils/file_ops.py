@@ -906,3 +906,12 @@ def extract_variable(xa_d: xa.Dataset | xa.DataArray, name=None):
         return variable
     else:
         return xa_d
+
+
+def open_xa_file(xa_path: Path | str) -> xa.Dataset | xa.DataArray:
+    try:
+        return spatial_data.process_xa_d(
+            xa.open_dataarray(xa_path, decode_coords="all")
+        )
+    except ValueError:
+        return spatial_data.process_xa_d(xa.open_dataset(xa_path, decode_coords="all"))

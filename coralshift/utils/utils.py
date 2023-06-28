@@ -238,3 +238,8 @@ def drop_nan_rows(
     df_dropped = df.dropna(subset=columns_to_check, how="all")
 
     return df_dropped
+
+
+def generate_resolution_str(resolution_d: float = 1 / 27, sfs: int = 4) -> str:
+    # TODO: allow specification of sfs
+    return replace_dot_with_dash(f"{resolution_d:.04f}d")
