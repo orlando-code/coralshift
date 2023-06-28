@@ -40,6 +40,22 @@ def flatten_list(nested_list: list[list]) -> list:
         return [element for sublist in nested_list for element in sublist]
 
 
+def remove_duplicates_from_dict(dictionaries):
+    return [dict(t) for t in {tuple(sorted(d.items())) for d in dictionaries}]
+
+
+def get_multiindex_min_max(dataframe):
+    min_max_dict = {}
+
+    for level_name in dataframe.index.names:
+        level_values = dataframe.index.get_level_values(level_name)
+        min_value = level_values.min()
+        max_value = level_values.max()
+        min_max_dict[level_name] = {"min": min_value, "max": max_value}
+
+    return min_max_dict
+
+
 def round_list_tuples(
     tuple_list: list[tuple[float, ...]], decimal_places: int = 2
 ) -> list[tuple]:
