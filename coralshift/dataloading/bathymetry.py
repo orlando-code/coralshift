@@ -179,7 +179,9 @@ def calculate_gradient_magnitude(xa_da: xa.DataArray, sigma: int = 1):
     ).chunk(chunks="auto")
 
 
-def generate_gradient_magnitude_nc(xa_da: xa.DataArray, sigma: int = 1):
+def generate_gradient_magnitude_nc(
+    xa_da: xa.DataArray, resolution_d: float = None, sigma: int = 1
+):
     """
     Generate a NetCDF file containing the gradient magnitude of a DataArray. The NetCDF file is saved in the directory
     specified by directories.get_gradients_dir(), with the filename format
@@ -195,7 +197,8 @@ def generate_gradient_magnitude_nc(xa_da: xa.DataArray, sigma: int = 1):
         tuple[xa.DataArray, str]: A tuple containing the gradient DataArray and the path to the saved NetCDF file.
     """
     # generate savepath
-    resolution_d = np.mean(spatial_data.calculate_spatial_resolution(xa_da))
+    if not resolution_d:
+        resolution_d = np.mean(spatial_data.calculate_spatial_resolution(xa_da))
     filename = f"{xa_da.name}_{resolution_d:.5f}_gradients.nc"
     save_path = directories.get_gradients_dir() / filename
 
