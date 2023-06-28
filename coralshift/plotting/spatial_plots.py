@@ -102,14 +102,14 @@ def get_cbar(cbar_type: str = "seq"):
     """
     if cbar_type == "seq":
         return get_continuous_cmap(
-            ["#3B9AB2", "#78B7C5", "#EBCC2A", "#E1AF00", "#F21A00"]
+            ["#3B9AB2", "#78B7C5", "#EBCC2A", "#E1AF00", "#d83c04"]
         )
     elif cbar_type == "div":
         return get_continuous_cmap(
-            ["#3B9AB2", "#78B7C5", "#FFFFFF", "#E1AF00", "#F21A00"]
+            ["#3B9AB2", "#78B7C5", "#FFFFFF", "#E1AF00", "#d83c04"]
         )
     elif cbar_type == "lim":
-        return get_continuous_cmap(["#78B7C5", "#FFFFFF", "#E1AF00"])
+        return get_continuous_cmap(["#78B7C5", "#EBCC2A", "#E1AF00"])
     else:
         raise ValueError(f"{cbar_type} not recognised.")
 
@@ -161,7 +161,7 @@ def plot_spatial(
     if not name:
         name = xa_da.name
     if not title:
-        title = xa_da.name + " at ${:.5f}^\circ$ (~{:.0f} m) resolution".format(  # noqa
+        title = xa_da.name + " at ${:.4f}^\circ$ (~{:.0f} m) resolution".format(  # noqa
             resolution_d, resolution_m
         )
 
