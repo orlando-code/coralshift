@@ -162,7 +162,7 @@ def resample_xa_d_to_other(
     # xa_da = file_ops.extract_variable(xa_d, var_name)
     # xa_resampled = xa_da.rio.reproject_match(target_xa_d, resampling=method)
     xa_d = xa_d.rename({"latitude": "y", "longitude": "x"})
-    xa_resampled = xa_d.rio.reproject_match(target_xa_d, resampling=method, nodata=0)
+    xa_resampled = xa_d.rio.reproject_match(target_xa_d, resampling=method)
 
     xa_processed = process_xa_d(xa_resampled)
     if not name == " ":
