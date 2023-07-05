@@ -9,7 +9,7 @@ import xarray as xa
 from tqdm import tqdm
 
 from coralshift.processing import spatial_data
-from coralshift.utils import directories, file_ops
+from coralshift.utils import directories, file_ops, utils
 
 
 def generate_area_geojson(area_class, area_name: str) -> None:
@@ -176,16 +176,32 @@ def generate_coral_shp(gdf_coral: gpd.GeoDataFrame, file_name: str) -> None:
         print(f"File at {save_path} already exists.")
 
 
-def process_reef_extent_tifs():
-    # fetch list of ground truth tifs
+def process_reef_extent_tifs(target_resolution_d: float = None):
+    # fetch list of reef presence tifs
     gt_tif_files = file_ops.return_list_filepaths(
-        directories.get_gt_files_dir(), ".tif"
+        directories.get_reef_baseline_dir(), ".tif", incl_subdirs=False
     )
     # generate dictionary of file names and arrays: {filename: xarray.DataArray, ...}
-    gt_tif_dict = spatial_data.tifs_to_xa_array_dict(gt_tif_files)
-    # save dictionary of tifs to nc, if files not already existing
-    file_ops.save_dict_xa_ds_to_nc(gt_tif_dict, directories.get_gt_files_dir())
+    gt_nc_dict = spatial_data.tifs_to_xa_array_dict(gt_tif_files)
 
+    resampled_gt_nc_dict = {}
+    res_string = utils.generate_resolution_str(resolution_d=target_resolution_d, sfs=4)
+    for name, xa_d in tqdm(
+        gt_nc_dict.items(), desc=f" Resampling xarray objects to {res_string}"
+    ):
+        new_name = f"{file_ops.remove_suffix(name)}_rs_{res_string}"
+        if target_resolution_d:
+            xa_d = spatial_data.resample_xarray_to_target(
+                xa_d, target_resolution_d=target_resolution_d, name=new_name
+            )
+        resampled_gt_nc_dict[new_name] = xa_d
+    # save dictionary of tifs to nc, if files not already existing
+    file_ops.save_dict_xa_ds_to_nc(gt_nc_dict, directories.get_gt_files_dir())
+
+
+############
+# DEPRECATED
+############
 
 # def process_nc_dir_coral_gt_tifs(tif_dir_name=None, target_resolution_d:float=None):
 #     if not tif_dir_name:
@@ -224,3 +240,14 @@ def process_reef_extent_tifs():
 
 #     return tif_paths
 #     print(f"All tifs converted to xarrays and stored as .nc files in {nc_dir}.")
+
+
+# def process_reef_extent_tifs():
+#     # fetch list of ground truth tifs
+#     gt_tif_files = file_ops.return_list_filepaths(
+#         directories.get_gt_files_dir(), ".tif"
+#     )
+#     # generate dictionary of file names and arrays: {filename: xarray.DataArray, ...}
+#     gt_tif_dict = spatial_data.tifs_to_xa_array_dict(gt_tif_files)
+#     # save dictionary of tifs to nc, if files not already existing
+#     file_ops.save_dict_xa_ds_to_nc(gt_tif_dict, directories.get_gt_files_dir())
