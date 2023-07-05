@@ -41,9 +41,6 @@ def spatial_confusion_matrix_da(
         - False Positives: 3
         - False Negatives: 4
     """
-    if not utils.check_discrete(predicted) or not utils.check_discrete(ground_truth):
-        predicted = baselines.threshold_array(predicted, threshold=threshold)
-        ground_truth = baselines.threshold_array(ground_truth, threshold=threshold)
 
     # compare ground truth and predicted values
     true_positives = xa.where((predicted == 1) & (ground_truth == 1), 1, 0)
@@ -336,8 +333,8 @@ def plot_confusion_matrix(
 
 
 def model_output_to_spatial_confusion(
-    label,
-    prediction,
+    label: pd.Series | np.ndarray,
+    prediction: pd.Series | np.ndarray,
     threshold: float = 0.25,
     lat_lims: tuple[float] = None,
     lon_lims: tuple[float] = None,
@@ -345,8 +342,8 @@ def model_output_to_spatial_confusion(
     cbar_pad=0.1,
 ) -> None:
     if not utils.check_discrete(prediction) or not utils.check_discrete(label):
-        prediction = baselines.threshold_array(prediction, threshold=threshold)
-        label = baselines.threshold_array(prediction, threshold=threshold)
+        prediction = utils.threshold_array(prediction, threshold=threshold)
+        label = utils.threshold_array(label, threshold=threshold)
 
     ds = baselines.outputs_to_xa_ds(label, prediction)
     confusion_values, vals_dict = spatial_confusion_matrix_da(

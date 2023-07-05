@@ -941,7 +941,9 @@ def evaluate_model(y_test: np.ndarray | pd.Series, predictions: np.ndarray):
     return mse, bce
 
 
-def threshold_array(array: np.ndarray | pd.Series, threshold: float = 0) -> np.ndarray:
+def threshold_array(
+    array: np.ndarray | pd.Series, threshold: float = 0.25
+) -> pd.Series:
     result = np.where(np.array(array) > threshold, 1, 0)
     if isinstance(array, pd.Series):
         return pd.Series(result, index=array.index)
