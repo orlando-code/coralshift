@@ -19,7 +19,7 @@ from coralshift.utils import utils
 
 
 def spatial_confusion_matrix_da(
-    predicted: xa.DataArray, ground_truth: xa.DataArray
+    predicted: xa.DataArray, ground_truth: xa.DataArray, threshold: float = 0.25
 ) -> xa.DataArray:
     """Compute a spatial confusion matrix based on the predicted and ground truth xa.DataArray.
 
@@ -41,6 +41,10 @@ def spatial_confusion_matrix_da(
         - False Positives: 3
         - False Negatives: 4
     """
+    if utils.check_discrete(predicted) or utils.check_discrete(ground_truth):
+        predicted = baselines.threshold_array(predicted, threshold=threshold)
+        ground_truth = baselines.threshold_array(ground_truth, threshold=threshold)
+
     # compare ground truth and predicted values
     true_positives = xa.where((predicted == 1) & (ground_truth == 1), 1, 0)
     true_negatives = xa.where((predicted == 0) & (ground_truth == 0), 2, 0)
