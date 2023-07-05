@@ -342,8 +342,8 @@ def model_output_to_spatial_confusion(
     cbar_pad=0.1,
 ) -> None:
     if not utils.check_discrete(prediction) or not utils.check_discrete(label):
-        prediction = utils.threshold_array(prediction, threshold=threshold)
-        label = utils.threshold_array(label, threshold=threshold)
+        prediction = baselines.threshold_array(prediction, threshold=threshold)
+        label = baselines.threshold_array(label, threshold=threshold)
 
     ds = baselines.outputs_to_xa_ds(label, prediction)
     confusion_values, vals_dict = spatial_confusion_matrix_da(
