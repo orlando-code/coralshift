@@ -21,6 +21,7 @@ def resample_xarray_to_target(
     lon_lims: tuple[float] = None,
     method=rasterio.enums.Resampling.bilinear,
     name: str = " ",
+    crs: str = "EPSG:4326",
 ) -> xa.Dataset:
     """
     Upsamples an xarray DataArray or Dataset to a target resolution.
