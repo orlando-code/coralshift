@@ -776,9 +776,11 @@ def resample_dir_ncs(ncs_dir, target_resolution_d=1 / 27):
 
 
 def tifs_to_resampled_ncs(
-    tifs_dir: Path | str = directories.get_reef_baseline_dir(),
+    tifs_dir: Path | str = None,
     target_resolution_d: float = 1 / 27,
 ):
+    if not tifs_dir:
+        tifs_dir = (directories.get_reef_baseline_dir(),)
     tif_files = return_list_filepaths(tifs_dir, ".tif")
 
     res_string = utils.generate_resolution_str(target_resolution_d)
