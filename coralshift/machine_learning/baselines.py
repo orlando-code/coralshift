@@ -684,10 +684,13 @@ def maximum_entropy_search_grid(
 
 def n_random_runs_preds(
     model,
-    runs_n,
-    xa_ds,
+    xa_dss: list[xa.Dataset],
+    runs_n: int = 10,
     data_type: str = "continuous",
     test_fraction: float = 0.25,
+    split_type: str = "pixel",
+    train_test_lat_divide: int = float,
+    train_direction: str = "N",
     bath_mask: bool = True,
 ) -> list[tuple[list]]:
     """
@@ -710,17 +713,65 @@ def n_random_runs_preds(
     run_outcomes = []
     for run in tqdm(
         range(runs_n),
-        desc=f" Running inference on {runs_n} randomly-initialised test splits with {test_fraction} test fraction",
+        desc=f"Inference on {runs_n} train-test splits",
     ):
-        # randomly select test data
+        # select test data
         _, X_test, _, y_test, _, _ = spatial_split_train_test(
-            xa_ds, data_type=data_type, test_fraction=test_fraction, bath_mask=bath_mask
+            xa_dss=xa_dss,
+            data_type=data_type,
+            test_fraction=test_fraction,
+            split_type=split_type,
+            train_test_lat_divide=train_test_lat_divide,
+            train_direction=train_direction,
+            bath_mask=bath_mask,
         )
 
         pred = model.predict(X_test)
         run_outcomes.append((y_test, pred))
 
     return run_outcomes
+
+
+# def rocs_n_runs(
+#     run_outcomes: tuple[list[float]], binarize_threshold: float = 0, figsize=[7, 7]
+# ):
+#     """
+#     Plot ROC curves for multiple random test runs.
+
+#     Parameters
+#     ----------
+#         run_outcomes: A list of tuples containing the true labels and predicted values for each test run.
+#         binarize_threshold (optional): The threshold value for binarizing the labels. Defaults to 0.
+
+#     Returns
+#     -------
+#         None
+#     """
+#     color_map = spatial_plots.get_cbar("seq")
+#     num_colors = len(run_outcomes)
+#     colors = [color_map(i / num_colors) for i in range(num_colors)]
+
+#     f, ax = plt.subplots(figsize=figsize)
+#     for c, outcome in enumerate(run_outcomes):
+#         # cast regression to binary classification for plotting
+#         binary_y_labels, binary_predictions = threshold_label(
+#             outcome[0], outcome[1], binarize_threshold
+#         )
+
+#         fpr, tpr, _ = sklmetrics.curve(
+#             binary_y_labels, binary_predictions, drop_intermediate=False
+#         )
+#         roc_auc = sklmetrics.auc(fpr, tpr)
+
+#         label = f"{roc_auc:.02f}"
+#         ax.plot(fpr, tpr, label=label, color=colors[c])
+
+#     n_runs = len(run_outcomes)
+#     # format
+#     model_results.format_roc(
+#         ax=ax,
+#         title=f"Receiver Operating Characteristic (ROC) Curve\n for {n_runs} randomly initialised test datasets.",
+#     )
 
 
 def rocs_n_runs(
@@ -738,30 +789,57 @@ def rocs_n_runs(
     -------
         None
     """
+    # colour formatting
     color_map = spatial_plots.get_cbar("seq")
     num_colors = len(run_outcomes)
     colors = [color_map(i / num_colors) for i in range(num_colors)]
 
     f, ax = plt.subplots(figsize=figsize)
+    roc_aucs = []
     for c, outcome in enumerate(run_outcomes):
         # cast regression to binary classification for plotting
         binary_y_labels, binary_predictions = threshold_label(
             outcome[0], outcome[1], binarize_threshold
         )
 
-        fpr, tpr, _ = sklmetrics.curve(
+        fpr, tpr, _ = sklmetrics.roc_curve(
             binary_y_labels, binary_predictions, drop_intermediate=False
         )
         roc_auc = sklmetrics.auc(fpr, tpr)
+        roc_aucs.append(roc_auc)
 
-        label = f"{roc_auc:.02f}"
+        label = f"{roc_auc:.05f}"
         ax.plot(fpr, tpr, label=label, color=colors[c])
+
+    # determine minimum and maximumm auc
+    min_auc, max_auc = np.min(roc_aucs), np.max(roc_aucs)
+    # return mean roc
+    mean_auc = np.mean(roc_aucs)
+
+    # Set legend labels for min and max AUC lines only
+    handles, legend_labels = ax.get_legend_handles_labels()
+    filtered_handles = []
+    filtered_labels = []
+    for handle, label in zip(handles, legend_labels):
+        if label in [f"{min_auc:.05f}", f"{max_auc:.05f}"]:
+            filtered_handles.append(handle)
+            filtered_labels.append(label)
+
+    if len(filtered_handles) > 1:
+        filtered_handles, filtered_labels = [filtered_handles[0]], [filtered_labels[0]]
+    ax.legend(
+        filtered_handles,
+        filtered_labels,
+        title="Maximum and minimum AUC scores",
+        loc="lower right",
+    )
 
     n_runs = len(run_outcomes)
     # format
     model_results.format_roc(
         ax=ax,
-        title=f"Receiver Operating Characteristic (ROC) Curve\n for {n_runs} randomly initialised test datasets.",
+        title=f"""Receiver Operating Characteristic (ROC) Curve\n for {n_runs} randomly initialised test datasets.
+        \nMean AUC {mean_auc:.05f}""",
     )
 
 
@@ -1447,48 +1525,48 @@ def train_tune(
     )
 
 
-def train_tune_across_resolutions(
-    model_type: str,
-    d_resolutions: list[float],
-    split_type: str = "pixel",
-    test_lats: tuple[float] = None,
-    test_lons: tuple[float] = None,
-    runs_n: int = 10,
-    test_fraction: float = 0.25,
-):
-    # TODO: finish this
-    for d_res in tqdm(
-        d_resolutions,
-        total=len(d_resolutions),
-        desc="Training models at different resolutions",
-    ):
-        # load in correct-resolution dataset
-        res_string = utils.replace_dot_with_dash(f"{d_res:.04f}d")
+# def train_tune_across_resolutions(
+#     model_type: str,
+#     d_resolutions: list[float],
+#     split_type: str = "pixel",
+#     test_lats: tuple[float] = None,
+#     test_lons: tuple[float] = None,
+#     runs_n: int = 10,
+#     test_fraction: float = 0.25,
+# ):
+#     # TODO: finish this
+#     for d_res in tqdm(
+#         d_resolutions,
+#         total=len(d_resolutions),
+#         desc="Training models at different resolutions",
+#     ):
+#         # load in correct-resolution dataset
+#         res_string = utils.replace_dot_with_dash(f"{d_res:.04f}d")
 
-        dir = directories.get_comparison_dir() / f"{res_string}_arrays"
-        filename = f"all_{res_string}_comparative"
+#         dir = directories.get_comparison_dir() / f"{res_string}_arrays"
+#         filename = f"all_{res_string}_comparative"
 
-        all_data = xa.open_dataset(comparison_file_path, decode_coords="all")
+#         all_data = xa.open_dataset(comparison_file_path, decode_coords="all")
 
-        # define train/test split so it's the same for all models
-        (X_train, X_test, y_train, y_test, _, _) = spatial_split_train_test(
-            all_data,
-            "gt",
-            split_type=split_type,
-            test_fraction=test_fraction,
-        )
+#         # define train/test split so it's the same for all models
+#         (X_train, X_test, y_train, y_test, _, _) = spatial_split_train_test(
+#             all_data,
+#             "gt",
+#             split_type=split_type,
+#             test_fraction=test_fraction,
+#         )
 
-        comparison_file_path = (dir / filename).with_suffix(".nc")
+#         comparison_file_path = (dir / filename).with_suffix(".nc")
 
-        train_tune(
-            X_train,
-            y_train,
-            model_type=model_type,
-            resolution=d_res,
-            save_dir=model_comp_dir,
-            name=f"{model_type}_{res_string}_tuned",
-            test_fraction=0.25,
-        )
+#         train_tune(
+#             X_train,
+#             y_train,
+#             model_type=model_type,
+#             resolution=d_res,
+#             save_dir=model_comp_dir,
+#             name=f"{model_type}_{res_string}_tuned",
+#             test_fraction=0.25,
+#         )
 
 
 def train_tune_across_models(
@@ -1680,3 +1758,106 @@ def load_model(
         model = pickle.load(open(Path(model_dir) / model_name, "rb"))
     print(model.best_params_)
     return model
+
+
+def n_random_runs_preds_across_models(
+    model_types: list[str],
+    models: list,
+    xa_dss: list[xa.Dataset],
+    runs_n: int = 10,
+    test_fraction: float = 0.25,
+    split_type: str = "pixel",
+    train_test_lat_divide: int = float,
+    train_direction: str = "N",
+    bath_mask: bool = True,
+):
+    model_class = ModelInitializer()
+    outcomes_dict = {}
+    for i, model_type in enumerate(model_types):
+        model = models[i]
+        data_type = model_class.get_data_type(model_type)
+        outcomes, X_test = n_random_runs_preds(
+            model=model,
+            xa_dss=xa_dss,
+            runs_n=runs_n,
+            data_type=data_type,
+            test_fraction=test_fraction,
+            split_type=split_type,
+            train_test_lat_divide=train_test_lat_divide,
+            train_direction=train_direction,
+            bath_mask=bath_mask,
+        )
+        outcomes_dict[model_type] = outcomes
+
+    return outcomes_dict
+
+
+def models_rocs_n_runs(
+    model_outcomes: dict[list[float]], binarize_threshold: float = 0, figsize=[7, 7]
+):
+    """
+    Plot ROC curves for multiple models' outcomes.
+
+    Parameters
+    ----------
+        model_outcomes: A dictionary where keys are model names and values are lists of outcomes containing the true
+            labels and predicted values for each test run.
+        binarize_threshold (optional): The threshold value for binarizing the labels. Defaults to 0.
+
+    Returns
+    -------
+        None
+    """
+    # Colour formatting
+    color_map = spatial_plots.get_cbar("seq")
+    num_models = len(model_outcomes)
+    colors = [color_map(i / num_models) for i in range(num_models)]
+
+    f, ax = plt.subplots(figsize=figsize)
+    roc_aucs = []
+    legend_labels = []
+
+    for c, (model_name, outcomes) in tqdm(
+        enumerate(model_outcomes.items()),
+        total=len(model_outcomes),
+        desc="Iterating over models",
+    ):
+        roc_aucs = []
+
+        for i, outcome in enumerate(outcomes):
+            # Cast regression to binary classification for plotting
+            binary_y_labels, binary_predictions = threshold_label(
+                outcome[0], outcome[1], binarize_threshold
+            )
+            fpr, tpr, _ = sklmetrics.roc_curve(
+                binary_y_labels, binary_predictions, drop_intermediate=False
+            )
+            roc_auc = sklmetrics.auc(fpr, tpr)
+            roc_aucs.append(roc_auc)
+
+            # plot final label
+            if i == (len(outcomes) - 2):
+                # Calculate mean AUC
+                mean_auc = np.mean(roc_aucs)
+                # Show label only for the last outcome of each model
+                label = f"{model_name} | {mean_auc:.03f}"
+                ax.plot(fpr, tpr, label=label, color=colors[c])
+                legend_labels.append(label)
+            else:
+                # Hide label for other outcomes
+                ax.plot(fpr, tpr, color=colors[c])
+
+    ax.legend(title="Mean model AUC scores", loc="lower right")
+    # Format the plot
+    n_runs = len(outcomes)
+    model_results.format_roc(
+        ax=ax,
+        title=f"Receiver Operating Characteristic (ROC) Curve\n for {n_runs} randomly initialized test datasets.",
+    )
+
+
+def outputs_to_xa_ds(labels, predictions) -> xa.Dataset:
+    if type(predictions) is not np.ndarray:
+        predictions = predictions.to_numpy()
+    df = pd.DataFrame({"labels": labels, "predictions": predictions})
+    return df.to_xarray().sortby(["longitude", "latitude"])
