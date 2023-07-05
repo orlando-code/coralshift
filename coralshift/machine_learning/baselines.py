@@ -1861,3 +1861,33 @@ def outputs_to_xa_ds(labels, predictions) -> xa.Dataset:
         predictions = predictions.to_numpy()
     df = pd.DataFrame({"labels": labels, "predictions": predictions})
     return df.to_xarray().sortby(["longitude", "latitude"])
+
+
+def generate_reproducing_metrics_at_different_resolutions(
+    resolutions: list[float], units: list[str]
+) -> xa.Dataset:
+    target_resolutions = [
+        spatial_data.choose_resolution(number, string)[1]
+        for number, string in zip(resolutions, units)
+    ]
+    for res in tqdm(
+        target_resolutions,
+        total=len(target_resolutions),
+        desc="Processing metrics at various resolutions",
+    ):
+        files_dir = directories.get_comparison_dir() / utils.replace_dot_with_dash(
+            f"{res:.05f}d_arrays"
+        )
+        files = file_ops.return_list_filepaths(files_dir, ".nc")
+        xa_ds_dict = {}
+
+        for fl in files:
+            name = (fl.stem).split("_")[0]
+            ds = xa.open_dataset(fl).rio.write_crs("epsg:4326")
+            variable_name = next(
+                (var_name for var_name in ds.data_vars if var_name != "spatial_ref"),
+                None,
+            )
+            xa_ds_dict[name] = ds[variable_name]
+
+        generate_reproducing_metrics(xa_ds_dict, res)
