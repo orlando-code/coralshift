@@ -1776,7 +1776,7 @@ def n_random_runs_preds_across_models(
     for i, model_type in enumerate(model_types):
         model = models[i]
         data_type = model_class.get_data_type(model_type)
-        outcomes, X_test = n_random_runs_preds(
+        outcomes = n_random_runs_preds(
             model=model,
             xa_dss=xa_dss,
             runs_n=runs_n,
