@@ -243,3 +243,14 @@ def drop_nan_rows(
 def generate_resolution_str(resolution_d: float = 1 / 27, sfs: int = 4) -> str:
     # TODO: allow specification of sfs
     return replace_dot_with_dash(f"{resolution_d:.04f}d")
+
+
+def check_discrete(array):
+    # Check if all elements are whole numbers (integers)
+    if np.all(np.equal(np.mod(array, 1), 0)):
+        return True
+    # Check if any elements are decimals (floating-point numbers)
+    elif np.any(np.not_equal(np.mod(array, 1), 0)):
+        return False
+    else:
+        return False
