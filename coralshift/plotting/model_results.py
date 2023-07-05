@@ -338,11 +338,16 @@ def plot_confusion_matrix(
 def model_output_to_spatial_confusion(
     label,
     prediction,
+    threshold:float=0.25.,
     lat_lims: tuple[float] = None,
     lon_lims: tuple[float] = None,
     fax=None,
     cbar_pad=0.1,
 ) -> None:
+    if not utils.check_discrete(prediction) or not utils.check_discrete(label):
+        prediction = baselines.threshold_array(prediction, threshold=threshold)
+        label = baselines.threshold_array(prediction, threshold=threshold)
+
     ds = baselines.outputs_to_xa_ds(label, prediction)
     confusion_values, vals_dict = spatial_confusion_matrix_da(
         ds["predictions"], ds["labels"]
