@@ -937,22 +937,22 @@ def open_xa_file(xa_path: Path | str) -> xa.Dataset | xa.DataArray:
 ############
 
 
-def tifs_to_ncs(nc_dir: Path | list[str], target_resolution_d: float = None) -> None:
-    tif_dir = nc_dir.parent
-    tif_paths = return_list_filepaths(tif_dir, ".tif")
-    for tif_path in tqdm(
-        tif_paths, total=len(tif_paths), desc="Writing tifs to nc files"
-    ):
-        # filename = str(file_ops.get_n_last_subparts_path(tif, 1))
-        filename = tif_path.stem
-        tif_array = tif_to_xa_array(tif_path)
-        # xa_array_dict[filename] = tif_array.rename(filename)
-        if target_resolution_d:
-            tif_array = spatial_data.upsample_xarray_to_target(
-                xa_array=tif_array, target_resolution=target_resolution_d
-            )
-        # save array to nc file
-        save_nc(tif_dir, filename, tif_array)
+# def tifs_to_ncs(nc_dir: Path | list[str], target_resolution_d: float = None) -> None:
+#     tif_dir = nc_dir.parent
+#     tif_paths = return_list_filepaths(tif_dir, ".tif")
+#     for tif_path in tqdm(
+#         tif_paths, total=len(tif_paths), desc="Writing tifs to nc files"
+#     ):
+#         # filename = str(file_ops.get_n_last_subparts_path(tif, 1))
+#         filename = tif_path.stem
+#         tif_array = tif_to_xa_array(tif_path)
+#         # xa_array_dict[filename] = tif_array.rename(filename)
+#         if target_resolution_d:
+#             tif_array = spatial_data.upsample_xarray_to_target(
+#                 xa_array=tif_array, target_resolution=target_resolution_d
+#             )
+#         # save array to nc file
+#         save_nc(tif_dir, filename, tif_array)
 
-    return tif_paths
-    print(f"All tifs converted to xarrays and stored as .nc files in {nc_dir}.")
+#     return tif_paths
+#     print(f"All tifs converted to xarrays and stored as .nc files in {nc_dir}.")
