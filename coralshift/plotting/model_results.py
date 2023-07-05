@@ -41,7 +41,7 @@ def spatial_confusion_matrix_da(
         - False Positives: 3
         - False Negatives: 4
     """
-    if utils.check_discrete(predicted) or utils.check_discrete(ground_truth):
+    if not utils.check_discrete(predicted) or not utils.check_discrete(ground_truth):
         predicted = baselines.threshold_array(predicted, threshold=threshold)
         ground_truth = baselines.threshold_array(ground_truth, threshold=threshold)
 
