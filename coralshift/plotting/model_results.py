@@ -338,7 +338,7 @@ def plot_confusion_matrix(
 def model_output_to_spatial_confusion(
     label,
     prediction,
-    threshold:float=0.25.,
+    threshold: float = 0.25,
     lat_lims: tuple[float] = None,
     lon_lims: tuple[float] = None,
     fax=None,
