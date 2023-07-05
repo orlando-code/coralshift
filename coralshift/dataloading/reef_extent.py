@@ -4,8 +4,6 @@ import geopandas as gpd
 import numpy as np
 import rasterio
 import xarray as xa
-
-# from pathlib import Path
 from tqdm import tqdm
 
 from coralshift.processing import spatial_data
