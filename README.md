@@ -18,18 +18,18 @@ This repository and associated code is governed by an MIT license. Please see th
 ---
 
 # Using this repository
-You're encouraged to explore the code in the accompanying notebooks. These allow you to download and visualise the necessary data, train and test machine learning models.
+You're encouraged to explore the code in the accompanying notebooks (found in the `/notebooks/` directory). These allow you to download and visualise the necessary data, train and test machine learning models.
 
 ## Environment setup
 It is recommended to use a package manager such as `conda` to install the dependencies. 
 You may install with `pip`. However, since the package utilises the `rasterio` module – which requires C compiled code – successful installation via `pip` is not guaranteed for Windows machines.
 
-### CONDA | CUDA
+### conda | cuda
 ```shell
 conda env create -f environment.yml
 ```
 
-### PIP
+### pip
 You may want to install it in a virtual environment.
 ```shell
 pip install -r requirements.txt
@@ -41,7 +41,7 @@ pip install -r requirements.txt
 'Toy' datasets – simplified recreations of the actual data used – are hosted on [Zenodo](https://zenodo.org/record/8110926) (DOI: 10.5281/zenodo.8110925). These allow rapid recreation of key results.
 
 ### Full datasets
-Datasets used in the accompanying report are downloaded via the `notebooks/dataloading.ipynb` notebook. This details the necessary steps to download and process the data. This functionality uses a Jupyter notebook to enable subsets of the data to be easily installed, and to make data installation accessible to all users through the notebook's visual format. Note: due to the sequential method by which APIs are queried, this download takes on the order of days to complete and requires a large amount of storage space. It is highly recommended that the example datasets (above) are used.
+Datasets used in the accompanying report are downloaded via the `notebooks/dataloading.ipynb` notebook. This details and automates the necessary steps to download and process the data. This functionality uses a Jupyter notebook to enable subsets of the data to be easily installed, and to make data installation accessible to all users through the notebook's visual format. Note: due to the sequential method by which APIs are queried, this download takes on the order of days to complete and requires a large amount of storage space. It is highly recommended that the example datasets (above) are used.
 
 Given the size of data ~10s GB, it is recommended to use a remote storage service, such as [Google Drive](https://www.google.co.uk/intl/en-GB/drive/).
 
