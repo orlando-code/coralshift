@@ -38,7 +38,7 @@ pip install -r requirements.txt
 ## Loading the datasets
 
 ### Example datasets
-'Toy' datasets – simplified recreations of the actual data used – are hosted on [Zenodo](10.5281/zenodo.8110925) (DOI: 10.5281/zenodo.8110925). These allow rapid recreation of key results.
+'Toy' datasets – simplified recreations of the actual data used – are hosted on [Zenodo](https://zenodo.org/record/8110926) (DOI: 10.5281/zenodo.8110925). These allow rapid recreation of key results.
 
 ### Full datasets
 Datasets used in the accompanying report are downloaded via the `notebooks/dataloading.ipynb` notebook. This details the necessary steps to download and process the data. This functionality uses a Jupyter notebook to enable subsets of the data to be easily installed, and to make data installation accessible to all users through the notebook's visual format. Note: due to the sequential method by which APIs are queried, this download takes on the order of days to complete and requires a large amount of storage space. It is highly recommended that the example datasets (above) are used.
