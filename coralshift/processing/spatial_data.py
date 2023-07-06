@@ -2233,7 +2233,7 @@ def drop_xa_variables(
 def generate_var_mask(
     xa_d: xa.Dataset | xa.DataArray,
     # var_name: str = "bathymetry_A",
-    limits: tuple[float] = [-2000, 50],
+    limits: tuple[float] = [-2000, 0],
     # sub_val: float = np.nan,
 ) -> xa.DataArray:
     if isinstance(xa_d, xa.DataArray):
