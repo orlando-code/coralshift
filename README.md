@@ -47,8 +47,7 @@ Given the size of data ~10s GB, it is recommended to use a remote storage servic
 
 After downloading, the data will be organised in the following directory structure. Capitalised words indicate where the user has a choice in specifying the data, e.g. choosing the resolution or the region of interest.
 
-`/coralshift/`
-`/datasets/`
+`/datasets/` (situated in parent folder of `coralshift` repository)
 
 ```
  ├── bathymetry  
