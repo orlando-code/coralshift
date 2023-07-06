@@ -706,27 +706,6 @@ def save_json(
         print(f"Dictionary saved as json file at {filepath}")
 
 
-def tifs_to_ncs(nc_dir: Path | list[str], target_resolution_d: float = None) -> None:
-    tif_dir = nc_dir.parent
-    tif_paths = return_list_filepaths(tif_dir, ".tif")
-    for tif_path in tqdm(
-        tif_paths, total=len(tif_paths), desc="Writing tifs to nc files"
-    ):
-        # filename = str(file_ops.get_n_last_subparts_path(tif, 1))
-        filename = tif_path.stem
-        tif_array = tif_to_xa_array(tif_path)
-        # xa_array_dict[filename] = tif_array.rename(filename)
-        if target_resolution_d:
-            tif_array = spatial_data.upsample_xarray_to_target(
-                xa_array=tif_array, target_resolution=target_resolution_d
-            )
-        # save array to nc file
-        save_nc(tif_dir, filename, tif_array)
-
-    return tif_paths
-    print(f"All tifs converted to xarrays and stored as .nc files in {nc_dir}.")
-
-
 def tif_to_xa_array(tif_path) -> xa.DataArray:
     return spatial_data.process_xa_d(rio.open_rasterio(rasterio.open(tif_path)))
 
@@ -778,6 +757,44 @@ def resample_list_xa_ds_into_dict(
         resampled_xa_das_dict[xa_da.name] = xa_resampled
 
     return resampled_xa_das_dict
+
+
+def resample_dir_ncs(ncs_dir, target_resolution_d=1 / 27):
+    nc_files = return_list_filepaths(ncs_dir, ".nc", incl_subdirs=False)
+    res_string = utils.generate_resolution_str(target_resolution_d)
+
+    save_dir = guarantee_existence(ncs_dir / f"{res_string}_arrays")
+    for nc in nc_files:
+        nc_xa = open_xa_file(nc).astype("float32")
+        new_name = f"{str(nc.stem)}_{res_string}"
+        # resample to res
+        resampled = spatial_data.resample_xarray_to_target(
+            xa_d=nc_xa, target_resolution_d=target_resolution_d, name=new_name
+        )
+        # save
+        save_nc(save_dir, new_name, resampled)
+
+
+def tifs_to_resampled_ncs(
+    tifs_dir: Path | str = None,
+    target_resolution_d: float = 1 / 27,
+):
+    if not tifs_dir:
+        tifs_dir = (directories.get_reef_baseline_dir(),)
+    tif_files = return_list_filepaths(tifs_dir, ".tif")
+
+    res_string = utils.generate_resolution_str(target_resolution_d)
+
+    save_dir = guarantee_existence(tifs_dir / f"{res_string}_arrays")
+    for tif in tif_files:
+        c_xa = open_xa_file(tif)
+        new_name = f"{str(c_xa.stem)}_{res_string}"
+        # resample to res
+        resampled = spatial_data.resample_xarray_to_target(
+            xa_d=c_xa, target_resolution_d=target_resolution_d, name=new_name
+        )
+        # save
+        save_nc(save_dir, new_name, resampled)
 
 
 def resample_list_xa_ds_to_target_res_and_save(
@@ -915,3 +932,29 @@ def open_xa_file(xa_path: Path | str) -> xa.Dataset | xa.DataArray:
         )
     except ValueError:
         return spatial_data.process_xa_d(xa.open_dataset(xa_path, decode_coords="all"))
+
+
+############
+# DEPRECATED
+############
+
+
+# def tifs_to_ncs(nc_dir: Path | list[str], target_resolution_d: float = None) -> None:
+#     tif_dir = nc_dir.parent
+#     tif_paths = return_list_filepaths(tif_dir, ".tif")
+#     for tif_path in tqdm(
+#         tif_paths, total=len(tif_paths), desc="Writing tifs to nc files"
+#     ):
+#         # filename = str(file_ops.get_n_last_subparts_path(tif, 1))
+#         filename = tif_path.stem
+#         tif_array = tif_to_xa_array(tif_path)
+#         # xa_array_dict[filename] = tif_array.rename(filename)
+#         if target_resolution_d:
+#             tif_array = spatial_data.upsample_xarray_to_target(
+#                 xa_array=tif_array, target_resolution=target_resolution_d
+#             )
+#         # save array to nc file
+#         save_nc(tif_dir, filename, tif_array)
+
+#     return tif_paths
+#     print(f"All tifs converted to xarrays and stored as .nc files in {nc_dir}.")
