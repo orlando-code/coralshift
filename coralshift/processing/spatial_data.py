@@ -21,6 +21,7 @@ def resample_xarray_to_target(
     lon_lims: tuple[float] = None,
     method=rasterio.enums.Resampling.bilinear,
     name: str = " ",
+    crs: str = "EPSG:4326",
 ) -> xa.Dataset:
     """
     Upsamples an xarray DataArray or Dataset to a target resolution.
@@ -2232,7 +2233,7 @@ def drop_xa_variables(
 def generate_var_mask(
     xa_d: xa.Dataset | xa.DataArray,
     # var_name: str = "bathymetry_A",
-    limits: tuple[float] = [-2000, 0],
+    limits: tuple[float] = [-2000, 50],
     # sub_val: float = np.nan,
 ) -> xa.DataArray:
     if isinstance(xa_d, xa.DataArray):

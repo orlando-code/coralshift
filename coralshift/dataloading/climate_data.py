@@ -4,10 +4,7 @@ import numpy as np
 import xarray as xa
 import os
 import cdsapi
-
-# import getpass
-
-# import cdsapi
+import getpass
 
 from pathlib import Path
 from tqdm import tqdm
@@ -188,10 +185,8 @@ def download_reanalysis(
     merged_download_dir = file_ops.guarantee_existence(download_dir / "merged_vars")
 
     # User credentials
-    # username = input("Enter your username: ")
-    # password = getpass.getpass("Enter your password: ")
-    username = "otimmerman"
-    password = "Fgg0N$tUUuL3"
+    username = input("Enter your username: ")
+    password = getpass.getpass("Enter your password: ")
 
     # generate name of combined file
     name_dict = generate_name_dict(variables, date_lims, lon_lims, lat_lims, depth_lims)
@@ -626,21 +621,17 @@ def fetch_weather_data(
             filename = generate_spatiotemporal_var_filename_from_dict(
                 {"var": param, "lats": lat_lims, "lons": lon_lims, "year": str(year)}
             )
-            # filename = str(file_ops.generate_filepath(param_download_dest, filename, format))
             filepath = str(
                 file_ops.generate_filepath(param_download_dest, filename, format)
             )
 
             if not Path(filepath).is_file():
                 time_info_dict = return_times_info(year, months, days)
-                # filename = str(file_ops.generate_filepath(param_download_dest, f"{param}_{year}", format))
-                # filename = str((param_download_dest / param / str(year)).with_suffix(format))
                 ecmwf_api_call(
                     c, filepath, param, time_info_dict, area, dataset_tag, format
                 )
             else:
                 print(f"Filepath already exists: {filepath}")
-        # TODO: more descriptive filename
 
 
 def generate_era5_data(

@@ -736,3 +736,14 @@ def plot_reef_areas(region: list[str] = None):
         )
 
     plt.title("Selected region(s) of interest")
+
+
+def plot_var_mask(
+    xa_d: xa.Dataset | xa.DataArray,
+    limits: tuple[float] = [-2000, 0],
+    title: str = "masked variable",
+) -> None:
+    # plot shallow water mask
+    shallow_mask = spatial_data.generate_var_mask(xa_d)
+    plot_spatial(shallow_mask, cmap_type="lim", title=title, cbar=False)
+    return shallow_mask
