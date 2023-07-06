@@ -224,7 +224,7 @@ def format_spatial_plot(
     """
     if cbar:
         plt.colorbar(
-            image, orientation=orient_colorbar, label=name, pad=0.1, fraction=0.046
+            image, orientation=orient_colorbar, label=name, pad=cbar_pad, fraction=0.046
         )
     ax.set_title(title)
     # ax.coastlines(resolution="10m", color="red", linewidth=1)
