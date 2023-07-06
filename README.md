@@ -24,12 +24,12 @@ You're encouraged to explore the code in the accompanying notebooks. These allow
 It is recommended to use a package manager such as `conda` to install the dependencies. 
 You may install with `pip`. However, since the package utilises the `rasterio` module – which requires C compiled code – successful installation via `pip` is not guaranteed for Windows machines.
 
-### CONDA | CUDA
+### conda | cuda
 ```shell
 conda env create -f environment.yml
 ```
 
-### PIP
+### pip
 You may want to install it in a virtual environment.
 ```shell
 pip install -r requirements.txt
