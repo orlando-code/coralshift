@@ -18,7 +18,7 @@ This repository and associated code is governed by an MIT license. Please see th
 ---
 
 # Using this repository
-You're encouraged to explore the code in the accompanying notebooks. These allow you to download and visualise the necessary data, train and test machine learning models.
+You're encouraged to explore the code in the accompanying notebooks (found in the `/notebooks/` directory). These allow you to download and visualise the necessary data, train and test machine learning models.
 
 ## Environment setup
 It is recommended to use a package manager such as `conda` to install the dependencies. 
