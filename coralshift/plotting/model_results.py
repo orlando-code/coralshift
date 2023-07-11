@@ -29,7 +29,7 @@ def spatial_confusion_matrix_da(
     ground_truth (xa.DataArray): Ground truth values.
 
     Returns
-    -------    -------
+    -------
     tuple[xa.DataArray, dict]: Spatial confusion matrix and dictionary of integer: description pairs
 
     Notes
@@ -64,6 +64,20 @@ def spatial_confusion_matrix_da(
 
 
 def generate_confusion_ds(xa_ds: xa.Dataset, ground_truth_var: str, predicted_var: str):
+    """
+    Generates confusion matrix values and adds them to the xarray Dataset.
+
+    Parameters
+    ----------
+        xa_ds (xa.Dataset): Input xarray Dataset.
+        ground_truth_var (str): Variable name for ground truth values in the Dataset.
+        predicted_var (str): Variable name for predicted values in the Dataset.
+
+    Returns
+    -------
+        Tuple[xa.Dataset, np.ndarray, Dict]: A tuple containing the modified xarray Dataset, confusion matrix values,
+        and a dictionary of value mappings.
+    """
     confusion_values, vals_dict = spatial_confusion_matrix_da(
         xa_ds[predicted_var], xa_ds[ground_truth_var]
     )
@@ -126,40 +140,6 @@ def plot_spatial_confusion(
     colorbar.set_ticklabels(list(vals_dict.keys()), rotation=0)
 
 
-# def plot_spatial_confusion(
-#     xa_ds: xa.Dataset, ground_truth_var: str, predicted_var: str
-# ) -> xa.Dataset:
-#     """Plot a spatial confusion matrix based on the predicted and ground truth variables in the xarray dataset.
-
-#     Parameters
-#     ----------
-#         xa_ds (xarray.Dataset): Input xarray dataset.
-#         ground_truth_var (str): Name of the ground truth variable in the dataset.
-#         predicted_var (str): Name of the predicted variable in the dataset.
-
-#     Returns
-#     -------    -------
-#         xarray.Dataset: Updated xarray dataset with the "comparison" variable added.
-#     """
-#     # calculate spatial confusion values and assign to new variable in Dataset
-#     xa_ds, confusion_values, vals_dict = generate_confusion_ds(
-#         xa_ds, ground_truth_var=ground_truth_var, predicted_var=predicted_var
-#     )
-
-#     # from Wes Anderson: https://github.com/karthik/wesanderson/blob/master/R/colors.R
-#     cmap = ["#EEEEEE", "#3B9AB2", "#78B7C5", "#F21A00", "#E1AF00"]
-#     ax = sns.heatmap(confusion_values, cmap=cmap, vmin=0, vmax=5)
-#     ax.set_aspect("equal")
-#     # format colourbar
-#     colorbar = ax.collections[0].colorbar
-#     num_ticks = len(cmap)
-#     vmin, vmax = colorbar.vmin, colorbar.vmax
-#     colorbar.set_ticks(
-#         [vmin + (vmax - vmin) / num_ticks * (0.5 + i) for i in range(num_ticks)]
-#     )
-#     colorbar.set_ticklabels(list(vals_dict.keys()))
-
-
 def format_roc(ax: Axes, title: str = "Receiver Operating Characteristic (ROC) Curve"):
     """
     Format the ROC plot axes.
@@ -188,7 +168,22 @@ def format_roc(ax: Axes, title: str = "Receiver Operating Characteristic (ROC) C
     ax.set_yticks(np.arange(0, 1.2, 0.2))
 
 
-def visualise_region_class_imbalance(region_imbalance_dict: dict):
+def visualise_region_class_imbalance(region_imbalance_dict: dict) -> None:
+    """
+    Visualize class imbalance for different regions.
+
+    Parameters
+    ----------
+        region_imbalance_dict (dict): Dictionary containing class imbalance information for each region.
+            The keys represent the region names, and the values are tuples containing the following:
+            - Total Grid Cells (int): Total number of grid cells in the region.
+            - Fractional Coral Presence (float): Fraction of grid cells containing coral.
+
+    Returns
+    -------
+        None
+    """
+
     df = pd.DataFrame.from_dict(
         region_imbalance_dict,
         orient="index",
@@ -237,14 +232,39 @@ def visualise_region_class_imbalance(region_imbalance_dict: dict):
     ax2.set_ylim((0, 0.2))
 
 
-def count_nonzero_values(xa_da: xa.DataArray):
+def count_nonzero_values(xa_da: xa.DataArray) -> int:
+    """
+    Count the number of nonzero values in a DataArray.
+
+    Parameters
+    ----------
+        xa_da (xa.DataArray): DataArray containing values.
+
+    Returns
+    -------
+        int: Number of nonzero values.
+    """
     non_zero_count = xa_da.where(xa_da != 0).count().item()
     return non_zero_count
 
 
 def calculate_total_class_imbalance(
     xa_ds: list[xa.Dataset | xa.DataArray], var_name: str = None
-):
+) -> tuple[int, float]:
+    """
+    Calculate the total class imbalance for multiple datasets or data arrays.
+
+    Parameters
+    ----------
+        xa_ds (List[Union[xa.Dataset, xa.DataArray]]): List of xarray Datasets or DataArrays.
+        var_name (str, optional): Variable name to extract from the datasets. Defaults to None.
+
+    Returns
+    -------
+        tuple[int, float]: A tuple containing the following:
+            - Total number of nonzero values across all datasets.
+            - Fraction representing the class imbalance.
+    """
     non_zero_vals, total_spatial_vals = [], []
     for xa_d in xa_ds:
         if var_name:
@@ -259,7 +279,22 @@ def calculate_total_class_imbalance(
     return total_non_zero, fraction
 
 
-def calculate_region_class_imbalance(xa_ds_dict: dict):
+def calculate_region_class_imbalance(xa_ds_dict: dict) -> dict:
+    """
+    Calculate the class imbalance for each region in a dictionary of xarray datasets.
+
+    Parameters
+    ----------
+        xa_ds_dict (dict): Dictionary containing xarray datasets or data arrays.
+            The keys represent the region names, and the values are xarray datasets or data arrays.
+
+    Returns
+    -------
+        dict: Dictionary containing class imbalance information for each region.
+            The keys represent the region names, and the values are tuples containing the following:
+            - Total number of nonzero values across the region.
+            - Fraction representing the class imbalance for the region.
+    """
     imbalance_dict = {}
     for k, v in xa_ds_dict.items():
         imbalance_dict[k] = calculate_total_class_imbalance([v])
@@ -314,6 +349,21 @@ def plot_spatial_diffs(
 def plot_confusion_matrix(
     labels, predictions, label_threshold: float = 0, fax=None, colorbar: bool = False
 ) -> None:
+    """
+    Plot the confusion matrix.
+
+    Parameters
+    ----------
+        labels (Any): True labels for comparison.
+        predictions (Any): Predicted labels.
+        label_threshold (float, optional): Label threshold. Defaults to 0.
+        fax (Optional[Any], optional): Axes to plot the confusion matrix. Defaults to None.
+        colorbar (bool, optional): Whether to show the colorbar. Defaults to False.
+
+    Returns
+    -------
+        None
+    """
     cmap = spatial_plots.get_cbar("lim")
 
     if not utils.check_discrete(predictions):
@@ -341,6 +391,23 @@ def model_output_to_spatial_confusion(
     fax=None,
     cbar_pad=0.1,
 ) -> None:
+    """
+    Generates a spatial confusion matrix plot based on label and prediction arrays.
+
+    Parameters
+    ----------
+        label (pd.Series or np.ndarray): True labels.
+        prediction (pd.Series or np.ndarray): Predicted labels.
+        threshold (float, optional): Threshold value for discretizing the prediction and label arrays. Defaults to 0.25.
+        lat_lims (tuple[float], optional): Latitude limits for defining a spatial region. Defaults to None.
+        lon_lims (tuple[float], optional): Longitude limits for defining a spatial region. Defaults to None.
+        fax (object, optional): Fax object for plotting. Defaults to None.
+        cbar_pad (float, optional): Padding between the colorbar and the plot. Defaults to 0.1.
+
+    Returns
+    -------
+        None
+    """
     if not utils.check_discrete(prediction) or not utils.check_discrete(label):
         prediction = baselines.threshold_array(prediction, threshold=threshold)
         label = baselines.threshold_array(label, threshold=threshold)
@@ -372,6 +439,24 @@ def plot_pixelwise_model_result(
     lat_lims=None,
     lon_lims=None,
 ):
+    """
+    Plot the pixel-wise model result.
+
+    Parameters
+    ----------
+        all_data (Any): Data for plotting (gt values).
+        labels (Any): Labels for comparison.
+        predictions (Any): Model predictions.
+        model_type (str, optional): Model type. Defaults to " ".
+        figsize (List[int], optional): Figure size. Defaults to [20, 20].
+        thresh_val (float, optional): Threshold value. Defaults to -0.25.
+        lat_lims (List[float], optional): Latitude limits. Defaults to None.
+        lon_lims (List[float], optional): Longitude limits. Defaults to None.
+
+    Returns
+    -------
+        None
+    """
     fig = plt.figure(figsize=figsize)
     gs = gridspec.GridSpec(2, 2)
 
@@ -391,8 +476,6 @@ def plot_pixelwise_model_result(
         fax=(fig, ax_spatial_cm),
         cbar_pad=0.11,
     )
-    # ax_cm = fig.add_subplot(gs[1,0])
-    # plot_confusion_matrix(labels, predictions, fax=(fig, ax_cm), colorbar=False)
 
 
 def plot_train_test_spatial(
@@ -418,8 +501,6 @@ def plot_train_test_spatial(
 
     cmap = spatial_plots.get_cbar()
     bounds = [0, 0.5, 1]
-    # TODO: fix cmap
-    # https://matplotlib.org/stable/api/_as_gen/matplotlib.colors.BoundaryNorm.html
     if bath_mask.any():
         xa_da = xa_da.where(bath_mask, np.nan)
 
@@ -443,7 +524,7 @@ def plot_train_test_spatial(
     val_lookup = dict(zip(positions, ["train", "test"]))
 
     def formatter_func(x, pos):
-        "The two args are the value and tick position"
+        "The two parameters are the value and tick position"
         val = val_lookup[x]
         return str(val)
 
@@ -458,3 +539,41 @@ def plot_train_test_spatial(
         fraction=0.046,
     )
     return xa_da
+
+
+############
+# DEPRECATED
+############
+
+# def plot_spatial_confusion(
+#     xa_ds: xa.Dataset, ground_truth_var: str, predicted_var: str
+# ) -> xa.Dataset:
+#     """Plot a spatial confusion matrix based on the predicted and ground truth variables in the xarray dataset.
+
+#     Parameters
+#     ----------
+#         xa_ds (xarray.Dataset): Input xarray dataset.
+#         ground_truth_var (str): Name of the ground truth variable in the dataset.
+#         predicted_var (str): Name of the predicted variable in the dataset.
+
+#     Returns
+#     -------    -------
+#         xarray.Dataset: Updated xarray dataset with the "comparison" variable added.
+#     """
+#     # calculate spatial confusion values and assign to new variable in Dataset
+#     xa_ds, confusion_values, vals_dict = generate_confusion_ds(
+#         xa_ds, ground_truth_var=ground_truth_var, predicted_var=predicted_var
+#     )
+
+#     # from Wes Anderson: https://github.com/karthik/wesanderson/blob/master/R/colors.R
+#     cmap = ["#EEEEEE", "#3B9AB2", "#78B7C5", "#F21A00", "#E1AF00"]
+#     ax = sns.heatmap(confusion_values, cmap=cmap, vmin=0, vmax=5)
+#     ax.set_aspect("equal")
+#     # format colourbar
+#     colorbar = ax.collections[0].colorbar
+#     num_ticks = len(cmap)
+#     vmin, vmax = colorbar.vmin, colorbar.vmax
+#     colorbar.set_ticks(
+#         [vmin + (vmax - vmin) / num_ticks * (0.5 + i) for i in range(num_ticks)]
+#     )
+#     colorbar.set_ticklabels(list(vals_dict.keys()))
