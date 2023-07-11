@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from coralshift.utils.file_ops import guarantee_existence
+from coralshift.utils.config import guarantee_existence
 from coralshift.config import get_coralshift_dir
 from pathlib import Path
 

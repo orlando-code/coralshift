@@ -12,25 +12,7 @@ import rioxarray as rio
 import numpy as np
 
 from coralshift.processing import spatial_data
-from coralshift.utils import utils, directories
-
-
-def guarantee_existence(path: Path | str) -> Path:
-    """Checks if string is an existing directory path, else creates it
-
-    Parameter
-    ---------
-    path (str)
-
-    Returns
-    -------
-    Path
-        pathlib.Path object of path
-    """
-    path_obj = Path(path)
-    if not path_obj.exists():
-        path_obj.mkdir(parents=True)
-    return path_obj.resolve()
+from coralshift.utils import utils, directories, config
 
 
 def check_file_exists(
@@ -649,7 +631,7 @@ def generate_filepath(
     necessary."""
     # if generating/ensuring directory path
     if not filename:
-        return guarantee_existence(dir_path)
+        return config.guarantee_existence(dir_path)
     # if filename provided, seemingly with suffix included
     elif not suffix:
         return Path(dir_path) / filename
@@ -763,7 +745,7 @@ def resample_dir_ncs(ncs_dir, target_resolution_d=1 / 27):
     nc_files = return_list_filepaths(ncs_dir, ".nc", incl_subdirs=False)
     res_string = utils.generate_resolution_str(target_resolution_d)
 
-    save_dir = guarantee_existence(ncs_dir / f"{res_string}_arrays")
+    save_dir = config.guarantee_existence(ncs_dir / f"{res_string}_arrays")
     for nc in nc_files:
         nc_xa = open_xa_file(nc).astype("float32")
         new_name = f"{str(nc.stem)}_{res_string}"
@@ -785,7 +767,7 @@ def tifs_to_resampled_ncs(
 
     res_string = utils.generate_resolution_str(target_resolution_d)
 
-    save_dir = guarantee_existence(tifs_dir / f"{res_string}_arrays")
+    save_dir = config.guarantee_existence(tifs_dir / f"{res_string}_arrays")
     for tif in tif_files:
         c_xa = open_xa_file(tif)
         new_name = f"{str(c_xa.stem)}_{res_string}"
