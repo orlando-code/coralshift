@@ -2237,7 +2237,7 @@ def generate_var_mask(
     # sub_val: float = np.nan,
 ) -> xa.DataArray:
     if isinstance(xa_d, xa.DataArray):
-        return (xa_d >= max(limits)) & (xa_d <= min(limits))
+        return (xa_d <= max(limits)) & (xa_d >= min(limits))
     elif isinstance(xa_d, xa.Dataset):
         matching_vars = [var for var in xa_d.variables if var.startswith("bath")]
         if len(matching_vars) == 0:
