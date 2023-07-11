@@ -1,0 +1,17 @@
+cartopy
+dask
+ipython
+geopandas
+geopy
+h5netcdf
+matplotlib
+numpy
+pandas
+pathlib
+rasterio
+shapely
+tqdm
+seaborn
+scikit-learn
+scipy
+xarray
