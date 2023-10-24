@@ -295,7 +295,7 @@ def plot_array_hist(
     """
     fig, ax = plt.subplots()
 
-    if not type(array) == np.ndarray:
+    if not isinstance(array, np.ndarray):
         # if not np array, should be DataArray: so try fetching values. Index first dimension since 1xmxn array
         array = array.values[0]
 

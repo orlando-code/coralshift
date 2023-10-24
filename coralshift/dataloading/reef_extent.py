@@ -33,31 +33,10 @@ def generate_area_geojson(area_class, area_name: str) -> None:
 
     if not output_path.is_file():
         lat_range, lon_range = area_class.get_lat_lon_limits(area_name)
-
-        # Create a GeoJSON feature collection
-        features = [
-            {
-                "type": "Feature",
-                "geometry": {
-                    "type": "MultiPolygon",
-                    "coordinates": [
-                        [
-                            [
-                                [lon_range[0], lat_range[0]],
-                                [lon_range[1], lat_range[0]],
-                                [lon_range[1], lat_range[1]],
-                                [lon_range[0], lat_range[1]],
-                                [lon_range[0], lat_range[0]],
-                            ]
-                        ]
-                    ],
-                },
-                "properties": {"name": name, "format": "GeoJSON"},
-            }
-        ]
-
-        # Create a GeoJSON object
-        geojson_data = {"type": "FeatureCollection", "features": features}
+        # create a geojson object
+        geojson_data = generate_area_geojson_info(
+            lat_range=lat_range, lon_range=lon_range, name=name
+        )
 
         with open(output_path, "w") as file:
             json.dump(geojson_data, file)
@@ -65,6 +44,50 @@ def generate_area_geojson(area_class, area_name: str) -> None:
         print(f"File already exists at {output_path}. Check if this is correct.")
 
     return output_path
+
+
+def generate_area_geojson_info(
+    lat_range: tuple[float], lon_range: tuple[float], name: str = "placeholder"
+) -> dict:
+    """Generate a GeoJSON feature collection representing a rectangular area.
+
+    Parameters
+    ----------
+        lat_range (tuple[float]): A tuple containing the latitude range (min, max) of the area.
+        lon_range (tuple[float]): A tuple containing the longitude range (min, max) of the area.
+        name (str, optional): Name or identifier for the area (default is "placeholder").
+
+    Returns
+    -------
+        dict: A GeoJSON object representing the rectangular area in the form of a Feature Collection.
+
+    Example:
+        # Generate a GeoJSON object representing an area from latitude 10 to 20 and longitude 30 to 40
+        geojson_info = generate_area_geojson_info((10, 20), (30, 40), name="Sample Area")
+    """
+    features = [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "MultiPolygon",
+                "coordinates": [
+                    [
+                        [
+                            [lon_range[0], lat_range[0]],
+                            [lon_range[1], lat_range[0]],
+                            [lon_range[1], lat_range[1]],
+                            [lon_range[0], lat_range[1]],
+                            [lon_range[0], lat_range[0]],
+                        ]
+                    ]
+                ],
+            },
+            "properties": {"name": name, "format": "GeoJSON"},
+        }
+    ]
+
+    # return GeoJSON object
+    return {"type": "FeatureCollection", "features": features}
 
 
 def process_benthic_pd(
