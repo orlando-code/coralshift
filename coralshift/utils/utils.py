@@ -70,7 +70,7 @@ def round_list_tuples(
     -------
         list[str]: A list of rounded values as strings.
     """
-    if type(tuple_list) == tuple:
+    if tuple_list.isinstance(tuple):
         tuple_list = [tuple_list]
     return [
         tuple(round(element, decimal_places) for element in sub_tuple)
@@ -89,7 +89,7 @@ def underscore_str_of_dates(dts: list[str | np.datetime64]) -> list[str]:
     -------
         list[str]: A list of date strings.
     """
-    if type(dts) == list or type(dts) == tuple:
+    if dts.isinstance(list) or dts.isinstance(tuple):
         return "_".join([spatial_data.date_from_dt(dt) for dt in dts])
     else:
         return spatial_data.date_from_dt(dts)
@@ -107,7 +107,7 @@ def underscore_str_of_strings(variables: str | list[str]) -> str:
         str: A string representation of the variable(s).
     """
     # if single variable
-    if type(variables) == str:
+    if variables.isinstance(str):
         return variables
     else:
         return "_".join([str(var) for var in variables])
@@ -124,7 +124,7 @@ def underscore_list_of_tuples(tuples: str | list[tuple]) -> str:
     -------
         str: String representation of the tuples with elements separated by underscores.
     """
-    if type(tuples) == list:
+    if tuples.isinstance(list):
         flattened_list = [item for sublist in tuples for item in sublist]
         return "_".join(map(str, flattened_list))
     else:
@@ -191,7 +191,7 @@ def pad_number_with_zeros(number: str | int, resulting_len: str = 2) -> str:
     -------
     str: The padded number as a string.
     """
-    if not type(number) == str:
+    if not number.isinstance(str):
         try:
             number = str(number)
         except ValueError:
