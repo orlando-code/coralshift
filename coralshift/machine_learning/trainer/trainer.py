@@ -3,7 +3,7 @@ from torch import nn
 from tqdm import tqdm
 from typing import List, Tuple
 
-from coralshift.data_handling.data_handler import DataHandler
+from coralshift.machine_learning.data_handling.data_handler import DataHandler
 
 
 class Trainer:
