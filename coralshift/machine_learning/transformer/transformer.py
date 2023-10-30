@@ -2,7 +2,7 @@ from coralshift.machine_learning.transformer.encoder import (
     TransformerBatchNormEncoderLayer,
 )
 from coralshift.machine_learning.transformer.positional_encoding import get_pos_encoder
-from coralshift.machine_learning.transformer.transformer_utils import get_activation_fn
+from coralshift.machine_learning.transformer_utils import get_activation_fn
 
 from torch import Tensor
 from torch.nn import (
