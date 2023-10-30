@@ -1,7 +1,8 @@
 import torch
 import numpy as np
 import torch.nn.functional as F
-from sktime.datasets import load_from_tsfile
+
+# from sktime.datasets import load_from_tsfile
 
 from coralshift.machine_learning.data_handling.data_handler import DataHandler
 
