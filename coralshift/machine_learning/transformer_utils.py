@@ -10,25 +10,29 @@ from coralshift.machine_learning.data_handling.data_handler import DataHandler
 def create_dummy_data(n_samples=100, n_features=3, n_timesteps=10, train=True):
     # Generate random data for the first n_samples/2 samples (greater than 100)
     data_high = np.random.randint(
-        101, 200, size=(n_samples / 2, n_features, n_timesteps)
+        101, 200, size=(int(n_samples / 2), n_features, n_timesteps)
     )
     # Generate random data for the latter n_samples/2 samples (less than 10)
-    data_low = np.random.randint(1, 10, size=(n_samples / 2, n_features, n_timesteps))
+    data_low = np.random.randint(
+        1, 10, size=(int(n_samples / 2), n_features, n_timesteps)
+    )
     # Concatenate the data arrays to get the final data array
     train_x = np.concatenate((data_high, data_low), axis=0)
     # Generate binary labels "yes" for the first n_samples/2 samples and "no" for the latter n_samples/2 samples
-    train_y = np.array(["yes"] * n_samples / 2 + ["no"] * n_samples / 2)
+    train_y = np.array(["yes"] * int(n_samples / 2) + ["no"] * int(n_samples / 2))
 
     # Generate random data for the first n_samples/2 samples (greater than 100)
     data_high = np.random.randint(
-        101, 200, size=(n_samples / 4, n_features, n_timesteps)
+        101, 200, size=(int(n_samples / 4), n_features, n_timesteps)
     )
     # Generate random data for the latter n_samples/2 samples (less than 10)
-    data_low = np.random.randint(1, 10, size=(n_samples / 4, n_features, n_timesteps))
+    data_low = np.random.randint(
+        1, 10, size=(int(n_samples / 4), n_features, n_timesteps)
+    )
     # Concatenate the data arrays to get the final data array
     test_x = np.concatenate((data_high, data_low), axis=0)
     # Generate binary labels "yes" for the first 25 samples and "no" for the latter 25 samples
-    test_y = np.array(["yes"] * n_samples / 4 + ["no"] * n_samples / 4)
+    test_y = np.array(["yes"] * int(n_samples / 4) + ["no"] * int(n_samples / 4))
 
     if train:
         return train_x, train_y
