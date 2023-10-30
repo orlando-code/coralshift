@@ -36,7 +36,9 @@ def create_dummy_data(n_samples=100, n_features=3, n_timesteps=10, train=True):
         return test_x, test_y
 
 
-def get_data(train_path, test_path):
+def get_data(
+    # train_path, test_path
+):
     torch.cuda.empty_cache()
     # outputs numpy arrays, shape: (n_samples, n_features, n_timesteps), (n_samples,)
     # train_x, train_y = load_from_tsfile(train_path, return_data_type="numpy3d")
