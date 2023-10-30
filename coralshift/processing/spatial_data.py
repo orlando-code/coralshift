@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import xarray as xa
-import rioxarray as rio
+
+# import rioxarray as rio
 import numpy as np
 import rasterio
 import pandas as pd
@@ -442,23 +443,23 @@ def return_pixels_closest_to_value(
     return array_vals[np.nonzero(array_vals)]
 
 
-def tif_to_xarray(tif_path: Path | str, renamed: str = None) -> xa.DataArray:
-    """
-    Convert a TIFF file to an xarray.DataArray object.
+# def tif_to_xarray(tif_path: Path | str, renamed: str = None) -> xa.DataArray:
+#     """
+#     Convert a TIFF file to an xarray.DataArray object.
 
-    Parameters
-    ----------
-        tif_path (Path or str): Path to the TIFF file.
-        renamed (str, optional): Name to assign to the DataArray. If not provided, the original name will be used.
+#     Parameters
+#     ----------
+#         tif_path (Path or str): Path to the TIFF file.
+#         renamed (str, optional): Name to assign to the DataArray. If not provided, the original name will be used.
 
-    Returns
-    -------∂aArray: The converted DataArray object.
-    """
-    xa_da = rio.open_rasterio(rasterio.open(tif_path))
-    if renamed:
-        return process_xa_d(xa_da.rename(renamed))
-    else:
-        return process_xa_d(xa_da)
+#     Returns
+#     -------∂aArray: The converted DataArray object.
+#     """
+#     xa_da = rio.open_rasterio(rasterio.open(tif_path))
+#     if renamed:
+#         return process_xa_d(xa_da.rename(renamed))
+#     else:
+#         return process_xa_d(xa_da)
 
 
 def return_distance_closest_to_value(
@@ -496,63 +497,64 @@ def return_distance_closest_to_value(
     )
 
 
-def upsample_xa_array(
-    xa_array: xa.DataArray, resolution: float = 1 / 12, shape: tuple = None
-) -> xa.DataArray:
-    """Upsamples the resolution of a DataArray using rioxarray's 'reproject' functionality: reprojecting it onto a lower
-    resolution and/or differently-sized grid
+# def upsample_xa_array(
+#     xa_array: xa.DataArray, resolution: float = 1 / 12, shape: tuple = None
+# ) -> xa.DataArray:
+#     """Upsamples the resolution of a DataArray using rioxarray's 'reproject' functionality: reprojecting it onto a
+# lower
+#     resolution and/or differently-sized grid
 
-    Parameters
-    ----------
-    xa_array (xa.DataArray): Input DataArray to upsample.
-    resolution (float, optional): Output resolution of the upsampled DataArray, in the same units as the input.
-        Defaults to 1/12.
-    shape (tuple, optional): Shape of the output DataArray as (height, width). If specified, overrides the resolution
-        parameter.
+#     Parameters
+#     ----------
+#     xa_array (xa.DataArray): Input DataArray to upsample.
+#     resolution (float, optional): Output resolution of the upsampled DataArray, in the same units as the input.
+#         Defaults to 1/12.
+#     shape (tuple, optional): Shape of the output DataArray as (height, width). If specified, overrides the resolution
+#         parameter.
 
-    Returns
-    -------
-    xa.DataArray: The upsampled DataArray
-    """
+#     Returns
+#     -------
+#     xa.DataArray: The upsampled DataArray
+#     """
 
-    if not shape:
-        upsampled_array = xa_array.rio.reproject(
-            xa_array.rio.crs, resolution=resolution
-        )
-    else:
-        upsampled_array = xa_array.rio.reproject(xa_array.rio.crs, shape=shape)
+#     if not shape:
+#         upsampled_array = xa_array.rio.reproject(
+#             xa_array.rio.crs, resolution=resolution
+#         )
+#     else:
+#         upsampled_array = xa_array.rio.reproject(xa_array.rio.crs, shape=shape)
 
-    return upsampled_array
+#     return upsampled_array
 
 
-def upsample_dict_of_xa_arrays(
-    xa_dict: dict, resolution: float = 1 / 12, shape: tuple[int, int] = None
-) -> dict:
-    """Upsamples the resolution of each DataArray in a dictionary and returns the upsampled dictionary.
+# def upsample_dict_of_xa_arrays(
+#     xa_dict: dict, resolution: float = 1 / 12, shape: tuple[int, int] = None
+# ) -> dict:
+#     """Upsamples the resolution of each DataArray in a dictionary and returns the upsampled dictionary.
 
-    Parameters
-    ----------
-    xa_dict (dict): Dictionary containing the input DataArrays.
-    resolution (float, optional): Output resolution of the upsampled DataArrays, in the same units as the input.
-        Defaults to 1/12.
-    shape (tuple, optional): Shape of the output DataArrays as (height, width). If specified, overrides the resolution
-        parameter.
+#     Parameters
+#     ----------
+#     xa_dict (dict): Dictionary containing the input DataArrays.
+#     resolution (float, optional): Output resolution of the upsampled DataArrays, in the same units as the input.
+#         Defaults to 1/12.
+#     shape (tuple, optional): Shape of the output DataArrays as (height, width). If specified, overrides the resolution
+#         parameter.
 
-    Returns
-    -------
-    dict: Dictionary containing the upsampled DataArrays with corresponding keys as array_name_upsampled names.
-    TODO: add in check to ensure that upsampling rather than downsampling?
-    """
-    upsampled_dict = {}
-    print(f"Upsampling {xa_dict.keys()} from dictionary to {resolution}{shape}.")
-    for name, array in tqdm(xa_dict.items(), desc="processing xarray dict: "):
-        upsampled_name = "_".join(
-            (file_ops.remove_suffix(name), "upsampled", "{0:.3g}".format(resolution))
-        )
-        upsampled_array = upsample_xa_array(array, resolution, shape)
-        upsampled_dict[upsampled_name] = upsampled_array
+#     Returns
+#     -------
+#     dict: Dictionary containing the upsampled DataArrays with corresponding keys as array_name_upsampled names.
+#     TODO: add in check to ensure that upsampling rather than downsampling?
+#     """
+#     upsampled_dict = {}
+#     print(f"Upsampling {xa_dict.keys()} from dictionary to {resolution}{shape}.")
+#     for name, array in tqdm(xa_dict.items(), desc="processing xarray dict: "):
+#         upsampled_name = "_".join(
+#             (file_ops.remove_suffix(name), "upsampled", "{0:.3g}".format(resolution))
+#         )
+#         upsampled_array = upsample_xa_array(array, resolution, shape)
+#         upsampled_dict[upsampled_name] = upsampled_array
 
-    return upsampled_dict
+#     return upsampled_dict
 
 
 def xarray_coord_limits(xa_array: xa.Dataset, dim: str) -> tuple[float]:
@@ -1218,8 +1220,8 @@ def process_xa_d(
     rename_mapping: dict = {
         "lat": "latitude",
         "lon": "longitude",
-        "x": "longitude",
         "y": "latitude",
+        "x": "longitude",
     },
     squeeze_coords: str | list[str] = None,
     chunk_dict: dict = {"latitude": 100, "longitude": 100, "time": 100},
@@ -2021,9 +2023,9 @@ def get_vars_from_ds_or_da(xa_d: xa.DataArray | xa.Dataset) -> str | list[str]:
     -------
     str | list[str]: Variable name(s).
     """
-    if type(xa_d) == xa.core.dataarray.DataArray:
+    if xa_d.isinstance(xa.core.dataarray.DataArray):
         vars = xa_d.name
-    elif type(xa_d) == xa.core.dataarray.Dataset:
+    elif xa_d.isinstance(xa.core.dataarray.Dataset):
         vars = list(xa_d.data_vars)
     else:
         raise TypeError("Format was neither an xarray Dataset nor a DataArray")
