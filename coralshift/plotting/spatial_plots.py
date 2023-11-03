@@ -165,7 +165,7 @@ def plot_spatial(
     else:
         name = list(xa_da.data_vars)[0]
     if not title:
-        title = name + " at ${:.4f}^\circ$ (~{:.0f} m) resolution".format(  # noqa
+        title = name + " at {:.4f}° (~{:.0f} m) resolution".format(  # noqa
             resolution_d, resolution_m
         )
 
