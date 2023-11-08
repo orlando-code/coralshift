@@ -19,3 +19,6 @@ __pycache__/
 ### VisualStudioCode Patch ###
 # Ignore all local history of files
 **/.history
+
+# ignore data folder: too large for repository
+/data
