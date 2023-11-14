@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import xarray as xa
 
-# import rioxarray as rio
+import rioxarray as rio
 import numpy as np
 import rasterio
 import pandas as pd
@@ -1078,47 +1078,96 @@ def get_variable_values(xa_ds: xa.Dataset, var_name: str) -> list[np.ndarray]:
     return values_list
 
 
-def buffer_nans(array: np.ndarray, size: float = 1) -> np.ndarray:
-    """Buffer nan values in a 2D array by taking the mean of valid neighbors.
+# def buffer_nans(array: np.ndarray, num_pixels: float = 1) -> np.ndarray:
+#     """Buffer nan values in a 2D array by taking the mean of valid neighbors.
 
-    Parameters
-    ----------
+#     Parameters
+#     ----------
+#         array (ndarray): Input 2D array with NaN values representing land.
+#         num_pixels (int, optional): Buffer num_pixels in pixels. Defaults to 1.
+
+#     Returns
+#     -------
+#         np.ndarray: Buffered array with NaN values replaced by the mean of valid neighbors.
+#     """
+
+#     def nan_sweeper(values: np.ndarray):
+#         """Custom function to sweep NaN values and calculate the mean of valid neighbors.
+
+#         Parameters
+#         ----------
+#             values (np.ndarray): 1D array representing the neighborhood of an element.
+
+#         Returns
+#         -------
+#             float: Mean value of valid neighbors or the central element if not NaN.
+#         """
+#         central_value = values[len(values) // 2]
+#         # check if central element of kernel is nan
+#         if np.isnan(central_value):
+#             if np.isnan(values).all():
+#                 return central_value
+#             # extract valid (non-nan values)
+#             valid_values = values[~(np.isnan(values))]
+#             # and return the mean of these values, to be assigned to rest of the buffer kernel
+#             return np.mean(valid_values)
+#         else:
+#             return central_value
+
+#     actual_num_pixels = num_pixels + 1
+#     # call nan_sweeper on each element of "array"
+#     # "constant" – array extended by filling all values beyond edge with same constant value, defined by cval
+#     buffered_array = generic_filter(
+#         array, nan_sweeper, size=actual_num_pixels, mode="constant", cval=np.nan
+#     )
+#     return buffered_array
+
+
+# def buffer_nans(array: np.ndarray, num_pixels: int = 1) -> np.ndarray:
+#     """Buffer NaN values in a 2D array by taking the mean of valid neighbors.
+
+#     Parameters:
+#         array (ndarray): Input 2D array with NaN values representing land.
+#         num_pixels (int, optional): Number of pixels to buffer by. Defaults to 1.
+
+#     Returns:
+#         np.ndarray: Buffered array with NaN values replaced by the mean of valid neighbors.
+#     """
+
+#     def nan_sweeper(values):
+#         # Check if the central element of the kernel is NaN
+#         if np.isnan(values[len(values) // 2]):
+#             # Extract valid (non-NaN) values
+#             valid_values = values[~np.isnan(values)]
+#             if len(valid_values) == 0:
+#                 return np.nan  # All neighbors are NaN
+#             else:
+#                 return np.mean(valid_values)
+#         else:
+#             return values[len(values) // 2]
+
+#     # kernel_size = 2 * num_pixels + 1  # Kernel size considering neighbors
+#     kernel_size = num_pixels + 1
+#     buffered_array = generic_filter(
+#         array, nan_sweeper, size=kernel_size, mode="constant", cval=np.nan
+#     )
+#     return buffered_array
+
+
+def buffer_nans(array: np.ndarray, num_pixels: int = 1) -> np.ndarray:
+    """Buffer NaN values in a 2D array by taking the mean of valid neighbors.
+
+    Parameters:
         array (ndarray): Input 2D array with NaN values representing land.
-        size (int, optional): Buffer size in pixels. Defaults to 1.
+        num_pixels (int, optional): Number of pixels to buffer by. Defaults to 1.
 
-    Returns
-    -------
+    Returns:
         np.ndarray: Buffered array with NaN values replaced by the mean of valid neighbors.
     """
+    from skimage.restoration import inpaint
 
-    def nan_sweeper(values: np.ndarray):
-        """Custom function to sweep NaN values and calculate the mean of valid neighbors.
-
-        Parameters
-        ----------
-            values (np.ndarray): 1D array representing the neighborhood of an element.
-
-        Returns
-        -------
-            float: Mean value of valid neighbors or the central element if not NaN.
-        """
-        central_value = values[len(values) // 2]
-        # check if central element of kernel is nan
-        if np.isnan(central_value):
-            if np.isnan(values).all():
-                return central_value
-            # extract valid (non-nan values)
-            valid_values = values[~(np.isnan(values))]
-            # and return the mean of these values, to be assigned to rest of the buffer kernel
-            return np.mean(valid_values)
-        else:
-            return central_value
-
-    # call nan_sweeper on each element of "array"
-    # "constant" – array extended by filling all values beyond edge with same constant value, defined by cval
-    buffered_array = generic_filter(
-        array, nan_sweeper, size=size, mode="constant", cval=np.nan
-    )
+    mask = np.isnan(array).astype(int)
+    buffered_array = inpaint.inpaint_biharmonic(array, mask)
     return buffered_array
 
     # # Use Dask array instead of NumPy array for parallel computation
@@ -1772,7 +1821,7 @@ def spatially_buffer_timeseries(
             xa_ds[data_var],
             input_core_dims=[[]],
             output_core_dims=[[]],
-            kwargs={"size": buffer_size},
+            kwargs={"num_pixels": buffer_size},
             dask="parallelized",
         )
         buffered_ds[data_var] = buffered
@@ -2063,13 +2112,10 @@ def calculate_spatial_resolution(xa_d: xa.Dataset | xa.DataArray) -> tuple[float
     -------
     tuple[float]: Spatial resolution of latitude and longitude.
     """
-    # calculate number of latitude and longitude data points
-    num_lats, num_lons = len(xa_d.latitude.values), len(xa_d.longitude.values)
-    # calculate extreme values of latitude and longitude
-    lat_lims = xarray_coord_limits(xa_d, "latitude")
-    lon_lims = xarray_coord_limits(xa_d, "longitude")
-    lat_resolution = np.divide(np.diff(lat_lims), num_lats).item()
-    lon_resolution = np.divide(np.diff(lon_lims), num_lons).item()
+    # average latitudinal resolution
+    lat_resolution = np.mean(np.diff(xa_d.latitude.values))
+    # average longitudinal resolution
+    lon_resolution = np.mean(np.diff(xa_d.longitude.values))
 
     return lat_resolution, lon_resolution
 
