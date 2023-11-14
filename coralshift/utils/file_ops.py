@@ -918,6 +918,57 @@ def open_xa_file(xa_path: Path | str) -> xa.Dataset | xa.DataArray:
         return spatial_data.process_xa_d(xa.open_dataset(xa_path, decode_coords="all"))
 
 
+####
+# Michaelmas
+
+
+def create_coord_subdir_name(og_dir_p, lats, lons, depths):
+    """
+    Creates a subdirectory of the original directory with the coordinates of the data appended to the name.
+
+    Args:
+        og_dir_p (str): The original directory.
+        lats (list): The latitude values of the data.
+        lons (list): The longitude values of the data.
+        depths (list): The depth values of the data.
+
+    Returns:
+        None
+
+    TODO: make less specific i.e. can specify a subset of info to append to new dir. Could split into naming and creation
+    """
+    og_dir_name = Path(og_dir_p).name
+    # Concatenate lat and lon values to create a subdirectory name
+    sub_dir_name = utils.replace_dot_with_dash(
+        f"{og_dir_name}_lat{min(lats)}_{max(lats)}_lon{min(lons)}_{max(lons)}_dep{min(depths)}_{max(depths)}"
+    )
+
+    return sub_dir_name
+
+
+def create_subdirectory(og_dir_p, subdir_name):
+    """
+    Creates a subdirectory of the original directory with the coordinates of the data appended to the name.
+
+    Args:
+        og_dir_p (str): The original directory.
+        new_dir_name (str): The name of the new subdirectory.
+
+    Returns:
+        None
+    """
+    # Create a Path object for the subdirectory
+    subdir_p = og_dir_p / subdir_name
+
+    # Check if the subdirectory already exists
+    if not subdir_p.exists():
+        # Create the subdirectory
+        subdir_p.mkdir(parents=True, exist_ok=True)
+        print(f"Subdirectory '{subdir_name}' created successfully.")
+    else:
+        print(f"Subdirectory '{subdir_name}' already exists.")
+
+
 ############
 # DEPRECATED
 ############
