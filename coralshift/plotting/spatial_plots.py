@@ -747,3 +747,41 @@ def plot_var_mask(
     shallow_mask = spatial_data.generate_var_mask(xa_d)
     plot_spatial(shallow_mask, cmap_type="lim", title=title, cbar=False)
     return shallow_mask
+
+
+def visualise_predictions(
+    pred_df: pd.DataFrame, gt: str = "unep_coral_presence", title: str = None
+) -> None:
+    """
+    Visualise predictions against ground truth.
+
+    Args:
+        pred_df (pd.DataFrame): The dataframe containing the predictions and ground truth.
+        gt (str): The name of the ground truth variable.
+        title (str): The title of the plot.
+
+    Returns:
+        None
+    """
+    f, ax = plt.subplots(
+        ncols=3, figsize=(14, 5), subplot_kw={"projection": ccrs.PlateCarree()}
+    )
+
+    spatial_plots.plot_spatial(
+        pred_df["unep_coral_presence"].isel(time=0),
+        title="Ground Truth",
+        fax=[f, ax[0]],
+    )
+    spatial_plots.plot_spatial(
+        pred_df["prediction"].isel(time=0), title="Predictions", fax=[f, ax[1]]
+    )
+    ax[2].scatter(pred_df["unep_coral_presence"], pred_df["prediction"])
+
+    # formatting
+    ax[2].set_xlabel("Actual")
+    ax[2].set_ylabel("Predicted")
+    ax[2].set_title("Predictions vs Actual")
+    ax[2].axline((0, 0), slope=1, c="k")
+    ax[2].set_ylim(0, 1)
+    if title:
+        f.suptitle(title)
