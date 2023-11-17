@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from coralshift.utils.config import guarantee_existence
-from coralshift.config import get_coralshift_dir
+from coralshift.utils.config import guarantee_existence, get_coralshift_dir
 from pathlib import Path
 
 # def get_data_dir() -> Path:

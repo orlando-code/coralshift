@@ -5,17 +5,19 @@ from coralshift.machine_learning.transformer.positional_encoding import get_pos_
 from coralshift.machine_learning.transformer_utils import get_activation_fn
 
 from torch import Tensor
-from torch.nn import (
-    Module,
-    Linear,
-    TransformerEncoderLayer,
-    TransformerEncoder,
-    Dropout,
-)
+from torch import nn
+
+# from torch.nn import (
+#     Module,
+#     Linear,
+#     TransformerEncoderLayer,
+#     TransformerEncoder,
+#     Dropout,
+# )
 import math
 
 
-class TSTransformerEncoder(Module):
+class TSTransformerEncoder(nn.Module):
     """Time series transformer encoder module.
 
     Args:
@@ -52,13 +54,13 @@ class TSTransformerEncoder(Module):
         self.d_model = d_model
         self.n_heads = n_heads
 
-        self.project_inp = Linear(feat_dim, d_model)
+        self.project_inp = nn.Linear(feat_dim, d_model)
         self.pos_enc = get_pos_encoder(pos_encoding)(
             d_model, dropout=dropout * (1.0 - freeze), max_len=max_len
         )
 
         if norm == "LayerNorm":
-            encoder_layer = TransformerEncoderLayer(
+            encoder_layer = nnn.TransformerEncoderLayer(
                 d_model,
                 self.n_heads,
                 dim_feedforward,
@@ -74,13 +76,13 @@ class TSTransformerEncoder(Module):
                 activation=activation,
             )
 
-        self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers)
 
-        self.output_layer = Linear(d_model, feat_dim)
+        self.output_layer = nn.Linear(d_model, feat_dim)
 
         self.act = get_activation_fn(activation)
 
-        self.dropout1 = Dropout(dropout)
+        self.dropout1 = nn.Dropout(dropout)
 
         self.feat_dim = feat_dim
 
@@ -117,7 +119,7 @@ class TSTransformerEncoder(Module):
         return output
 
 
-class TSTransformerEncoderClassiregressor(Module):
+class TSTransformerEncoderClassiregressor(nn.Module):
     """
     Simplest classifier/regressor. Can be either regressor or classifier because the output does not include
     softmax. Concatenates final layer embeddings and uses 0s to ignore padding embeddings in final output layer.
@@ -158,13 +160,13 @@ class TSTransformerEncoderClassiregressor(Module):
         self.d_model = d_model
         self.n_heads = n_heads
 
-        self.project_inp = Linear(feat_dim, d_model)
+        self.project_inp = nn.Linear(feat_dim, d_model)
         self.pos_enc = get_pos_encoder(pos_encoding)(
             d_model, dropout=dropout * (1.0 - freeze), max_len=max_len
         )
 
         if norm == "LayerNorm":
-            encoder_layer = TransformerEncoderLayer(
+            encoder_layer = nn.TransformerEncoderLayer(
                 d_model,
                 self.n_heads,
                 dim_feedforward,
@@ -180,11 +182,11 @@ class TSTransformerEncoderClassiregressor(Module):
                 activation=activation,
             )
 
-        self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers)
 
         self.act = get_activation_fn(activation)
 
-        self.dropout1 = Dropout(dropout)
+        self.dropout1 = nn.Dropout(dropout)
 
         self.feat_dim = feat_dim
         self.num_classes = num_classes
@@ -192,7 +194,7 @@ class TSTransformerEncoderClassiregressor(Module):
 
     def build_output_module(
         self, d_model: int, max_len: int, num_classes: int
-    ) -> Module:
+    ) -> nn.Module:
         """Build linear layer that maps from d_model*max_len to num_classes.
 
         Softmax not included here as it is computed in the loss function.
@@ -205,9 +207,9 @@ class TSTransformerEncoderClassiregressor(Module):
         Returns:
             output_layer: Tensor of shape (batch_size, num_classes)
         """
-        output_layer = Linear(d_model * max_len, num_classes)
-        # no softmax (or log softmax), because CrossEntropyLoss does this internally. If probabilities are needed,
-        # add F.log_softmax and use NLLoss
+        output_layer = nn.Linear(d_model * max_len, num_classes)
+        # no softmax (or log softmax), because CrossEntropyLoss does this internally. Can compute probabilities are
+        # in case of CEL, use F.log_softmax and use NLLoss. Currently using MSEloss, so no need to compute probabilities
         return output_layer
 
     def forward(self, X: Tensor, padding_masks: Tensor) -> Tensor:

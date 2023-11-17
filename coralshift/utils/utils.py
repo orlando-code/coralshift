@@ -178,7 +178,7 @@ def replace_dot_with_dash(string: str) -> str:
     return string.replace(".", "-")
 
 
-def pad_number_with_zeros(number: str | int, resulting_len: str = 2) -> str:
+def pad_number_with_zeros(number: str | int, resulting_len: int = 2) -> str:
     """Add leading zeros to a number until the desired length. Useful for generating dates in URL strings or any other
     scenario where leading zeros are required.
 
@@ -191,7 +191,7 @@ def pad_number_with_zeros(number: str | int, resulting_len: str = 2) -> str:
     -------
     str: The padded number as a string.
     """
-    if not number.isinstance(str):
+    if not isinstance(number, str):
         try:
             number = str(number)
         except ValueError:

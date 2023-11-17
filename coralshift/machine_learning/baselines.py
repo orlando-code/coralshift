@@ -26,6 +26,8 @@ from coralshift.processing import spatial_data
 from coralshift.plotting import spatial_plots, model_results
 from coralshift.dataloading import bathymetry
 
+from coralshift import functions_creche
+
 
 def generate_test_train_coordinates(
     xa_ds: xa.Dataset,
@@ -1442,7 +1444,7 @@ def generate_parameter_grid(params_dict: dict, num_samples: int = 3) -> dict:
 
 
 def initialise_grid_search(
-    model_type, best_params_dict, cv: int = 3, num_samples: int = 3
+    model_type, best_params_dict, cv: int = 3, num_samples: int = 3, verbose=0
 ):
     param_grid = generate_parameter_grid(best_params_dict)
     # generate_gridsearch_grid(best_params_dict)
@@ -1451,7 +1453,7 @@ def initialise_grid_search(
 
     return (
         GridSearchCV(
-            estimator=model, param_grid=param_grid, cv=cv, n_jobs=-1, verbose=2
+            estimator=model, param_grid=param_grid, cv=cv, n_jobs=-1, verbose=verbose
         ),
         param_grid,
     )
@@ -1461,15 +1463,17 @@ def train_tune(
     X_train: pd.DataFrame,
     y_train: np.ndarray | pd.Series,
     model_type: str,
-    resolution: float,
+    # resolution: float,
     name: str = "_",
-    test_fraction: float = 0.25,
+    # test_fraction: float = 0.25,
     save_dir: Path | str = None,
     n_iter: int = 50,
     cv: int = 3,
     num_samples: int = 3,
     search_type: str = "random",
     best_params_dict: dict = None,
+    n_jobs: int = -1,
+    verbose: int = 0,
 ):
     model, data_type = initialise_model(model_type)
 
@@ -1483,14 +1487,18 @@ def train_tune(
             param_distributions=search_grid,
             n_iter=n_iter,
             cv=cv,
-            verbose=2,
+            verbose=verbose,
             random_state=42,
-            n_jobs=-1,
+            n_jobs=n_jobs,
         )
         print("Fitting model with a randomized hyperparameter search...")
     elif search_type == "grid":
         model_search, search_grid = initialise_grid_search(
-            model_type, best_params_dict, cv=cv, num_samples=num_samples
+            model_type,
+            best_params_dict,
+            cv=cv,
+            num_samples=num_samples,
+            verbose=verbose,
         )
         print("Fitting model with a grid hyperparameter search...")
     else:
@@ -1501,30 +1509,32 @@ def train_tune(
     end_time = time.time()
     fit_time = end_time - start_time
 
-    # save best parameter model and metadata
-    if not save_dir:
-        save_dir = file_ops.guarantee_existence(
-            directories.get_datasets_dir() / "model_params"
-        )
+    return model_search
 
-    save_path = save_sklearn_model(model_search, save_dir, name)
-    create_train_metadata(
-        name=name,
-        model_path=save_path,
-        model_type=model_type,
-        data_type=data_type,
-        search_type=search_type,
-        fit_time=fit_time,
-        test_fraction=test_fraction,
-        coord_ranges=utils.get_multiindex_min_max(X_train),
-        features=list(X_train.columns),
-        resolution=resolution,
-        n_iter=n_iter,
-        cv=cv,
-        param_distributions=search_grid,
-        random_state=42,
-        n_jobs=-1,
-    )
+    # # save best parameter model and metadata
+    # if not save_dir:
+    #     save_dir = file_ops.guarantee_existence(
+    #         directories.get_datasets_dir() / "model_params"
+    #
+
+    # save_path = save_sklearn_model(model_search, save_dir, name)
+    # create_train_metadata(
+    #     name=name,
+    #     model_path=save_path,
+    #     model_type=model_type,
+    #     data_type=data_type,
+    #     search_type=search_type,
+    #     fit_time=fit_time,
+    #     test_fraction=test_fraction,
+    #     coord_ranges=utils.get_multiindex_min_max(X_train),
+    #     features=list(X_train.columns),
+    #     resolution=resolution,
+    #     n_iter=n_iter,
+    #     cv=cv,
+    #     param_distributions=search_grid,
+    #     random_state=42,
+    #     n_jobs=-1,
+    # )
 
 
 # def train_tune_across_resolutions(
@@ -1893,3 +1903,37 @@ def generate_reproducing_metrics_at_different_resolutions(
             xa_ds_dict[name] = ds[variable_name]
 
         generate_reproducing_metrics(xa_ds_dict, res)
+
+
+def evaluate_model(
+    model, df: pd.DataFrame, X: np.ndarray, y: np.ndarray, figsize: tuple = [4, 4]
+) -> None:
+    """
+    Evaluate model (visually and mse) on a given dataset, returning an xarray with predictions and ground truth.
+
+    Args:
+        model (sklearn model): trained model
+        df (pd.DataFrame): dataframe with ground truth
+        X (np.ndarray): input data
+        y (np.ndarray): ground truth
+        figsize (tuple, optional): figure size. Defaults to [4,4].
+
+    Returns:
+        pred_xa (xa.Dataset): xarray dataset with ground truth and predictions
+    """
+    y_pred = model.predict(X)
+    pred_df = functions_creche.reform_df(df, y_pred)
+    mse = sklmetrics.mean_squared_error(
+        pred_df["unep_coral_presence"], pred_df["prediction"]
+    )
+
+    f, ax = plt.subplots(figsize=figsize)
+    ax.scatter(y, y_pred)
+    # y=x for comparison
+    ax.axline((0, 0), slope=1, c="k")
+    ax.axis("equal")
+    ax.set_xlabel("Ground Truth")
+    ax.set_ylabel("Prediction")
+    ax.set_xlim([0, 1])
+
+    plt.suptitle(f"MSE: {mse:.04f}")
