@@ -24,7 +24,8 @@ class Trainer:
         dh: DataHandler,
         epochs: int = 10,
     ):
-        self.criterion = nn.CrossEntropyLoss()
+        # self.criterion = nn.CrossEntropyLoss()
+        self.criterion = nn.MSELoss()
 
         self.dh = dh
         self.dataset = None
