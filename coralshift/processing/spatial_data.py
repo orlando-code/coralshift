@@ -1266,11 +1266,13 @@ def chunk_as_necessary(
 
 def process_xa_d(
     xa_d: xa.Dataset | xa.DataArray,
+    rename_lat_lon_grids: bool = False,
     rename_mapping: dict = {
         "lat": "latitude",
         "lon": "longitude",
         "y": "latitude",
         "x": "longitude",
+        "lev": "depth"
     },
     squeeze_coords: str | list[str] = None,
     chunk_dict: dict = {"latitude": 100, "longitude": 100, "time": 100},
@@ -1298,6 +1300,9 @@ def process_xa_d(
 
     """
     temp_xa_d = xa_d.copy()
+
+    if rename_lat_lon_grids:
+        temp_xa_d = temp_xa_d.rename({'latitude': 'latitude_grid', 'longitude': 'longitude_grid'})
 
     for coord, new_coord in rename_mapping.items():
         if new_coord not in temp_xa_d.coords and coord in temp_xa_d.coords:
