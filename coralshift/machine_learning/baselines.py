@@ -26,6 +26,8 @@ from coralshift.processing import spatial_data
 from coralshift.plotting import spatial_plots, model_results
 from coralshift.dataloading import bathymetry
 
+from coralshift import functions_creche
+
 
 def generate_test_train_coordinates(
     xa_ds: xa.Dataset,
@@ -1461,7 +1463,7 @@ def train_tune(
     X_train: pd.DataFrame,
     y_train: np.ndarray | pd.Series,
     model_type: str,
-    resolution: float,
+    # resolution: float,
     name: str = "_",
     # test_fraction: float = 0.25,
     save_dir: Path | str = None,
@@ -1920,8 +1922,10 @@ def evaluate_model(
         pred_xa (xa.Dataset): xarray dataset with ground truth and predictions
     """
     y_pred = model.predict(X)
-    pred_df = reform_df(df, y_pred)
-    mse = mean_squared_error(pred_df["unep_coral_presence"], pred_df["prediction"])
+    pred_df = functions_creche.reform_df(df, y_pred)
+    mse = sklmetrics.mean_squared_error(
+        pred_df["unep_coral_presence"], pred_df["prediction"]
+    )
 
     f, ax = plt.subplots(figsize=figsize)
     ax.scatter(y, y_pred)
