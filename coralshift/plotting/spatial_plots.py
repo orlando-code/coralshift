@@ -112,7 +112,7 @@ def get_n_colors_from_hexes(
     Returns:
         list[str]: A list of n hex codes.
     """
-    cmap = spatial_plots.get_continuous_cmap(hex_list)
+    cmap = get_continuous_cmap(hex_list)
     colors = [cmap(i / num) for i in range(num)]
     hex_codes = [mcolors.to_hex(color) for color in colors]
     return hex_codes
@@ -798,12 +798,12 @@ def visualise_predictions(
         ncols=3, figsize=(14, 5), subplot_kw={"projection": ccrs.PlateCarree()}
     )
 
-    spatial_plots.plot_spatial(
+    plot_spatial(
         pred_df["unep_coral_presence"].isel(time=0),
         title="Ground Truth",
         fax=[f, ax[0]],
     )
-    spatial_plots.plot_spatial(
+    plot_spatial(
         pred_df["prediction"].isel(time=0), title="Predictions", fax=[f, ax[1]]
     )
     ax[2].scatter(pred_df["unep_coral_presence"], pred_df["prediction"])
