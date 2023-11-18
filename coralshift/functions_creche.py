@@ -2,6 +2,8 @@ import geopandas as gpd
 import numpy as np
 import rasterio
 from rasterio import features
+from datetime import datetime
+import calendar
 import xarray as xa
 import pandas as pd
 from tqdm import tqdm
@@ -220,7 +222,7 @@ def apply_fill_loess(dataset, nx=2, ny=2):
 
 
 def resample_xa_d(
-    xa_d_list: xa.DataArray | xa.Dataset,
+    xa_d: xa.DataArray | xa.Dataset,
     lat_range: list[float],
     lon_range: list[float],
     resolution_lat: float,
@@ -231,7 +233,7 @@ def resample_xa_d(
     Resample an xarray DataArray or Dataset to a common extent and resolution.
 
     Args:
-        xa_d_list (xa.DataArray | xa.Dataset): xarray DataArray or Dataset to resample.
+        xa_d (xa.DataArray | xa.Dataset): xarray DataArray or Dataset to resample.
         lat_range (list[float]): Latitude range of the common extent.
         lon_range (list[float]): Longitude range of the common extent.
         resolution_lat (float): Latitude resolution of the common extent.
@@ -240,6 +242,15 @@ def resample_xa_d(
 
     Returns:
         xa.DataArray | xa.Dataset: Resampled xarray DataArray or Dataset.
+
+    resample_methods:
+        "linear" – Bilinear interpolation.
+        "nearest" – Nearest-neighbor interpolation.
+        "zero" – Piecewise-constant interpolation.
+        "slinear" – Spline interpolation of order 1.
+        "quadratic" – Spline interpolation of order 2.
+        "cubic" – Spline interpolation of order 3.
+        TODO: implement"polynomial"
     """
     # Create a dummy dataset with the common extent and resolution
     common_dataset = xa.Dataset(
@@ -250,9 +261,41 @@ def resample_xa_d(
     )
 
     # Resample the input dataset to the common resolution and extent using "method" interpolation
-    resampled_dataset = input_ds.interp(
+    resampled_dataset = xa_d.interp(
         latitude=common_dataset["latitude"],
         longitude=common_dataset["longitude"],
+        method=resample_method,
+    )
+
+    return resampled_dataset
+
+
+def resample_to_other(
+    xa_d_to_resample, target_xa, resample_method: str = "linear"
+) -> xa.Dataset | xa.DataArray:
+    """
+    Resample an xarray DataArray or Dataset to the resolution and extent of another xarray DataArray or Dataset.
+
+    Args:
+        xa_d_to_resample (xa.DataArray | xa.Dataset): xarray DataArray or Dataset to resample.
+        target_xa (xa.DataArray | xa.Dataset): xarray DataArray or Dataset to resample to.
+
+    Returns:
+        xa.DataArray | xa.Dataset: Resampled xarray DataArray or Dataset.
+
+    resample_methods:
+        "linear" – Bilinear interpolation.
+        "nearest" – Nearest-neighbor interpolation.
+        "zero" – Piecewise-constant interpolation.
+        "slinear" – Spline interpolation of order 1.
+        "quadratic" – Spline interpolation of order 2.
+        "cubic" – Spline interpolation of order 3.
+        TODO: implement"polynomial"
+    """
+    # Resample the input dataset to the resolution and extent of the target dataset
+    resampled_dataset = xa_d_to_resample.interp(
+        latitude=target_xa["latitude"],
+        longitude=target_xa["longitude"],
         method=resample_method,
     )
 
@@ -355,25 +398,26 @@ def tvt_spatial_split(
 
     df_list = []
 
-    if 0 in tvt_fractions:
-        nonzero_fractions = [frac for frac in tvt_fractions if frac != 0]
-        split_indices = [int(frac * len(df)) for frac in np.cumsum(nonzero_fractions)]
+    # this was hanlding omission of val completely: for now, keeping it in, but just empty
+    # if 0 in tvt_fractions:
+    #     nonzero_fractions = [frac for frac in tvt_fractions if frac != 0]
+    #     split_indices = [int(frac * len(df)) for frac in np.cumsum(nonzero_fractions)]
 
-        for idx, split_idx in enumerate(split_indices):
-            if idx == 0:
-                df_list.append(df.iloc[:split_idx])
-            elif idx == len(split_indices) - 1:
-                df_list.append(df.iloc[split_idx:])
-            else:
-                df_list.append(df.iloc[split_indices[idx - 1] : split_idx])
-    else:
-        df_list = np.split(
-            df,
-            [
-                int(tvt_fractions[0] * len(df)),
-                int((tvt_fractions[0] + tvt_fractions[1]) * len(df)),
-            ],
-        )
+    #     for idx, split_idx in enumerate(split_indices):
+    #         if idx == 0:
+    #             df_list.append(df.iloc[:split_idx])
+    #         elif idx == len(split_indices) - 1:
+    #             df_list.append(df.iloc[split_idx:])
+    #         else:
+    #             df_list.append(df.iloc[split_indices[idx - 1] : split_idx])
+    # else:
+    df_list = np.split(
+        df,
+        [
+            int(tvt_fractions[0] * len(df)),
+            int((tvt_fractions[0] + tvt_fractions[1]) * len(df)),
+        ],
+    )
 
     return df_list
 
@@ -502,20 +546,29 @@ def process_df_for_rfr(
     df_tvt_scaled_onehot_list = [
         onehot_df(scaled_df) for scaled_df in df_tvt_scaled_list
     ]
-    if 0 in train_val_test_frac:
-        # cast to numpy arrays
-        trains, tests = [
-            Xs_ys_from_df(df, predictors + ["onehot_nan"], gt)
-            for df in df_tvt_scaled_onehot_list
-        ]
-        return (trains, (0, 0), tests), df_tvt_scaled_list
-    else:
-        # cast to numpy arrays
-        trains, vals, tests = [
-            Xs_ys_from_df(df, predictors + ["onehot_nan"], gt)
-            for df in df_tvt_scaled_onehot_list
-        ]
-        return (trains, vals, tests), df_tvt_scaled_list
+
+    samples = []
+    for df in df_tvt_scaled_onehot_list:
+        if len(df) > 0:
+            samples.append(Xs_ys_from_df(df, predictors + ["onehot_nan"], gt))
+        else:
+            samples.append((None, None))
+
+    return samples, df_tvt_scaled_onehot_list
+    # if 0 in train_val_test_frac:
+    #     # cast to numpy arrays
+    #     trains, vals, tests = [
+    #         Xs_ys_from_df(df, predictors + ["onehot_nan"], gt)
+    #         for df in df_tvt_scaled_onehot_list if len(df) > 0 else return (0,0)
+    #     ]
+    #     return (trains, (0, 0), tests), df_tvt_scaled_list
+    # else:
+    #     # cast to numpy arrays
+    #     trains, vals, tests = [
+    #         Xs_ys_from_df(df, predictors + ["onehot_nan"], gt)
+    #         for df in df_tvt_scaled_onehot_list
+    #     ]
+    #     return (trains, vals, tests), df_tvt_scaled_list
 
 
 def reform_df(df: pd.DataFrame, predictions: np.ndarray) -> pd.DataFrame:
@@ -532,3 +585,137 @@ def reform_df(df: pd.DataFrame, predictions: np.ndarray) -> pd.DataFrame:
     df_predictions["prediction"] = predictions
 
     return df_predictions
+
+
+def year_to_datetime(year: int, xa_d: xa.DataArray | xa.Dataset = None) -> datetime:
+    """
+    Convert an integer denoting a year to a datetime object.
+
+    Args:
+        year (int): The year to convert.
+        xa_d (xa.DataArray | xa.Dataset, optional): An xarray DataArray or Dataset to check the year against. Defaults to None.
+
+    Returns:
+        datetime: The datetime object corresponding to the year.
+    """
+    # TODO: replace with datetime module
+    if xa_d:
+        # Extract the minimum and maximum years from the dataset's time coordinate
+        min_year, max_year = spatial_data.min_max_of_coords(xa_d, "time")
+
+        # Ensure the provided year is within the range of the dataset's time coordinate
+        if year < min_year or year > max_year:
+            raise ValueError(f"Year {year} is outside the dataset's time range")
+
+    return datetime(year, 1, 1)
+
+
+def calculate_statistics(
+    xa_ds: xa.Dataset,
+    vars: list[str] = ["so", "thetao", "tos", "uo", "vo"],
+    years_window: tuple[int] = None,
+) -> xa.Dataset:
+    """
+    Calculate statistics for each variable in the dataset, similar to Couce (2012, 2023).
+
+    Args:
+        xa_ds (xa.Dataset): Input xarray dataset.
+        vars (list[str], optional): List of variable names to calculate statistics for.
+        Defaults to ["so", "thetao", "tos", "uo", "vo"].
+        years_window (tuple[int], optional): The time period to calculate statistics for. Defaults to None.
+
+    Returns:
+        xa.Dataset: Dataset containing the calculated statistics.
+    """
+    if years_window:
+        # Select the time period of interest
+        xa_ds = xa_ds.sel(
+            time=slice(
+                year_to_datetime(min(years_window)), year_to_datetime(max(years_window))
+            )
+        )
+
+    stats = {}
+
+    if not vars:
+        vars = dataset_period.data_vars.keys()
+
+    for i, var_name in tqdm(
+        enumerate(vars), desc=f"calculating statistics for {len(vars)} variables..."
+    ):
+        var_data = xa_ds[var_name]
+        # Calculate annual average
+        # annual_mean = var_data.resample(time='1Y').mean()
+        # stats[f"{var_name}_am"] = annual_mean
+
+        # Calculate mean for each month
+        monthly_mean = var_data.groupby("time.month").mean(dim="time")
+
+        # Map numerical month values to month names
+        month_names = [calendar.month_name[i] for i in monthly_mean["month"].values]
+
+        # Assign monthly means to their respective month names
+        for i, month in enumerate(month_names):
+            stats[f"{var_name}_{month.lower()}_mean"] = monthly_mean.isel(
+                month=i
+            ).values
+
+        # Calculate maximum and minimum of monthly values over the whole time period
+        monthly_max_overall = var_data.groupby("time.month").max(dim="time")
+        monthly_min_overall = var_data.groupby("time.month").min(dim="time")
+
+        for i, month in enumerate(month_names):
+            stats[f"{var_name}_{month.lower()}_max"] = monthly_max_overall.isel(
+                month=i
+            ).values
+            stats[f"{var_name}_{month.lower()}_min"] = monthly_min_overall.isel(
+                month=i
+            ).values
+
+        # Calculate standard deviation of time steps
+        time_std = var_data.std(dim="time")
+        stats[f"{var_name}_time_std"] = time_std.values
+
+        # Calculate standard deviation of January and July values
+        january_std = var_data.where(var_data["time.month"] == 1).std(dim="time")
+        july_std = var_data.where(var_data["time.month"] == 7).std(dim="time")
+        stats[f"{var_name}_jan_std"] = january_std.values
+        stats[f"{var_name}_jul_std"] = july_std.values
+
+        # Calculate the overall mean for each statistic
+        stats[f"{var_name}_overall_mean"] = var_data.mean(dim="time").values
+
+    # Combine all calculated variables into a new dataset
+    stats_xa = xa.Dataset(
+        {key: (("latitude", "longitude"), value) for key, value in stats.items()},
+        coords={"latitude": var_data.latitude, "longitude": var_data.longitude},
+    )
+
+    return stats_xa
+
+
+def investigate_depth_mask(comp_var_xa, mask_var_xa, var_limits: list[tuple[float]]):
+    # TODO: make less janky
+    raw_vals = []
+    positive_negative_ratio = []
+    x_labels = [str(lim_pair) for lim_pair in var_limits]
+
+    for lim_pair in var_limits:
+        masked_vals = generate_var_mask(comp_var_xa, mask_var_xa, lim_pair)
+        val_sum = np.nansum(masked_vals["elevation"].values)
+        raw_vals.append(val_sum)
+
+        positive_negative_ratio.append(
+            val_sum / np.count_nonzero(masked_vals["elevation"].values == 0)
+        )
+
+    return raw_vals, positive_negative_ratio
+
+
+def generate_var_mask(
+    comp_var_xa: xa.DataArray,
+    mask_var_xa: xa.DataArray,
+    limits: tuple[float] = [-2000, 0],
+) -> xa.DataArray:
+    mask = (mask_var_xa <= max(limits)) & (mask_var_xa >= min(limits))
+    return comp_var_xa.where(mask, drop=True)

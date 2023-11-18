@@ -27,6 +27,8 @@ Defines globals used throughout the codebase.
 data_folder = "data"
 
 cmip6_data_folder = os.path.join(data_folder, "env_vars", "cmip6")
+bathymetry_folder = os.path.join(data_folder, "bathymetry")
+gt_folder = os.path.join(data_folder, "ground_truth")
 
 dataloader_config_folder = "dataloader_configs"
 

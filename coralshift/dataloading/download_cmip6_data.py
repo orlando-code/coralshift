@@ -62,9 +62,9 @@ overwrite = False
 delete_latlon_data = True  # Delete lat-lon intermediate files is use_xarray is True
 compress = False
 
-do_download = False
+do_download = True
 do_download_ind = True
-do_concat_by_time = False
+do_concat_by_time = True
 do_merge_by_vars = True
 
 do_crop = True  # handled in preprocessing
@@ -89,14 +89,27 @@ def tuples_to_string(lats, lons):
     return f"lats_{min(round_lats)}-{max(round_lats)}_lons_{min(round_lons)}-{max(round_lons)}"
 
 
-def _spatial_crop(ds):
-    spatial_ds = ds.sel(
-        lat=slice(min(lats), max(lats)), lon=slice(min(lons), max(lons))
-    )
-    if "lev" in ds.coords:
-        return spatial_ds.sel(lev=slice(min(levs), max(levs)))
-    else:
-        return spatial_ds
+if source_id == "EC-Earth3P-HR":
+
+    def _spatial_crop(ds):
+        spatial_ds = ds.sel(
+            lat=slice(min(lats), max(lats)), lon=slice(min(lons), max(lons))
+        )
+        if "lev" in ds.coords:
+            return spatial_ds.sel(lev=slice(min(levs), max(levs)))
+        else:
+            return spatial_ds
+
+else:
+
+    def _spatial_crop(ds):
+        spatial_ds = ds.sel(
+            lat=slice(min(lats), max(lats)), lon=slice(min(lons), max(lons))
+        )
+        if "lev" in ds.coords:
+            return spatial_ds.sel(lev=slice(min(levs), max(levs)))
+        else:
+            return spatial_ds
 
 
 # Below taken from https://hub.binder.pangeo.io/user/pangeo-data-pan--cmip6-examples-ro965nih/lab
@@ -164,43 +177,65 @@ def esgf_search(
 
 
 download_dict = {
-    "BCC-CSM2-HR": {
+    # "BCC-CSM2-HR": {
+    #     "experiment_ids": ["hist-1950"],
+    #     "data_nodes": [
+    #         "cmip.bcc.cma.cn",  # listed in metadata from https://esgf-node.llnl.gov/search/cmip6/
+    #     ],
+    #     "frequency": "mon",
+    #     "variable_dict": {
+    #         "thetao": {
+    #             "include": True,
+    #             "table_id": "Omon",
+    #             "plevels": None,
+    #         },
+    #         "tos": {
+    #             "include": True,
+    #             "table_id": "Omon",
+    #             "plevels": None,
+    #         },
+    #         "uo": {
+    #             "include": True,
+    #             "table_id": "Omon",
+    #             "plevels": None,
+    #         },
+    #         "vo": {
+    #             "include": True,
+    #             "table_id": "Omon",
+    #             "plevels": None,
+    #         },
+    #         "so": {
+    #             "include": True,
+    #             "table_id": "Omon",
+    #             "plevels": None,
+    #         },
+    #         # "deptho": {
+    #         #     "include": True,
+    #         #     "table_id": "Ofx",
+    #         #     "plevels": None,
+    #         # },
+    #     },
+    # }
+    "EC-Earth3P-HR": {
         "experiment_ids": ["hist-1950"],
         "data_nodes": [
-            "cmip.bcc.cma.cn",  # listed in metadata from https://esgf-node.llnl.gov/search/cmip6/
+            # "cmip.bcc.cma.cn",  # listed in metadata from https://esgf-node.llnl.gov/search/cmip6/
+            "esgf3.dkrz.de",
+            "esgf-data1.llnl.gov",
+            "esgf.ceda.ac.uk",
         ],
         "frequency": "mon",
         "variable_dict": {
-            "thetao": {
+            "hfds": {
                 "include": True,
-                "table_id": "Omon",
+                "table_id": "Omon",  ###
                 "plevels": None,
             },
-            "tos": {
+            "rsdo": {
                 "include": True,
-                "table_id": "Omon",
+                "table_id": "Omon",  ###
                 "plevels": None,
             },
-            "uo": {
-                "include": True,
-                "table_id": "Omon",
-                "plevels": None,
-            },
-            "vo": {
-                "include": True,
-                "table_id": "Omon",
-                "plevels": None,
-            },
-            "so": {
-                "include": True,
-                "table_id": "Omon",
-                "plevels": None,
-            },
-            # "deptho": {
-            #     "include": True,
-            #     "table_id": "Ofx",
-            #     "plevels": None,
-            # },
         },
     }
 }
