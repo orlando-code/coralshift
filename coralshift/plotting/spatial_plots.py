@@ -5,6 +5,8 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib import animation, colors
 import matplotlib.gridspec as gridspec
+import matplotlib.colors as mcolors
+
 
 from pathlib import Path
 import xarray as xa
@@ -85,6 +87,35 @@ def get_continuous_cmap(hex_list, float_list=None):
         cdict[col] = col_list
     cmp = colors.LinearSegmentedColormap("my_cmp", segmentdata=cdict, N=256)
     return cmp
+
+
+# TODO: wrap up colourmaps into a class
+# class ColourMaps():
+#     __init__(self):
+#         self.sequential_hexes = ["#3B9AB2", "#78B7C5", "#EBCC2A", "#E1AF00", "#d83c04"],
+#         self.diverging_hexes = ["#3B9AB2", "#78B7C5", "#FFFFFF", "#E1AF00", "#d83c04"]
+
+#     def get_cmap(self, cmap_type: str = "seq"):
+
+
+def get_n_colors_from_hexes(
+    num: int,
+    hex_list: list[str] = ["#3B9AB2", "#78B7C5", "#EBCC2A", "#E1AF00", "#d83c04"],
+) -> list[str]:
+    """
+    Get a list of n colors from a list of hex codes.
+
+    Args:
+        num (int): The number of colors to return.
+        hex_list (list[str]): The list of hex codes from which to create spectrum for sampling.
+
+    Returns:
+        list[str]: A list of n hex codes.
+    """
+    cmap = spatial_plots.get_continuous_cmap(hex_list)
+    colors = [cmap(i / num) for i in range(num)]
+    hex_codes = [mcolors.to_hex(color) for color in colors]
+    return hex_codes
 
 
 def get_cbar(cbar_type: str = "seq"):
