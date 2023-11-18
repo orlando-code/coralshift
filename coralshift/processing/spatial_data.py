@@ -1272,7 +1272,7 @@ def process_xa_d(
         "lon": "longitude",
         "y": "latitude",
         "x": "longitude",
-        "lev": "depth"
+        "lev": "depth",
     },
     squeeze_coords: str | list[str] = None,
     chunk_dict: dict = {"latitude": 100, "longitude": 100, "time": 100},
@@ -1302,7 +1302,9 @@ def process_xa_d(
     temp_xa_d = xa_d.copy()
 
     if rename_lat_lon_grids:
-        temp_xa_d = temp_xa_d.rename({'latitude': 'latitude_grid', 'longitude': 'longitude_grid'})
+        temp_xa_d = temp_xa_d.rename(
+            {"latitude": "latitude_grid", "longitude": "longitude_grid"}
+        )
 
     for coord, new_coord in rename_mapping.items():
         if new_coord not in temp_xa_d.coords and coord in temp_xa_d.coords:
@@ -2285,18 +2287,19 @@ def drop_xa_variables(
 
 def generate_var_mask(
     xa_d: xa.Dataset | xa.DataArray,
-    # var_name: str = "bathymetry_A",
+    mask_var: str = "elevation",
     limits: tuple[float] = [-2000, 0],
-    # sub_val: float = np.nan,
+    comp_mask_var: str = "unep_coral_presence",
 ) -> xa.DataArray:
     if isinstance(xa_d, xa.DataArray):
         return (xa_d <= max(limits)) & (xa_d >= min(limits))
+
     elif isinstance(xa_d, xa.Dataset):
-        matching_vars = [var for var in xa_d.variables if var.startswith("bath")]
-        if len(matching_vars) == 0:
-            raise ValueError("No variable starting with 'bath' found in the dataset.")
-        var_name = matching_vars[0]
-        return (xa_d[var_name] <= max(limits)) & (xa_d[var_name] >= min(limits))
+        if mask_var not in xa_d.variables:
+            raise ValueError(f"Variable {mask_var} not found in dataset.")
+        else:
+            return (xa_d[mask_var] <= max(limits)) & (xa_d[mask_var] >= min(limits))
+
     else:
         raise TypeError(
             f"xa_d was neither an xarray Dataset nor a DataArray. Instead type: {type(xa_d)}."
