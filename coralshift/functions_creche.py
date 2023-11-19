@@ -719,3 +719,12 @@ def generate_var_mask(
 ) -> xa.DataArray:
     mask = (mask_var_xa <= max(limits)) & (mask_var_xa >= min(limits))
     return comp_var_xa.where(mask, drop=True)
+
+
+def tuples_to_string(lats, lons):
+    # Round the values in the tuples to the nearest integers
+    round_lats = [round(lat) for lat in lats]
+    round_lons = [round(lon) for lon in lons]
+
+    # Create the joined string
+    return f"lats_{min(round_lats)}-{max(round_lats)}_lons_{min(round_lons)}-{max(round_lons)}"
