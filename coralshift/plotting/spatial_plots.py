@@ -158,6 +158,8 @@ def plot_spatial(
     cbar: bool = True,
     orient_colorbar: str = "vertical",
     cbar_pad: float = 0.1,
+    presentation: bool = False,
+    map_proj: str = ccrs.PlateCarree(),
 ) -> tuple[Figure, Axes]:
     """
     Plot a spatial plot with colorbar, coastlines, landmasses, and gridlines.
@@ -176,8 +178,8 @@ def plot_spatial(
     Returns
     -------
     tuple: The figure and axes objects.
+    TODO: saving option and tidy up presentation formatting
     """
-    map_proj = ccrs.PlateCarree()
     # may need to change this
 
     if not fax:
@@ -212,7 +214,23 @@ def plot_spatial(
     if symmetric:
         vmin, vmax = (-vmax, vmax) if abs(vmin) > abs(vmax) else (vmin, -vmin)
 
-    im = xa_da.plot(ax=ax, cmap=cmap, vmin=vmin, vmax=vmax, add_colorbar=False)
+    if presentation:
+        fig, ax = customize_plot_colors(fig, ax)
+        cbar = False
+        ax.set_xticks([])
+        ax.set_xticklabels([])
+        ax.tick_params(axis="both", which="both", length=0)
+        title = ""
+        ax.set_global()  # very cool but usually unnecessary
+
+    im = xa_da.plot(
+        ax=ax,
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+        add_colorbar=False,
+        transform=ccrs.PlateCarree(),
+    )
     # nicely format spatial plot
     format_spatial_plot(
         image=im,
@@ -224,6 +242,7 @@ def plot_spatial(
         orient_colorbar=orient_colorbar,
         cbar_pad=cbar_pad,
         edgecolor=edgecolor,
+        presentation=presentation,
     )
 
     return fig, ax, im
@@ -239,6 +258,7 @@ def format_spatial_plot(
     orient_colorbar: str = "horizontal",
     cbar_pad: float = 0.1,
     edgecolor: str = "black",
+    presentation: bool = False,
 ) -> tuple[Figure, Axes]:
     """Format a spatial plot with a colorbar, title, coastlines and landmasses, and gridlines.
 
@@ -261,11 +281,50 @@ def format_spatial_plot(
     # ax.coastlines(resolution="10m", color="red", linewidth=1)
     ax.add_feature(
         cfeature.NaturalEarthFeature(
-            "physical", "land", "10m", edgecolor=edgecolor, facecolor="#d2ccc4"
+            "physical",
+            "land",
+            "10m",
+            edgecolor=edgecolor,
+            facecolor="#d2ccc4",
+            linewidth=0.5,
         )
     )
-    ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True)
-    # ax.gridlines(draw_labels={"bottom": "x", "left": "y"})
+    draw_labels = True
+    if presentation:
+        draw_labels = False
+    gl = ax.gridlines(
+        crs=ccrs.PlateCarree(), draw_labels=draw_labels, x_inline=False, y_inline=False
+    )
+    # gl.bottom_labels = gl.right_labels = False
+
+    return fig, ax
+
+
+def customize_plot_colors(fig, ax, background_color="#212121", text_color="white"):
+    # Set figure background color
+    fig.patch.set_facecolor(background_color)
+
+    # Set axis background color (if needed)
+    ax.set_facecolor(background_color)
+
+    # Set text color for all elements in the plot
+    for text in fig.texts:
+        text.set_color(text_color)
+    for text in ax.texts:
+        text.set_color(text_color)
+    for text in ax.xaxis.get_ticklabels():
+        text.set_color(text_color)
+    for text in ax.yaxis.get_ticklabels():
+        text.set_color(text_color)
+    ax.title.set_color(text_color)
+    ax.xaxis.label.set_color(text_color)
+    ax.yaxis.label.set_color(text_color)
+
+    # Set legend text color
+    legend = ax.get_legend()
+    if legend:
+        for text in legend.get_texts():
+            text.set_color(text_color)
 
     return fig, ax
 
