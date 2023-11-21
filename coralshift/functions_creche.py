@@ -81,7 +81,7 @@ def raster_to_xarray(
         raster,
         coords={"latitude": latitudes, "longitude": longitudes},
         dims=["latitude", "longitude"],
-        name=name,
+        name=name
     )
     # Set the CRS (coordinate reference system) if needed
     # TODO: make kwarg
@@ -549,21 +549,21 @@ def process_df_for_rfr(
     ]
     df_tvt_scaled_list = None # trying to free up memory
 
-    def process_df(df, predictors, gt):
-        if len(df) > 0:
-            return Xs_ys_from_df(df, predictors + ["onehot_nan"], gt)
-        else:
-            return (None, None)
-    
-    delayed_samples = [delayed(process_df)(ddf, predictors, gt) for ddf in ddf_list]
-
-    return delayed_samples, df_tvt_scaled_onehot_list
-#     samples = []
-#     for df in df_tvt_scaled_onehot_list:
+#     def process_df(df, predictors, gt):
 #         if len(df) > 0:
-#             samples.append(Xs_ys_from_df(df, predictors + ["onehot_nan"], gt))
+#             return Xs_ys_from_df(df, predictors + ["onehot_nan"], gt)
 #         else:
-#             samples.append((None, None))
+#             return (None, None)
+    
+#     delayed_samples = [delayed(process_df)(ddf, predictors, gt) for ddf in ddf_list]
+
+#     return delayed_samples, df_tvt_scaled_onehot_list
+    samples = []
+    for df in df_tvt_scaled_onehot_list:
+        if len(df) > 0:
+            samples.append(Xs_ys_from_df(df, predictors + ["onehot_nan"], gt))
+        else:
+            samples.append((None, None))
 
     return samples, df_tvt_scaled_onehot_list
     # if 0 in train_val_test_frac:
@@ -730,3 +730,12 @@ def generate_var_mask(
 ) -> xa.DataArray:
     mask = (mask_var_xa <= max(limits)) & (mask_var_xa >= min(limits))
     return comp_var_xa.where(mask, drop=True)
+
+
+def tuples_to_string(lats, lons):
+    # Round the values in the tuples to the nearest integers
+    round_lats = [round(lat) for lat in lats]
+    round_lons = [round(lon) for lon in lons]
+
+    # Create the joined string
+    return f"lats_{min(round_lats)}-{max(round_lats)}_lons_{min(round_lons)}-{max(round_lons)}"
