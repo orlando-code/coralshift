@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 from pyinterp.backends import xarray
 from pyinterp import fill
 
+from coralshift.processing import spatial_data
+
 
 def rasterize_geodf(
     geo_df: gpd.geodataframe, resolution_lat: float = 1.0, resolution_lon: float = 1.0
@@ -90,7 +92,7 @@ def raster_to_xarray(
     #     attrs=dict(
     #         description="Rasterised Reef Check coral presence survey data"
     #     ))
-    return xa_array
+    return spatial_data.process_xa_d(xa_array)
 
 
 def lat_lon_vals_from_geo_df(
