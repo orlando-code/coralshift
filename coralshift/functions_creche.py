@@ -83,7 +83,7 @@ def raster_to_xarray(
         raster,
         coords={"latitude": latitudes, "longitude": longitudes},
         dims=["latitude", "longitude"],
-        name=name,
+        name=name
     )
     # Set the CRS (coordinate reference system) if needed
     # TODO: make kwarg
@@ -544,11 +544,22 @@ def process_df_for_rfr(
     df_tvt_scaled_list = [
         scale_dataframe(df, scaling_params_dict) for df in df_tvt_list
     ]
+    df_tvt_list = None # trying to free up memory
     # one-hot encode nans
     df_tvt_scaled_onehot_list = [
         onehot_df(scaled_df) for scaled_df in df_tvt_scaled_list
     ]
+    df_tvt_scaled_list = None # trying to free up memory
 
+#     def process_df(df, predictors, gt):
+#         if len(df) > 0:
+#             return Xs_ys_from_df(df, predictors + ["onehot_nan"], gt)
+#         else:
+#             return (None, None)
+    
+#     delayed_samples = [delayed(process_df)(ddf, predictors, gt) for ddf in ddf_list]
+
+#     return delayed_samples, df_tvt_scaled_onehot_list
     samples = []
     for df in df_tvt_scaled_onehot_list:
         if len(df) > 0:
