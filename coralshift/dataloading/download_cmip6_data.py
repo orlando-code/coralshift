@@ -79,16 +79,6 @@ levs = [0, 6]
 ####### Orlando functions
 ################################################################################
 
-
-def tuples_to_string(lats, lons):
-    # Round the values in the tuples to the nearest integers
-    round_lats = [round(lat) for lat in lats]
-    round_lons = [round(lon) for lon in lons]
-
-    # Create the joined string
-    return f"lats_{min(round_lats)}-{max(round_lats)}_lons_{min(round_lons)}-{max(round_lons)}"
-
-
 if source_id == "EC-Earth3P-HR":
 
     def _spatial_crop(ds):
