@@ -295,6 +295,15 @@ def format_spatial_plot(
     gl = ax.gridlines(
         crs=ccrs.PlateCarree(), draw_labels=draw_labels, x_inline=False, y_inline=False
     )
+    import matplotlib.ticker as mticker
+
+    gl.xlabel_style = {"color": "white"}
+    gl.ylabel_style = {"color": "white"}
+
+    # gl.ylocator = mticker.FixedLocator([1,2,3,4,])
+    gl.bottom_labels = False
+    gl.right_labels = True
+    gl.left_labels = False
     # gl.bottom_labels = gl.right_labels = False
 
     return fig, ax
