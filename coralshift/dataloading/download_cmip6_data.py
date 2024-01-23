@@ -1,16 +1,21 @@
-import os
-import numpy as np
-import sys
-
-import time
-import warnings
-import xarray as xr
-
+# web communication
 import argparse
 import requests
-from pathlib import Path
+from cdo import Cdo
 
-import config
+# file handling
+import config  # global file system paths. Could draw more from utils.directories script
+import time
+import warnings
+from pathlib import Path
+import os
+
+import xarray as xa
+import numpy as np
+
+
+# from coralshift.utils import tuples_to_string # can't find coralshift module
+
 
 # TODO: adapt this for different types of file (e.g. with depth dimension, regridding necessary etc.)
 # TODO: slim down to necessary steps
@@ -46,8 +51,8 @@ simulations in parallel using this script.
 # --------------------------------------------------------------------
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--source_id", default="BCC-CSM2-HR", type=str)
-parser.add_argument("--member_id", default="r1i1p1f1", type=str)
+parser.add_argument("--source_id", default="EC-Earth3P-HR", type=str)
+parser.add_argument("--member_id", default="r1i1p2f1", type=str)
 commandline_args = parser.parse_args()
 
 source_id = commandline_args.source_id
@@ -64,12 +69,12 @@ compress = False
 
 do_download = True
 do_download_ind = True
-do_concat_by_time = True
-do_merge_by_vars = True
+do_concat_by_time = False
+do_merge_by_vars = False
 
-do_crop = True  # handled in preprocessing
+do_crop = False  # handled in preprocessing
 do_regrid = False
-gen_video = False
+do_seafloor = True
 
 lats = [-40, 0]
 lons = [130, 170]
@@ -100,6 +105,41 @@ else:
             return spatial_ds.sel(lev=slice(min(levs), max(levs)))
         else:
             return spatial_ds
+
+
+def gen_seafloor_indices(xa_da: xa.DataArray, var: str, dim: str = "lev"):
+    """Generate indices of seafloor values for a given variable in an xarray dataset.
+
+    Args:
+        xa_da (xa.DataArray): xarray dataset containing variable of interest
+        var (str): name of variable of interest
+        dim (str, optional): dimension along which to search for seafloor values. Defaults to "lev".
+
+    Returns:
+        indices_array (np.ndarray): array of indices of seafloor values for given variable
+    """
+    nans = np.isnan(xa_da[var]).sum(dim=dim)  # separate out
+    indices_array = -(nans.values) - 1
+    indices_array[indices_array == -(len(xa_da[dim].values) + 1)] = -1
+    return indices_array
+
+
+def extract_seafloor_vals(xa_da, indices_array):
+    vals_array = xa_da.values
+    t, j, i = indices_array.shape
+    # create open grid for indices along each dimension
+    T, J, I = np.ogrid[:t, :j, :i]
+    # select values from vals_array using indices_array
+    return vals_array[T, indices_array, J, I]
+
+
+def tuples_to_string(lats, lons):
+    # Round the values in the tuples to the nearest integers
+    round_lats = [round(lat) for lat in lats]
+    round_lons = [round(lon) for lon in lons]
+
+    # Create the joined string
+    return f"lats_{min(round_lats)}-{max(round_lats)}_lons_{min(round_lons)}-{max(round_lons)}"
 
 
 # Below taken from https://hub.binder.pangeo.io/user/pangeo-data-pan--cmip6-examples-ro965nih/lab
@@ -166,6 +206,9 @@ def esgf_search(
     return sorted(all_files)
 
 
+####### Download information
+################################################################################
+
 download_dict = {
     # "BCC-CSM2-HR": {
     #     "experiment_ids": ["hist-1950"],
@@ -216,14 +259,59 @@ download_dict = {
         ],
         "frequency": "mon",
         "variable_dict": {
-            "hfds": {
+            # "hfds": {   # Downward Heat Flux at Sea Water Surface
+            #     "include": True,
+            #     "table_id": "Omon",  ###
+            #     "plevels": None,    # surface variable. May automate this a little more e.g lookup dict of surface/levels variable
+            # },
+            "rsdo": {  # Downwelling Shortwave Radiation in Sea Water
                 "include": True,
                 "table_id": "Omon",  ###
-                "plevels": None,
+                "plevels": [-1],
             },
-            "rsdo": {
+            # "umo": {    # Ocean Mass X Transport
+            #     "include": True,
+            #     "table_id": "Omon",  ###
+            #     "plevels": None,
+            # },
+            # "vmo": {    # Ocean Mass Y Transport
+            #     "include": True,
+            #     "table_id": "Omon",  ###
+            #     "plevels": None,
+            # },
+            "mlotst": {  # Ocean Mixed Layer Thickness Defined by Sigma T
                 "include": True,
                 "table_id": "Omon",  ###
+                "plevels": [-1],
+            },
+            "so": {  # Sea Water Salinity
+                "include": True,
+                "table_id": "Omon",  ###
+                "plevels": [-1],
+            },
+            "thetao": {  # Sea Water Potential Temperature
+                "include": True,
+                "table_id": "Omon",  ###
+                "plevels": [-1],
+            },
+            "uo": {  # Sea Water X Velocity
+                "include": True,
+                "table_id": "Omon",  ###
+                "plevels": [-1],
+            },
+            "vo": {  # Sea Water Y Velocity
+                "include": True,
+                "table_id": "Omon",  ###
+                "plevels": [-1],
+            },
+            # "wfo": {    # Water Flux into Sea Water
+            #     "include": True,
+            #     "table_id": "Omon",  ###
+            #     "plevels": None,
+            # },
+            "tos": {  # Sea Surface Temperature
+                "include": True,
+                "table_id": "Omon",  ### also available at 3hr
                 "plevels": None,
             },
         },
@@ -243,6 +331,7 @@ warnings.simplefilter("ignore", UserWarning)
 tic = time.time()
 
 source_id_dict = download_dict[source_id]
+variable_dict = source_id_dict["variable_dict"]
 
 query = {
     "source_id": source_id,
@@ -260,7 +349,9 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
     query["variable_id"] = variable_id
     query["table_id"] = variable_id_dict["table_id"]
 
-    if "ocean_variable" in variable_id_dict.keys() or source_id == "EC-Earth3":
+    if (
+        "ocean_variable" in variable_id_dict.keys()
+    ):  # this originally included "or EC-Earth3" (lower-res version)
         query["grid_label"] = "gr"
     else:
         query["grid_label"] = "gn"
@@ -270,8 +361,9 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
     # video_folder = os.path.join(config.video_folder, "cmip6", source_id, member_id)
 
     # Paths for each plevel (None if surface variable)
-    fpaths_EASE = {}
+    # fpaths_EASE = {}
     fpaths_latlon = {}
+    fpaths_tripolar = {}
     video_fpaths = {}
     fpaths = {}
 
@@ -279,14 +371,17 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
         variable_id_dict["plevels"] = [None]
 
     skip = {}  # Whether to skip each plevel variable
-    existing_EASE_fpaths = []
-    existing_fpaths = []
+    # existing_tripolar_fpaths = []
+    existing_latlon_fpaths = []
 
     for plevel in variable_id_dict["plevels"]:
         fname = variable_id
         if plevel is not None:
-            # suffix for the pressure level in hPa
-            fname += "{:.0f}".format(plevel / 100)
+            if plevel == -1:
+                fname += "_seafloor"
+            else:
+                # suffix for the pressure level in hPa
+                fname += "{:.0f}".format(plevel / 100)
 
         if do_crop:
             fname = fname + "_" + tuples_to_string(lats, lons) + ".nc"
@@ -294,24 +389,28 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
             fname = fname + ".nc"
         fpaths[plevel] = os.path.join(download_folder, fname)
 
-        # if do_regrid:
-        #     fname += "_EASE"
+        # Intermediate lat-lon file before iris regridding
+        fpaths_tripolar[plevel] = os.path.join(download_folder, fname + "_tripolar.nc")
+
+        if do_regrid:
+            fname += "_latlon"
+
+        fpaths_latlon[plevel] = os.path.join(download_folder, fname + ".nc")
         # video_fpaths[plevel] = os.path.join(video_folder, fname + ".mp4")
         # if compress:
         #     fname += "_cmpr"
         # fpaths_EASE[plevel] = os.path.join(download_folder, fname + ".nc")
 
-        if os.path.exists(fpaths[plevel]):
+        if os.path.exists(fpaths_latlon[plevel]):
             if overwrite:
                 print("removing existing file... ", end="", flush=True)
-                os.remove(fpaths[plevel])
+                os.remove(fpaths_latlon[plevel])
                 skip[plevel] = False
             else:
                 print("skipping existing file... ", end="", flush=True)
                 skip[plevel] = True
                 # existing_EASE_fpaths.append(fpaths_EASE[plevel])
-                existing_fpaths.append(fpaths[plevel])
-
+                existing_latlon_fpaths.append(fpaths_latlon[plevel])
         else:
             skip[plevel] = False
 
@@ -319,7 +418,7 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
 
     if skipall:
         print(
-            "skipping due to existing files {}".format(existing_EASE_fpaths),
+            "skipping due to existing files {}".format(existing_latlon_fpaths),
             end="",
             flush=True,
         )
@@ -328,13 +427,14 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
     if do_download:
         print("searching ESGF... ", end="", flush=True)
         results = []
+
         for experiment_id in source_id_dict["experiment_ids"]:
             query["experiment_id"] = experiment_id
 
             experiment_id_results = []
             for data_node in source_id_dict["data_nodes"]:
                 query["data_node"] = data_node
-                print(query)
+                # print(query)
                 experiment_id_results.extend(esgf_search(**query))
 
                 # Keep looping over possible data nodes until the experiment data is found
@@ -348,12 +448,17 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
 
         for plevel in variable_id_dict["plevels"]:
             if plevel is not None:
-                print("{} hPa, ".format(plevel / 100), end="", flush=True)
+                if plevel == -1:
+                    print("extracting seafloor values, ", end="", flush=True)
+                else:
+                    print(
+                        "extracting {} hPa, ".format(plevel / 100), end="", flush=True
+                    )
 
             if skip[plevel]:
                 print(
                     "skipping this plevel due to existing file {}".format(
-                        fpaths_EASE[plevel]
+                        fpaths_latlon[plevel]
                     ),
                     end="",
                     flush=True,
@@ -363,6 +468,8 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
             print("loading metadata... ", end="", flush=True)
 
             if do_download_ind:
+                seafloor_indices = None
+
                 print("downloading individual files... ", end="", flush=True)
                 ind_download_folder = os.path.join(download_folder, variable_id)
                 if not os.path.exists(ind_download_folder):
@@ -372,7 +479,65 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
                     date = result.split("_")[-1].split(".")[0]
                     ind_fname = fname.split(".")[0] + "_" + date + ".nc"
                     save_fp = os.path.join(ind_download_folder, ind_fname)
-                    ds = xr.open_dataset(result, decode_times=False, chunks="auto")
+
+                    # TODO: sort out naming
+                    ds = xa.open_dataset(
+                        result,
+                        decode_times=True,
+                        # chunks={'time': '499MB'}
+                        chunks={"i": 200, "j": 200},
+                        # chunks = {"lev": "499MB"}
+                        # chunks=None
+                    ).isel(lev=slice(0, 2))
+
+                    # print('\ndownloading with xarray... ', end='', flush=True)
+                    # ds.compute()
+
+                    # print('\nsaving to process without size restrictions... ', end='', flush=True)
+                    # ds.to_netcdf(fpaths_tripolar[plevel])
+
+                    # ds = xa.open_dataset(fpaths_tripolar[plevel], chunks=None)
+
+                    if plevel is not None:
+                        if plevel == -1:
+                            # #  Assign the numpy array to a new variable in the new dataset
+                            #     new_dataset[var_name] = (['time', 'j', 'i'], values)
+
+                            #     # Assign coordinates to the new dataset based on an existing dataset
+                            #     new_dataset[var_name].coords['i'] = ds['i']
+                            #     new_dataset[var_name].coords['j'] = ds['j']
+                            #     new_dataset[var_name].coords['time'] = ds['time']
+
+                            # ds_copy = ds.copy()[["i", "j", "time"]]
+                            # ds_copy[variable_id] = cmip6_da
+
+                            if seafloor_indices is None:
+                                print(
+                                    "determining seafloor indices... ",
+                                    end="",
+                                    flush=True,
+                                )
+                                seafloor_indices = gen_seafloor_indices(
+                                    ds.isel(time=0), var=variable_id
+                                )
+                                seafloor_indices = np.broadcast_to(
+                                    seafloor_indices,
+                                    (len(ds.time), len(ds.j), len(ds.i)),
+                                )
+
+                            print("\textracting seafloor values...", end="", flush=True)
+                            cmip6_array = extract_seafloor_vals(
+                                ds[variable_id], seafloor_indices
+                            )
+                            ds = ds.copy()[["time", "i", "j"]]
+                            ds[variable_id] = (["time", "j", "i"], cmip6_array)
+
+                        else:
+                            cmip6_da = cmip6_da.sel(
+                                plev=plevel
+                            )  # this would have to be changed for models with different vertical coordinate names. Possibly in preprocessing
+
+                    # TODO: overwrite saved file with selected level
 
                     if do_crop:
                         ds = _spatial_crop(ds)
@@ -393,9 +558,9 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
                         ds.to_netcdf(save_fp)
 
             else:
-                # test_xa = print(xr.open_dataset(results[0], decode_times=False))
+                # test_xa = print(xa.open_dataset(results[0], decode_times=False))
                 # Avoid 500MB DAP request limit
-                # cmip6_da = xr.open_mfdataset(
+                # cmip6_da = xa.open_mfdataset(
                 #     results[:2],
                 #     # combine="by_coords",
                 #     combine="nested",
@@ -406,21 +571,47 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
                 #     preprocess=_spatial_crop,
                 #     chunks={"time": "499MB"},
                 # )[variable_id]
+                static_da = (
+                    xa.open_dataset(results[0])[variable_id].isel(time=0).compute()
+                )
+                cmip6_da = xa.open_mfdataset(
+                    results[:3],
+                    combine="by_coords",
+                    # chunks={'time': '499MB'}
+                    chunks=None,
+                )[variable_id]
+
+                seafloor_indices = None
+
+                if plevel is not None:
+                    if plevel == -1:
+                        if seafloor_indices is None:
+                            seafloor_indices = gen_seafloor_indices(static_da)
+
+                        cmip6_da = extract_seafloor_vals(cmip6_da, seafloor_indices)
+
+                    else:
+                        cmip6_da = cmip6_da.sel(
+                            plev=plevel
+                        )  # this would have to be changed for models with different vertical coordinate names. Possibly in preprocessing
+
+                print("downloading with xarray... ", end="", flush=True)
+                cmip6_da.compute()
+
+                # TODO: change dtype of variable to float32
+                print("saving to regrid via cdo... ", end="", flush=True)
+                cmip6_da.to_netcdf(fpaths_tripolar[plevel])
 
                 # decoded_datasets = []
                 # for ds in results:
-                #     ds = xr.open_dataset(ds, decode_times=True)
+                #     ds = xa.open_dataset(ds, decode_times=True)
                 #     # Assign the modified time coordinates back to the dataset
                 #     ds["time"] = ds.indexes["time"].to_datetimeindex()
 
                 #     decoded_datasets.append(ds)
 
-                # cmip6_da = xr.merge(decoded_datasets)[variable_id].chunk({"time": "auto"})
+                # cmip6_da = xa.merge(decoded_datasets)[variable_id].chunk({"time": "auto"})
 
-                if plevel is not None:
-                    cmip6_da = cmip6_da.sel(plev=plevel)
-
-                print("downloading with xarray... ", end="", flush=True)
                 # cmip6_da.compute()
 
                 # if crop:
@@ -434,10 +625,33 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
                 # else:
                 #     save_fp = fpaths_latlon[plevel]
 
-                save_fp = fpaths[plevel]
-                print(f"saving to nc file... {save_fp}", end="", flush=True)
+                # save_fp = fpaths[plevel]
+                # print(f"saving to nc file... {save_fp}", end="", flush=True)
 
-                cmip6_da.to_netcdf(save_fp)
+                # cmip6_da.to_netcdf(save_fp)
+
+    if do_regrid:
+        # initialise instance of Cdo for regridding
+        cdo = Cdo()
+        for plevel in variable_id_dict["plevels"]:
+            if skip[plevel]:
+                print(
+                    "skipping this plevel due to existing file {}".format(
+                        fpaths_latlon[plevel]
+                    ),
+                    end="",
+                    flush=True,
+                )
+                continue
+
+            regrid_fname = fpaths_latlon[plevel] + ".nc"  # check this
+            # TODO: allow customisation of regridding method and resolution
+            cdo.remapbil(
+                "r1440x720", input=fpaths_tripolar[plevel], output="regrid_fname"
+            )
+
+            if delete_tripolar_data:
+                os.remove(fpaths_tripolar[plevel])
 
     if do_concat_by_time:
         # TODO: get rid of useless variable_id loop: covered by parent loop
@@ -480,7 +694,7 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
                 else:
                     print("concatenating files by time... ", end="", flush=True)
                     nc_fs = list(Path(variable_dir).glob("*.nc"))
-                    concatted = xr.open_mfdataset(nc_fs)
+                    concatted = xa.open_mfdataset(nc_fs)
 
                     print(variable_dir)
                     print(save_fp)
@@ -493,9 +707,6 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
                         f"saving concatenated file to {save_fp}... ", end="", flush=True
                     )
                     concatted.to_netcdf(save_fp)
-
-    if do_regrid:
-        print("EASE regridding functionality removed")
 
         # for plevel in variable_id_dict["plevels"]:
         #     if skip[plevel]:
@@ -536,7 +747,7 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
         #         (source_id, member_id) == ('EC-Earth3', 'r2i1p1f1'):
         #     print('\nGenerating video... ')
         #     xarray_to_video(
-        #         da=next(iter(xr.open_dataset(fpaths_EASE[plevel]).data_vars.values())),
+        #         da=next(iter(xa.open_dataset(fpaths_EASE[plevel]).data_vars.values())),
         #         video_path=video_fpaths[plevel],
         #         fps=30,
         #         mask=land_mask,
@@ -558,8 +769,8 @@ if do_merge_by_vars:
 
     if not os.path.exists(merged_fp):
         print(f"merging variable files... ", end="", flush=True)
-        dss = [xr.open_dataset(fname) for fname in var_nc_fs]
-        merged = xr.merge(dss)
+        dss = [xa.open_dataset(fname) for fname in var_nc_fs]
+        merged = xa.merge(dss)
         merged.to_netcdf(merged_fp)
     else:
         print(

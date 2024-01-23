@@ -341,8 +341,8 @@ def spatially_combine_xa_d_list(
     # Create a new dataset with the common extent and resolution
     common_dataset = xa.Dataset(
         coords={
-            "latitude": (["latitude"], np.arange(*lat_range, resolution_lat)),
-            "longitude": (["longitude"], np.arange(*lon_range, resolution_lon)),
+            "latitude": (["latitude"], np.arange(*np.sort(lat_range), resolution_lat)),
+            "longitude": (["longitude"], np.arange(*np.sort(lon_range), resolution_lon)),
         }
     )
 
@@ -654,7 +654,7 @@ def calculate_statistics(
         vars = dataset_period.data_vars.keys()
 
     for i, var_name in tqdm(
-        enumerate(vars), desc=f"calculating statistics for {len(vars)} variables..."
+        enumerate(vars), desc=f"calculating statistics for variables", total=len(vars)
     ):
         var_data = xa_ds[var_name]
         # Calculate annual average
@@ -741,3 +741,117 @@ def tuples_to_string(lats, lons):
 
     # Create the joined string
     return f"lats_{min(round_lats)}-{max(round_lats)}_lons_{min(round_lons)}-{max(round_lons)}"
+
+
+def split_dataset_and_save(ds_fp, divisor, output_dir_name: str=None, select_vars: list[str]=None):
+    
+    ds = xa.open_dataset(ds_fp)
+    
+    if select_vars:
+        ds = ds[select_vars]
+            
+    subsets_dict = split_dataset_by_indices(ds, divisor)
+    
+    # Create a subdirectory to save the split datasets
+    if output_dir_name:
+        output_dir = Path(ds_fp).parent / f"{output_dir_name}_{divisor**2}_split_datasets"
+    else:
+        output_dir = Path(ds_fp).parent / f"{divisor**2}_split_datasets"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    
+    for coord_info, subset in tqdm(subsets_dict.items(), desc="saving dataset subsets..."):
+        stem_stem = str(Path(ds_fp).stem).split("lats")[0]
+        # Construct the filename based on bounds
+        filename = f"{stem_stem}_{coord_info}.nc"
+        save_fp = output_dir / filename
+        subset.to_netcdf(save_fp)
+    return subsets_dict
+    
+
+def split_dataset_by_indices(dataset, divisor) -> dict:
+    subsets_dict = {}
+    num_lats = len(dataset.latitude.values) // divisor
+    num_lons = len(dataset.longitude.values) // divisor
+    for i in range(divisor):
+        for j in range(divisor):
+            start_lat_ind = i * num_lats
+            start_lon_ind = j * num_lons
+            
+            subset = dataset.isel(latitude=slice(start_lat_ind, start_lat_ind + num_lats),
+                                  longitude=slice(start_lon_ind, start_lon_ind + num_lons))
+            
+            lat_lims = spatial_data.min_max_of_coords(subset, "latitude")
+            lon_lims = spatial_data.min_max_of_coords(subset, "longitude")
+            
+            coord_info = functions_creche.tuples_to_string(lat_lims, lon_lims)
+            subsets_dict[coord_info] = subset
+    
+    return subsets_dict
+
+
+def ds_to_ml_ready(ds, 
+    gt:str="unep_coral_presence", exclude_list: list[str]=["latitude", "longitude", "latitude_grid", "longitude_grid", "crs", "depth", "spatial_ref"], 
+    train_val_test_frac=[1,0,0], inf_type: str="classification", threshold=0.5, depth_mask_lims = [-50, 0], client=None, remove_rows:bool=False):
+    
+    df = ds.compute().to_dataframe()
+    # TODO: implement checking for empty dfs
+
+    predictors = [pred for pred in df.columns if pred != gt and pred not in exclude_list]
+    depth_condition = (df["elevation"] < max(depth_mask_lims)) & (df["elevation"] > min(depth_mask_lims))
+    
+    if remove_rows:
+        df = df[depth_condition]
+    else:
+        df["within_depth"] = 0
+        df.loc[depth_condition, "within_depth"] = 1
+        
+    if len(df) > 0:
+        scaler = MinMaxScaler()
+        df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns, index = df.index)
+    
+    df["nan_onehot"] = df.isna().any(axis=1).astype(int)
+    df = df.fillna(0)
+    
+#     X = df[predictors].to_numpy()
+#     y = df[gt].to_numpy()
+    
+    X = df[predictors]
+    y = df[gt]
+    
+    return X, y
+
+def cont_to_class(array, threshold=0.5):
+    array[array >= threshold] = 1
+    array[array < threshold] = 0
+
+    return array.astype(int)
+
+
+def customize_plot_colors(fig, ax, background_color="#212121", text_color="white"):
+    # Set figure background color
+    fig.patch.set_facecolor(background_color)
+
+    # Set axis background color (if needed)
+    ax.set_facecolor(background_color)
+
+    # Set text color for all elements in the plot
+    for text in fig.texts:
+        text.set_color(text_color)
+    for text in ax.texts:
+        text.set_color(text_color)
+    for text in ax.xaxis.get_ticklabels():
+        text.set_color(text_color)
+    for text in ax.yaxis.get_ticklabels():
+        text.set_color(text_color)
+    ax.title.set_color(text_color)
+    ax.xaxis.label.set_color(text_color)
+    ax.yaxis.label.set_color(text_color)
+
+    # Set legend text color
+    legend = ax.get_legend()
+    if legend:
+        for text in legend.get_texts():
+            text.set_color(text_color)
+
+    return fig, ax

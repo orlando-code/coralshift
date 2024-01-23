@@ -1,4 +1,4 @@
-#!/bin/bash
+ #!/bin/bash
 
 mkdir -p logs/cmip6_download_logs/
 
@@ -10,6 +10,17 @@ mkdir -p logs/cmip6_download_logs/
 # python3 coralshift/dataloading/download_cmip6_data.py  --source_id BCC-CSM2-HR --member_id r1i1p1f1 > logs/cmip6_download_logs/BCC-CSM2-HR.txt 2>&1 &
 
 # EC-Earth3P-HR
-python3 coralshift/dataloading/download_cmip6_data.py --source_id EC-Earth3P-HR --member_id r1i1p2f1 > logs/cmip6_download_logs/EC-Earth3P-HR.txt 2>&1 &
+# python3 coralshift/dataloading/download_cmip6_data.py --source_id EC-Earth3P-HR --member_id r1i1p2f1 > logs/cmip6_download_logs/EC-Earth3P-HR.txt 2>&1 &
+# python3 coralshift/dataloading/download_cmip6_data_parallel.py --source_id EC-Earth3P-HR --variable_id rsdo > logs/cmip6_download_logs/EC-Earth3P-HR_rsdo.txt 2>&1 &
+python3 coralshift/dataloading/download_cmip6_data_parallel.py --source_id EC-Earth3P-HR --variable_id mlotst > logs/cmip6_download_logs/EC-Earth3P-HR_mlotst.txt 2>&1 &
+# python3 coralshift/dataloading/download_cmip6_data_parallel.py --source_id EC-Earth3P-HR --variable_id so > logs/cmip6_download_logs/EC-Earth3P-HR_so.txt 2>&1 &
+# python3 coralshift/dataloading/download_cmip6_data_parallel.py --source_id EC-Earth3P-HR --variable_id thetao > logs/cmip6_download_logs/EC-Earth3P-HR_thetao.txt 2>&1 &
+# python3 coralshift/dataloading/download_cmip6_data_parallel.py --source_id EC-Earth3P-HR --variable_id uo > logs/cmip6_download_logs/EC-Earth3P-HR_uo.txt 2>&1 &
+# python3 coralshift/dataloading/download_cmip6_data_parallel.py --source_id EC-Earth3P-HR --variable_id vo > logs/cmip6_download_logs/EC-Earth3P-HR_vo.txt 2>&1 &
+python3 coralshift/dataloading/download_cmip6_data_parallel.py --source_id EC-Earth3P-HR --variable_id tos > logs/cmip6_download_logs/EC-Earth3P-HR_tos.txt 2>&1 &
+
+
+
 
 # python3 icenet/download_cmip6_data.py  --source_id EC-Earth3P-HR --member_id r2i1p2f1 > logs/cmip6_download_logs/EC-Earth3P-HR.txt 2>&1 &
+

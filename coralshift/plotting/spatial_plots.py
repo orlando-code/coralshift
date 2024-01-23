@@ -221,7 +221,7 @@ def plot_spatial(
         ax.set_xticklabels([])
         ax.tick_params(axis="both", which="both", length=0)
         title = ""
-        ax.set_global()  # very cool but usually unnecessary
+        # ax.set_global()  # very cool but usually unnecessary
 
     im = xa_da.plot(
         ax=ax,
@@ -289,20 +289,25 @@ def format_spatial_plot(
             linewidth=0.5,
         )
     )
+    # ax.tick_params(axis='both', which='major', labelsize=60)
+    
     draw_labels = True
     if presentation:
         draw_labels = False
     gl = ax.gridlines(
         crs=ccrs.PlateCarree(), draw_labels=draw_labels, x_inline=False, y_inline=False
     )
-    import matplotlib.ticker as mticker
 
-    gl.xlabel_style = {"color": "white"}
-    gl.ylabel_style = {"color": "white"}
+    gl.xlabel_style = {"color": "white", "size": 4, "rotation": 45}
+    gl.ylabel_style = {"color": "white", "size": 4, "rotation": -45}
 
+    # import matplotlib.ticker as mticker
     # gl.ylocator = mticker.FixedLocator([1,2,3,4,])
+    gl.top_labels = True
     gl.bottom_labels = False
     gl.right_labels = True
+    # gl.right_labels = False
+
     gl.left_labels = False
     # gl.bottom_labels = gl.right_labels = False
 
@@ -331,9 +336,10 @@ def customize_plot_colors(fig, ax, background_color="#212121", text_color="white
 
     # Set legend text color
     legend = ax.get_legend()
-    if legend:
+    if legend:  # this isn't actually doing anything
         for text in legend.get_texts():
-            text.set_color(text_color)
+            text.set_color("text_color")
+        legend(facecolor=background_color)
 
     return fig, ax
 

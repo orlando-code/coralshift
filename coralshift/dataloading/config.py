@@ -4,8 +4,6 @@ from pathlib import Path
 import os
 import pandas as pd
 
-# from setuptools import setup, find_packages
-
 
 def get_coralshift_dir():
     coralshift_module = importlib.import_module("coralshift")
@@ -30,11 +28,11 @@ cmip6_data_folder = os.path.join(data_folder, "env_vars", "cmip6")
 bathymetry_folder = os.path.join(data_folder, "bathymetry")
 gt_folder = os.path.join(data_folder, "ground_truth")
 
-dataloader_config_folder = "dataloader_configs"
+# dataloader_config_folder = "dataloader_configs"
 
-networks_folder = "trained_networks"
+# networks_folder = "trained_networks"
 
-results_folder = "results"
+# results_folder = "results"
 # forecast_results_folder = os.path.join(results_folder, "forecast_results")
 # permute_and_predict_results_folder = os.path.join(
 #     results_folder, "permute_and_predict_results"
@@ -53,17 +51,11 @@ results_folder = "results"
 ### Missing months
 ###############################################################################
 
-missing_dates = [
-    pd.Timestamp("1986-4-1"),
-    pd.Timestamp("1986-5-1"),
-    pd.Timestamp("1986-6-1"),
-    pd.Timestamp("1987-12-1"),
-]
-
 ###############################################################################
 ### Weights and biases config (https://docs.wandb.ai/guides/track/advanced/environment-variables)
 ###############################################################################
 
+# TODO: set up wandb config
 # Get API key from https://wandb.ai/authorize
 WANDB_API_KEY = "YOUR-KEY-HERE"
 # Absolute path to store wandb generated files (folder must exist)
@@ -72,10 +64,3 @@ WANDB_DIR = "/path/to/wandb/dir"
 # Absolute path to wandb config dir (
 WANDB_CONFIG_DIR = "/path/to/wandb/config/dir"
 WANDB_CACHE_DIR = "/path/to/wandb/cache/dir"
-
-###############################################################################
-### ECMWF details
-###############################################################################
-
-ECMWF_API_KEY = "YOUR-KEY-HERE"
-ECMWF_API_EMAIL = "YOUR-KEY-HERE"
