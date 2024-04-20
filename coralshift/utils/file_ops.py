@@ -7,6 +7,9 @@ import json
 import xarray as xa
 import pandas as pd
 import geopandas as gpd
+import yaml
+import os
+import pickle
 
 # import rasterio
 # import rioxarray as rio
@@ -78,6 +81,19 @@ def save_nc(
         return save_path, xa.open_dataset(save_path, decode_coords="all")
     else:
         return save_path
+
+
+def check_exists_save(
+    xa_d: xa.Dataset | xa.DataArray,
+    save_fp: str | Path,
+    save_message: str,
+    skip_message: str,
+):
+    if not os.path.exists(save_fp):
+        print(save_message, flush=True)
+    else:
+        print(skip_message, flush=True)
+    return not os.path.exists(save_fp)
 
 
 def prune_file_list_on_existence(file_list: list[Path | str]) -> list:
@@ -935,7 +951,8 @@ def create_coord_subdir_name(og_dir_p, lats, lons, depths):
     Returns:
         None
 
-    TODO: make less specific i.e. can specify a subset of info to append to new dir. Could split into naming and creation
+    TODO: make less specific i.e. can specify a subset of info to append to new dir. Could split into
+    naming and creation
     """
     og_dir_name = Path(og_dir_p).name
     # Concatenate lat and lon values to create a subdirectory name
@@ -967,6 +984,55 @@ def create_subdirectory(og_dir_p, subdir_name):
         print(f"Subdirectory '{subdir_name}' created successfully.")
     else:
         print(f"Subdirectory '{subdir_name}' already exists.")
+
+
+def read_yaml(yaml_path: str | Path):
+    with open(yaml_path, "r") as file:
+        yaml_info = yaml.safe_load(file)
+    return yaml_info
+
+
+def edit_yaml(yaml_path: str | Path, info: dict):
+    yaml_info = read_yaml(yaml_path)
+    yaml_info.update(info)
+
+    save_yaml(yaml_path, yaml_info)
+
+
+def save_yaml(yaml_path: str | Path, info: dict):
+    with open(yaml_path, "w") as file:
+        yaml.dump(info, file)
+
+
+def uniquify_file_numerically(dir_path: str | Path, filename: str):
+    """If a file already exists in the directory, make a new file with a number appended to the end"""
+    counter = 1
+    new_filename = f"{filename}_000"
+    while (dir_path / new_filename).exists():
+        new_filename = f"{Path(filename).stem}_{utils.pad_number_with_zeros(counter, resulting_len=3)}{Path(filename).suffix}"
+        counter += 1
+    return new_filename
+
+
+def uniquify_file_wordily(dir_path: str | Path, filename: str):
+    """If a file already exists in the directory, make a new file with a letter appended to the end"""
+    counter = 97  # ASCII code for 'a'
+    new_filename = f"{filename}_a"
+    while (dir_path / new_filename).exists():
+        new_filename = f"{Path(filename).stem}_{chr(counter)}_{Path(filename).suffix}"
+        counter += 1
+    return new_filename
+
+
+def read_pkl(pkl_path: str | Path):
+    with open(pkl_path, "rb") as file:
+        pkl_info = pickle.load(file)
+    return pkl_info
+
+
+def write_pkl(pkl_path: str | Path, info):
+    with open(pkl_path, "wb") as file:
+        pickle.dump(info, file)
 
 
 ############

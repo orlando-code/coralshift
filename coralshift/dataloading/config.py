@@ -2,7 +2,6 @@ import importlib
 import inspect
 from pathlib import Path
 import os
-import pandas as pd
 
 
 def get_coralshift_dir():
@@ -19,14 +18,20 @@ Defines globals used throughout the codebase.
 """
 
 ###############################################################################
-### Folder structure naming system
+# Folder structure naming system
 ###############################################################################
 
 data_folder = "data"
 
 cmip6_data_folder = os.path.join(data_folder, "env_vars", "cmip6")
+static_cmip6_data_folder = os.path.join(
+    cmip6_data_folder, "EC-Earth3P-HR/r1i1p2f1_latlon"
+)
 bathymetry_folder = os.path.join(data_folder, "bathymetry")
-gt_folder = os.path.join(data_folder, "ground_truth")
+gt_data_dir = os.path.join(data_folder, "ground_truth")
+# subdirs
+gdcr_dir = Path(gt_data_dir) / "unep_wcmc"
+
 
 # dataloader_config_folder = "dataloader_configs"
 
@@ -48,19 +53,19 @@ gt_folder = os.path.join(data_folder, "ground_truth")
 # region_mask_filename = "region_mask.npy"
 
 ###############################################################################
-### Missing months
+# Missing months
 ###############################################################################
 
 ###############################################################################
-### Weights and biases config (https://docs.wandb.ai/guides/track/advanced/environment-variables)
+# Weights and biases config (https://docs.wandb.ai/guides/track/advanced/environment-variables)
 ###############################################################################
 
 # TODO: set up wandb config
 # Get API key from https://wandb.ai/authorize
-WANDB_API_KEY = "YOUR-KEY-HERE"
+WANDB_API_KEY = "b31d9bc1dad7625997b86c2a5db38f8369babbe7"
 # Absolute path to store wandb generated files (folder must exist)
 #   Note: user must have write access
-WANDB_DIR = "/path/to/wandb/dir"
+WANDB_DIR = "/maps/rt582/coralshift/wandb"
 # Absolute path to wandb config dir (
 WANDB_CONFIG_DIR = "/path/to/wandb/config/dir"
 WANDB_CACHE_DIR = "/path/to/wandb/cache/dir"

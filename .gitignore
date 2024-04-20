@@ -25,3 +25,12 @@ __pycache__/
 
 # ignore logging: specific to user
 /logs
+/testlogs
+/newtestlogs
+
+# machine learning runs
+/runs/*
+!/runs/config_files/
+
+# ignore any installation-specific directories egg
+**/*egg*/

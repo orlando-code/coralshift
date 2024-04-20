@@ -254,3 +254,10 @@ def check_discrete(array):
         return False
     else:
         return False
+
+
+def convert_to_numeric(value):
+    try:
+        return pd.to_numeric(value)
+    except (ValueError, TypeError):
+        return np.nan

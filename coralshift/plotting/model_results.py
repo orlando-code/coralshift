@@ -16,10 +16,12 @@ import sklearn.metrics as sklmetrics
 from coralshift.plotting import spatial_plots
 from coralshift.machine_learning import baselines
 from coralshift.utils import utils
+from coralshift import functions_creche
+from coralshift.processing import spatial_data
 
 
-def spatial_confusion_matrix_da(
-    predicted: xa.DataArray, ground_truth: xa.DataArray, threshold: float = 0.25
+def generate_spatial_confusion_matrix_da(
+    predicted: xa.DataArray, ground_truth: xa.DataArray
 ) -> xa.DataArray:
     """Compute a spatial confusion matrix based on the predicted and ground truth xa.DataArray.
 
@@ -30,18 +32,9 @@ def spatial_confusion_matrix_da(
 
     Returns
     -------
-    tuple[xa.DataArray, dict]: Spatial confusion matrix and dictionary of integer: description pairs
+    xa.DataArray: Spatial confusion matrix
 
-    Notes
-    -----
-    The spatial confusion matrix assigns the following categories to each cell:
-        - No Data: 0
-        - True Positives: 1
-        - True Negatives: 2
-        - False Positives: 3
-        - False Negatives: 4
     """
-
     # compare ground truth and predicted values
     true_positives = xa.where((predicted == 1) & (ground_truth == 1), 1, 0)
     true_negatives = xa.where((predicted == 0) & (ground_truth == 0), 2, 0)
@@ -52,7 +45,11 @@ def spatial_confusion_matrix_da(
         true_positives + true_negatives + false_positives + false_negatives
     )
 
-    vals_dict = {
+    return category_variable
+
+
+def get_confusion_vals_dict():
+    return {
         "No Data": 0,
         "True Positives": 1,
         "True Negatives": 2,
@@ -60,39 +57,115 @@ def spatial_confusion_matrix_da(
         "False Negatives": 4,
     }
 
-    return category_variable, vals_dict
 
+def plot_regression_histograms(
+    actual, predicted, n_bins: int = 20, presentation_format: bool = False
+):
+    overfit_r2 = sklmetrics.r2_score(actual, predicted)
 
-def generate_confusion_ds(xa_ds: xa.Dataset, ground_truth_var: str, predicted_var: str):
-    """
-    Generates confusion matrix values and adds them to the xarray Dataset.
-
-    Parameters
-    ----------
-        xa_ds (xa.Dataset): Input xarray Dataset.
-        ground_truth_var (str): Variable name for ground truth values in the Dataset.
-        predicted_var (str): Variable name for predicted values in the Dataset.
-
-    Returns
-    -------
-        Tuple[xa.Dataset, np.ndarray, Dict]: A tuple containing the modified xarray Dataset, confusion matrix values,
-        and a dictionary of value mappings.
-    """
-    confusion_values, vals_dict = spatial_confusion_matrix_da(
-        xa_ds[predicted_var], xa_ds[ground_truth_var]
+    fig, ax = plt.subplots(ncols=2, figsize=(10, 4))
+    # plot y=x
+    ax[0].plot(
+        [0, 1],
+        [0, 1],
+        color="gray",
+        linestyle=(5, (10, 3)),
+        label=f"Inference R$^2$ = {overfit_r2:.2f}",
     )
-    xa_ds["comparison"] = confusion_values
+    # plot scatter
+    ax[0].scatter(actual, predicted, alpha=0.1, color="#d83c04")
+    # plot histogram
+    ax[1].hist(actual, bins=n_bins, color="#d83c04", alpha=0.5, label="actual")
+    ax[1].hist(predicted, bins=n_bins, color="#3B9AB2", alpha=0.5, label="predicted")
 
-    return xa_ds, confusion_values, vals_dict
+    # format
+    plt.suptitle("Inferred-actual comparison")
+    ax[0].set_ylabel("Predicted coral presence")
+    ax[0].set_xlabel("Actual coral presence")
+    ax[1].set_xlabel("Actual coral presence")
+
+    if presentation_format:
+        [functions_creche.customize_plot_colors(fig, a) for a in [ax[0], ax[1]]]
+        [a.legend(facecolor="#212121", labelcolor="white") for a in [ax[0], ax[1]]]
+    else:
+        [a.legend() for a in [ax[0], ax[1]]]
+
+
+def plot_performance_vs_resolution():
+    """Ported directly from pipeline.ipynb
+    TODO: clean this up and automate. Please."""
+    resolutions = [1, 0.5, 0.25, 0.1, 0.05, 0.01]
+    man_accuracy_scores = [
+        0.98828125,
+        0.990234375,
+        0.98876953125,
+        0.9949609375,
+        0.99544921875,
+        0.9478665610321997,
+    ]
+    man_balanced_accuracy_scores = [
+        0.5,
+        0.5694620030903217,
+        0.5537305421363392,
+        0.7689423737055896,
+        0.8129974262710511,
+        0.8566799050622791,
+    ]
+    man_f1_scores = [
+        0.0,
+        0.16666666666666666,
+        0.17857142857142855,
+        0.5956112852664577,
+        0.6750348675034867,
+        0.7631139110311135,
+    ]
+
+    # Colors
+    colors = ["#3B9AB2", "#EBCC2A", "#d83c04"]
+    scores = [man_accuracy_scores, man_balanced_accuracy_scores, man_f1_scores]
+    score_names = ["Accuracy", "Balanced accuracy", "F1 score"]
+
+    # Plotting
+    fig, ax = plt.subplots(dpi=300)
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+
+    for idx, score in enumerate(scores):
+        ax.scatter(
+            resolutions[: len(score)],
+            score,
+            label=score_names[idx],
+            color=colors[idx],
+            zorder=3,
+        )
+        ax.plot(resolutions[: len(score)], score, linestyle=":", color=colors[idx])
+
+    for res in resolutions:
+        ax.axvline(res, zorder=0, lw=0.5, c="lightgrey")
+
+    ax.axhline(0.6, c=colors[0], label="Literature baseline accuracy")
+    # Adding labels and title
+    ax.set_xlabel("Resolution (degrees)")
+    ax.set_ylabel("Scores")
+    # ax.set_title('Performance vs Resolution')
+
+    ax.set_xticks(resolutions)
+    ax.set_xticklabels(rotation=45, labels=resolutions)
+    # Adding legend
+    ax.legend(loc="upper right", facecolor="#212121", labelcolor="white")
+
+    functions_creche.customize_plot_colors(fig, ax)
 
 
 def plot_spatial_confusion(
-    xa_ds: xa.Dataset,
-    ground_truth_var: str,
-    predicted_var: str,
-    vals_dict: dict,
-    fax=None,
-    cbar_pad=0.1,
+    comparison_xa: xa.DataArray,
+    figsize: tuple[float, float] = [16, 12],
+    fax: bool = None,
+    cbar_pad: float = 0.1,
+    presentation_format: bool = True,
 ) -> xa.Dataset:
     """Plot a spatial confusion matrix based on the predicted and ground truth variables in the xarray dataset.
 
@@ -107,37 +180,57 @@ def plot_spatial_confusion(
         xarray.Dataset: Updated xarray dataset with the "comparison" variable added.
     """
     # calculate spatial confusion values and assign to new variable in Dataset
-    map_proj = ccrs.PlateCarree()
     if not fax:
-        # may need to change this
-        fig = plt.figure(figsize=[16, 8])
-        ax = plt.axes(projection=map_proj)
+        fig, ax = spatial_plots.generate_geo_axis(figsize=figsize)
     else:
-        fig = fax[0]
-        ax = fax[1]
+        fig, ax = fax[0], fax[1]
 
-    # from Wes Anderson: https://github.com/karthik/wesanderson/blob/master/R/colors.R
-    cmap_colors = ["#EEEEEE", "#3B9AB2", "#78B7C5", "#d83c04", "#E1AF00"]
+    # fetch meaning of values
+    vals_dict = get_confusion_vals_dict()
+    cmap_colors = ["#EEEEEE", "#3B9AB2", "#cae7ed", "#d83c04", "#E1AF00"]
 
-    im = xa_ds["comparison"].plot.imshow(
-        ax=ax, vmin=0, vmax=4, cmap=mcolors.ListedColormap(cmap_colors)
+    im = comparison_xa.plot(
+        ax=ax,
+        cmap=mcolors.ListedColormap(cmap_colors),
+        vmin=0,
+        vmax=4,
+        add_colorbar=True,
+        transform=ccrs.PlateCarree(),
+        alpha=1,
     )
 
-    spatial_plots.format_spatial_plot(
-        im, fig, ax, title="", name="", cbar=False, edgecolor="black"
-    )
     ax.set_aspect("equal")
     # remove old colorbar
     cb = im.colorbar
     cb.remove()
-
     colorbar = plt.colorbar(im, ax=[ax], location="right", pad=cbar_pad)
     num_ticks = len(cmap_colors)
     vmin, vmax = colorbar.vmin, colorbar.vmax
     colorbar.set_ticks(
         [vmin + (vmax - vmin) / num_ticks * (0.5 + i) for i in range(num_ticks)]
     )
-    colorbar.set_ticklabels(list(vals_dict.keys()), rotation=0)
+
+    if presentation_format:
+        label_style_dict = {"fontsize": 12, "color": "white", "rotation": 45}
+        functions_creche.customize_plot_colors(fig, ax)
+        cbar_label_color = "white"
+    else:
+        label_style_dict = None
+        cbar_label_color = "black"
+
+    colorbar.set_ticklabels(list(vals_dict.keys()), color=cbar_label_color)
+
+    spatial_plots.format_spatial_plot(
+        im,
+        fig,
+        ax,
+        title="",
+        cbar_name="",
+        cbar=False,
+        edgecolor="black",
+        label_style_dict=label_style_dict,
+        presentation_format=presentation_format,
+    )
 
 
 def format_roc(ax: Axes, title: str = "Receiver Operating Characteristic (ROC) Curve"):
@@ -346,8 +439,49 @@ def plot_spatial_diffs(
     )
 
 
+def plot_spatial_confusion_matrix(
+    y, predictions, threshold, presentation_format: bool = True
+):
+    spatial_predictions_ds = spatial_data.spatial_predictions_from_data(y, predictions)
+
+    # Threshold the values while retaining NaNs
+    thresholded_predictions_values = functions_creche.cont_to_class(
+        spatial_predictions_ds["predictions"].values,
+        threshold,
+    )
+    thresholded_labels_values = functions_creche.cont_to_class(
+        spatial_predictions_ds["label"].values,
+        threshold,
+    )
+
+    # Create a new DataArray with thresholded values
+    thresholded_ds = spatial_predictions_ds.copy()
+    thresholded_ds["thresholded_labels"] = (
+        thresholded_ds["label"].dims,
+        thresholded_labels_values,
+    )
+    thresholded_ds["thresholded_predictions"] = (
+        thresholded_ds["predictions"].dims,
+        thresholded_predictions_values,
+    )
+
+    confusion_values = generate_spatial_confusion_matrix_da(
+        predicted=thresholded_ds["thresholded_predictions"],
+        ground_truth=thresholded_ds["thresholded_labels"],
+    )
+
+    plot_spatial_confusion(confusion_values, presentation_format=presentation_format)
+
+    return confusion_values
+
+
 def plot_confusion_matrix(
-    labels, predictions, label_threshold: float = 0, fax=None, colorbar: bool = False
+    labels,
+    predictions,
+    label_threshold: float = 0,
+    fax=None,
+    colorbar: bool = False,
+    presentation_format: bool = False,
 ) -> None:
     """
     Plot the confusion matrix.
@@ -364,22 +498,27 @@ def plot_confusion_matrix(
     -------
         None
     """
-    cmap = spatial_plots.get_cbar("lim")
+    cmap = spatial_plots.get_cbar()
 
-    if not utils.check_discrete(predictions):
-        labels = baselines.threshold_array(predictions, threshold=label_threshold)
+    if not utils.check_discrete(predictions) or not utils.check_discrete(labels):
+        labels = baselines.threshold_array(labels, threshold=label_threshold)
         predictions = baselines.threshold_array(predictions, threshold=label_threshold)
 
     classes = ["coral absent", "coral present"]
     # initialise confusion matrix
-    cm = sklmetrics.confusion_matrix(labels, predictions)
+    cm = sklmetrics.confusion_matrix(
+        labels, predictions, labels=[0, 1], normalize="true"
+    )
     disp = sklmetrics.ConfusionMatrixDisplay(
         confusion_matrix=cm, display_labels=classes
     )
-    if fax:
-        disp.plot(cmap=cmap, colorbar=colorbar, text_kw={"color": "black"}, ax=fax[1])
-    else:
-        disp.plot(cmap=cmap, colorbar=colorbar, text_kw={"color": "black"})
+    if not fax:
+        fax = plt.subplots()
+
+    disp.plot(cmap=cmap, colorbar=colorbar, text_kw={"color": "black"}, ax=fax[1])
+
+    if presentation_format:
+        functions_creche.customize_plot_colors(fax[0], fax[1])
 
 
 def model_output_to_spatial_confusion(
@@ -539,6 +678,33 @@ def plot_train_test_spatial(
         fraction=0.046,
     )
     return xa_da
+
+
+def plot_spatial_inference_comparison(y, predictions, presentation_format: bool = True):
+    spatial_predictions = spatial_data.spatial_predictions_from_data(y, predictions)
+
+    f, ax = plt.subplots(
+        ncols=2,
+        figsize=(16, 12),
+        dpi=300,
+        subplot_kw={"projection": ccrs.PlateCarree()},
+    )
+
+    spatial_plots.plot_spatial(
+        spatial_predictions["label"],
+        fax=(f, ax[0]),
+        cbar_orientation="horizontal",
+        cbar=True,
+        presentation_format=presentation_format,
+    )
+    spatial_plots.plot_spatial(
+        spatial_predictions["predictions"],
+        fax=(f, ax[1]),
+        cbar_orientation="horizontal",
+        cbar=True,
+        presentation_format=presentation_format,
+    )
+    return f, ax
 
 
 ############

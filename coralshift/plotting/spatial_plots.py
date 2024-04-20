@@ -23,6 +23,10 @@ from coralshift.dataloading import bathymetry
 from coralshift.utils import file_ops
 
 
+def simple_plot(ds):
+    ds.plot()
+
+
 def hex_to_rgb(value):
     """
     Convert a hexadecimal color code to RGB values.
@@ -103,6 +107,7 @@ def get_n_colors_from_hexes(
     hex_list: list[str] = ["#3B9AB2", "#78B7C5", "#EBCC2A", "#E1AF00", "#d83c04"],
 ) -> list[str]:
     """
+    from Wes Anderson: https://github.com/karthik/wesanderson/blob/master/R/colors.R
     Get a list of n colors from a list of hex codes.
 
     Args:
@@ -141,25 +146,41 @@ def get_cbar(cbar_type: str = "seq"):
         )
     elif cbar_type == "lim":
         return get_continuous_cmap(["#78B7C5", "#EBCC2A", "#E1AF00"])
+    elif cbar_type == "spatial_conf_matrix":
+        # TODO: correct (for plot_spatial_confusion)
+        colors = ["#EEEEEE", "#3B9AB2", "#cae7ed", "#d83c04", "#E1AF00"]
+        return mpl.colors.ListedColormap(colors)
+    elif isinstance(cbar_type, list):
+        return get_continuous_cmap(cbar_type)
     else:
         raise ValueError(f"{cbar_type} not recognised.")
+
+
+def generate_geo_axis(
+    figsize: tuple[float, float] = (10, 10), map_proj=ccrs.PlateCarree(), dpi=300
+):
+    return plt.figure(figsize=figsize, dpi=dpi), plt.axes(projection=map_proj)
 
 
 def plot_spatial(
     xa_da: xa.DataArray,
     fax: Axes = None,
     title: str = None,
-    name: str = None,
+    cbar_name: str = None,
     figsize: tuple[float, float] = (10, 10),
     val_lims: tuple[float, float] = None,
     cmap_type: str = "seq",
     symmetric: bool = False,
     edgecolor: str = "black",
     cbar: bool = True,
-    orient_colorbar: str = "vertical",
+    cbar_orientation: str = "vertical",
     cbar_pad: float = 0.1,
-    presentation: bool = False,
-    map_proj: str = ccrs.PlateCarree(),
+    cbar_frac: float = 0.046,
+    presentation_format: bool = False,
+    labels: list[str] = False,
+    label_style_dict: dict = None,
+    map_proj=ccrs.PlateCarree(),
+    alpha: float = 1,
 ) -> tuple[Figure, Axes]:
     """
     Plot a spatial plot with colorbar, coastlines, landmasses, and gridlines.
@@ -168,12 +189,14 @@ def plot_spatial(
     ----------
     xa_da (xa.DataArray): The input xarray DataArray representing the spatial data.
     title (str, optional): The title of the plot.
-    name (str, optional): The name of the DataArray.
+    cbar_name (str, optional): The name of the DataArray.
     val_lims (tuple[float, float], optional): The limits of the colorbar range.
     cmap_type (str, optional): The type of colormap to use.
     symmetric (bool, optional): Whether to make the colorbar symmetric around zero.
     edgecolor (str, optional): The edge color of the landmasses.
-    orient_colorbar (str, optional): The orientation of the colorbar ('vertical' or 'horizontal').
+    cbar_orientation (str, optional): The orientation of the colorbar ('vertical' or 'horizontal').
+    labels (list[str], optional): Which gridlines to include, as strings e.g. ["t","r","b","l"]
+    map_proj (str, optional): The projection of the map.
 
     Returns
     -------
@@ -181,26 +204,22 @@ def plot_spatial(
     TODO: saving option and tidy up presentation formatting
     """
     # may need to change this
-
+    # for some reason fig not including axis ticks. Universal for other plotting
     if not fax:
-        fig = plt.figure(figsize=figsize)
-        ax = plt.axes(projection=map_proj)
+        fig, ax = generate_geo_axis(figsize=figsize, map_proj=map_proj)
     else:
-        fig = fax[0]
-        ax = fax[1]
+        fig, ax = fax[0], fax[1]
 
-    resolution_d = np.mean(spatial_data.calculate_spatial_resolution(xa_da))
-    resolution_m = np.mean(spatial_data.degrees_to_distances(resolution_d))
+    # if not name, and data array:
+    if isinstance(xa_da, xa.DataArray) and not cbar_name:
+        cbar_name = xa_da.name
+    elif isinstance(xa_da, xa.Dataset) and not cbar_name:
+        cbar_name = list(xa_da.data_vars)[0]
 
-    # if not name:
-    if isinstance(xa_da, xa.DataArray):
-        name = xa_da.name
-    else:
-        name = list(xa_da.data_vars)[0]
     if not title:
-        title = name + " at {:.4f}° (~{:.0f} m) resolution".format(  # noqa
-            resolution_d, resolution_m
-        )
+        resolution_d = np.mean(spatial_data.calculate_spatial_resolution(xa_da))
+        resolution_m = np.mean(spatial_data.degrees_to_distances(resolution_d))
+        title = f"{cbar_name} at {resolution_d:.4f}° (~{resolution_m:.0f} m) resolution"
 
     # if colorbar limits not specified, set to be maximum of array
     if not val_lims:
@@ -210,18 +229,9 @@ def plot_spatial(
 
     cmap = get_cbar(cmap_type)
 
-    # if choosing coloorbar to be centred arouoond zero (e.g. for highlighting residuals)
+    # if choosing colorbar to be centred arouoond zero (e.g. for highlighting residuals)
     if symmetric:
         vmin, vmax = (-vmax, vmax) if abs(vmin) > abs(vmax) else (vmin, -vmin)
-
-    if presentation:
-        fig, ax = customize_plot_colors(fig, ax)
-        cbar = False
-        ax.set_xticks([])
-        ax.set_xticklabels([])
-        ax.tick_params(axis="both", which="both", length=0)
-        title = ""
-        # ax.set_global()  # very cool but usually unnecessary
 
     im = xa_da.plot(
         ax=ax,
@@ -230,19 +240,31 @@ def plot_spatial(
         vmax=vmax,
         add_colorbar=False,
         transform=ccrs.PlateCarree(),
+        alpha=alpha,
     )
+
+    if presentation_format:
+        fig, ax = customize_plot_colors(fig, ax)
+        # cbar = False
+        ax.tick_params(axis="both", which="both", length=0)
+        # title = None
+        # ax.set_global()  # very cool but usually unnecessary
+
     # nicely format spatial plot
     format_spatial_plot(
         image=im,
         fig=fig,
         ax=ax,
         title=title,
-        name=name,
+        cbar_name=cbar_name,
         cbar=cbar,
-        orient_colorbar=orient_colorbar,
+        cbar_orientation=cbar_orientation,
         cbar_pad=cbar_pad,
+        cbar_frac=cbar_frac,
         edgecolor=edgecolor,
-        presentation=presentation,
+        presentation_format=presentation_format,
+        labels=labels,
+        label_style_dict=label_style_dict,
     )
 
     return fig, ax, im
@@ -252,13 +274,16 @@ def format_spatial_plot(
     image: xa.DataArray,
     fig: Figure,
     ax: Axes,
-    title: str = "",
-    name: str = "",
+    title: str = None,
+    cbar_name: str = "",
     cbar: bool = True,
-    orient_colorbar: str = "horizontal",
+    cbar_orientation: str = "horizontal",
     cbar_pad: float = 0.1,
+    cbar_frac: float = 0.046,
     edgecolor: str = "black",
-    presentation: bool = False,
+    presentation_format: bool = False,
+    labels: list[str] = False,
+    label_style_dict: dict = None,
 ) -> tuple[Figure, Axes]:
     """Format a spatial plot with a colorbar, title, coastlines and landmasses, and gridlines.
 
@@ -268,48 +293,72 @@ def format_spatial_plot(
         fig (Figure): figure object to plot onto.
         ax (Axes): axes object to plot onto.
         title (str): title of the plot.
+        cbar_name (str): label of colorbar.
+        cbar (bool): whether to include a colorbar.
+        cbar_orientation (str): orientation of colorbar.
+        cbar_pad (float): padding of colorbar.
+        edgecolor (str): color of landmass edges.
+        presentation_format (bool): whether to format for presentation.
+        labels (list[str]): which gridlines to include, as strings e.g. ["t","r","b","l"]
+        label_style_dict (dict): dictionary of label styles.
 
     Returns
     -------
         Figure, Axes
     """
     if cbar:
-        plt.colorbar(
-            image, orientation=orient_colorbar, label=name, pad=cbar_pad, fraction=0.046
+        cb = plt.colorbar(
+            image,
+            orientation=cbar_orientation,
+            label=cbar_name,
+            pad=cbar_pad,
+            fraction=cbar_frac,
         )
-    ax.set_title(title)
-    # ax.coastlines(resolution="10m", color="red", linewidth=1)
+        if cbar_orientation == "horizontal":
+            cbar_ticks = cb.ax.get_xticklabels()
+        else:
+            cbar_ticks = cb.ax.get_yticklabels()
+
     ax.add_feature(
         cfeature.NaturalEarthFeature(
             "physical",
             "land",
             "10m",
-            edgecolor=edgecolor,
-            facecolor="#d2ccc4",
+            edgecolor="black",
+            # facecolor=(0, 0, 0, 0),
+            facecolor="none",
             linewidth=0.5,
+            alpha=1,
         )
     )
-    # ax.tick_params(axis='both', which='major', labelsize=60)
-    
-    draw_labels = True
-    if presentation:
-        draw_labels = False
+    ax.set_title(title)
+
+    # format ticks, gridlines, and colours
+    ax.tick_params(axis="both", which="major")
+    default_label_style_dict = {"fontsize": 12, "color": "black", "rotation": 45}
+
     gl = ax.gridlines(
-        crs=ccrs.PlateCarree(), draw_labels=draw_labels, x_inline=False, y_inline=False
+        crs=ccrs.PlateCarree(), draw_labels=True, x_inline=False, y_inline=False
     )
 
-    gl.xlabel_style = {"color": "white", "size": 4, "rotation": 45}
-    gl.ylabel_style = {"color": "white", "size": 4, "rotation": -45}
+    if label_style_dict:
+        for k, v in label_style_dict.items():
+            default_label_style_dict[k] = v
+    if presentation_format:
+        default_label_style_dict["color"] = "white"
+        if cbar:
+            plt.setp(cbar_ticks, color="white")
+            cb.set_label("colorbar label", color="white")
 
-    # import matplotlib.ticker as mticker
-    # gl.ylocator = mticker.FixedLocator([1,2,3,4,])
-    gl.top_labels = True
-    gl.bottom_labels = False
-    gl.right_labels = True
-    # gl.right_labels = False
+    if labels:
+        # convert labels to relevant boolean: ["t","r","b","l"]
+        gl.top_labels = "t" in labels
+        gl.bottom_labels = "b" in labels
+        gl.left_labels = "l" in labels
+        gl.right_labels = "r" in labels
 
-    gl.left_labels = False
-    # gl.bottom_labels = gl.right_labels = False
+    gl.xlabel_style = default_label_style_dict
+    gl.ylabel_style = default_label_style_dict
 
     return fig, ax
 
@@ -319,7 +368,7 @@ def customize_plot_colors(fig, ax, background_color="#212121", text_color="white
     fig.patch.set_facecolor(background_color)
 
     # Set axis background color (if needed)
-    ax.set_facecolor(background_color)
+    # ax.set_facecolor(background_color)
 
     # Set text color for all elements in the plot
     for text in fig.texts:

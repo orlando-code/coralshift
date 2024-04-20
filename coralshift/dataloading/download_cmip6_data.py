@@ -4,7 +4,7 @@ import requests
 from cdo import Cdo
 
 # file handling
-import config  # global file system paths. Could draw more from utils.directories script
+import config  # global file system paths. Could draw more from utils.directories script. One guarantees existence, but is lonnger/less clear. TBC.
 import time
 import warnings
 from pathlib import Path
@@ -12,7 +12,6 @@ import os
 
 import xarray as xa
 import numpy as np
-
 
 # from coralshift.utils import tuples_to_string # can't find coralshift module
 
@@ -51,42 +50,56 @@ simulations in parallel using this script.
 # --------------------------------------------------------------------
 
 parser = argparse.ArgumentParser()
+
+# TODO: make more concise
 parser.add_argument("--source_id", default="EC-Earth3P-HR", type=str)
-parser.add_argument("--member_id", default="r1i1p2f1", type=str)
+parser.add_argument("--do_download", default=True, type=bool)
+parser.add_argument("--do_overwrite", default=False, type=bool)
+parser.add_argument("--do_delete_tripolar", default=False, type=bool)
+parser.add_argument("--do_download_ind", default=True, type=bool)
+parser.add_argument("--do_concat_by_time", default=False, type=bool)
+parser.add_argument("--do_merge_by_vars", default=False, type=bool)
+parser.add_argument("--do_crop", default=True, type=bool)
+parser.add_argument("--do_regrid", default=True, type=bool)
+
 commandline_args = parser.parse_args()
 
 source_id = commandline_args.source_id
 member_id = commandline_args.member_id
+do_download = commandline_args.do_download
+do_overwrite = commandline_args.do_overwrite
+do_delete_tripolar = commandline_args.do_delete_tripolar
+do_download_ind = commandline_args.do_download_ind
+do_concat_by_time = commandline_args.do_concat_by_time
+do_merge_by_vars = commandline_args.do_merge_by_vars
+do_crop = commandline_args.do_crop
+do_regrid = commandline_args.do_regrid
 
 print("\n\nDownloading data for {}, {}\n".format(source_id, member_id))
 
 ####### User download options
 ################################################################################
 
-overwrite = False
-delete_latlon_data = True  # Delete lat-lon intermediate files is use_xarray is True
-compress = False
-
-do_download = True
-do_download_ind = True
-do_concat_by_time = False
-do_merge_by_vars = False
-
-do_crop = False  # handled in preprocessing
-do_regrid = False
-do_seafloor = True
-
+# global for now
 lats = [-40, 0]
 lons = [130, 170]
 levs = [0, 6]
+
+# deprecated
+# delete_latlon_data = True  # Delete lat-lon intermediate files is use_xarray is True
+# compress = False
 
 
 ####### Orlando functions
 ################################################################################
 
+
 if source_id == "EC-Earth3P-HR":
 
     def _spatial_crop(ds):
+        """
+        Cropping function for EC-Earth3P-HR model data. Speeds up processing to crop early
+        """
         spatial_ds = ds.sel(
             lat=slice(min(lats), max(lats)), lon=slice(min(lons), max(lons))
         )
@@ -96,7 +109,7 @@ if source_id == "EC-Earth3P-HR":
             return spatial_ds
 
 else:
-
+    # I don't see a diffference?
     def _spatial_crop(ds):
         spatial_ds = ds.sel(
             lat=slice(min(lats), max(lats)), lon=slice(min(lons), max(lons))
@@ -210,45 +223,6 @@ def esgf_search(
 ################################################################################
 
 download_dict = {
-    # "BCC-CSM2-HR": {
-    #     "experiment_ids": ["hist-1950"],
-    #     "data_nodes": [
-    #         "cmip.bcc.cma.cn",  # listed in metadata from https://esgf-node.llnl.gov/search/cmip6/
-    #     ],
-    #     "frequency": "mon",
-    #     "variable_dict": {
-    #         "thetao": {
-    #             "include": True,
-    #             "table_id": "Omon",
-    #             "plevels": None,
-    #         },
-    #         "tos": {
-    #             "include": True,
-    #             "table_id": "Omon",
-    #             "plevels": None,
-    #         },
-    #         "uo": {
-    #             "include": True,
-    #             "table_id": "Omon",
-    #             "plevels": None,
-    #         },
-    #         "vo": {
-    #             "include": True,
-    #             "table_id": "Omon",
-    #             "plevels": None,
-    #         },
-    #         "so": {
-    #             "include": True,
-    #             "table_id": "Omon",
-    #             "plevels": None,
-    #         },
-    #         # "deptho": {
-    #         #     "include": True,
-    #         #     "table_id": "Ofx",
-    #         #     "plevels": None,
-    #         # },
-    #     },
-    # }
     "EC-Earth3P-HR": {
         "experiment_ids": ["hist-1950"],
         "data_nodes": [
@@ -267,7 +241,7 @@ download_dict = {
             "rsdo": {  # Downwelling Shortwave Radiation in Sea Water
                 "include": True,
                 "table_id": "Omon",  ###
-                "plevels": [-1],
+                "plevels": [-1],  # -1 indicates lowest level (seafloor)
             },
             # "umo": {    # Ocean Mass X Transport
             #     "include": True,
@@ -318,7 +292,9 @@ download_dict = {
     }
 }
 
-download_folder = os.path.join(config.cmip6_data_folder, source_id, member_id)
+download_folder = os.path.join(
+    config.cmip6_data_folder, source_id, member_id, "testing"
+)
 if not os.path.exists(download_folder):
     os.makedirs(download_folder)
 
@@ -340,12 +316,11 @@ query = {
 }
 
 for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
-    # variable_id = 'vas'
-    # variable_id_dict = source_id_dict['variable_dict'][variable_id]
-
+    # if dictionary specifies not to include this variable, skip
     if variable_id_dict["include"] is False:
         continue
 
+    ### SET UP QUERY
     query["variable_id"] = variable_id
     query["table_id"] = variable_id_dict["table_id"]
 
@@ -358,28 +333,25 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
 
     print("\n\n{}: ".format(variable_id), end="", flush=True)
 
-    # video_folder = os.path.join(config.video_folder, "cmip6", source_id, member_id)
-
-    # Paths for each plevel (None if surface variable)
-    # fpaths_EASE = {}
-    fpaths_latlon = {}
+    ### SET UP FILE PATHS
+    # Paths for each plevel (None indicates surface variable)
     fpaths_tripolar = {}
-    video_fpaths = {}
+    fpaths_latlon = {}
     fpaths = {}
 
+    # TODO: automate this casting to list check
     if variable_id_dict["plevels"] is None:
         variable_id_dict["plevels"] = [None]
 
-    skip = {}  # Whether to skip each plevel variable
-    # existing_tripolar_fpaths = []
-    existing_latlon_fpaths = []
+    skip = {}  # Whether to skip each plevel variable?
+    fpaths_latlon_existing = []
 
     for plevel in variable_id_dict["plevels"]:
         fname = variable_id
-        if plevel is not None:
-            if plevel == -1:
+        if plevel is not None:  # if not surface variable
+            if plevel == -1:  # if seafloor variable
                 fname += "_seafloor"
-            else:
+            else:  # else other pressure level
                 # suffix for the pressure level in hPa
                 fname += "{:.0f}".format(plevel / 100)
 
@@ -389,41 +361,37 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
             fname = fname + ".nc"
         fpaths[plevel] = os.path.join(download_folder, fname)
 
-        # Intermediate lat-lon file before iris regridding
+        # Intermediate lat-lon file before CDO regridding
         fpaths_tripolar[plevel] = os.path.join(download_folder, fname + "_tripolar.nc")
 
         if do_regrid:
             fname += "_latlon"
+            # TODO: check that this is actually writing anywhere
+            fpaths_latlon[plevel] = os.path.join(download_folder, fname + ".nc")
 
-        fpaths_latlon[plevel] = os.path.join(download_folder, fname + ".nc")
-        # video_fpaths[plevel] = os.path.join(video_folder, fname + ".mp4")
-        # if compress:
-        #     fname += "_cmpr"
-        # fpaths_EASE[plevel] = os.path.join(download_folder, fname + ".nc")
-
-        if os.path.exists(fpaths_latlon[plevel]):
-            if overwrite:
-                print("removing existing file... ", end="", flush=True)
-                os.remove(fpaths_latlon[plevel])
-                skip[plevel] = False
+            if os.path.exists(fpaths_latlon[plevel]):
+                if do_overwrite:
+                    print("removing existing file... ", end="", flush=True)
+                    os.remove(fpaths_latlon[plevel])
+                    skip[plevel] = False
+                else:
+                    print("skipping existing file... ", end="", flush=True)
+                    skip[plevel] = True
+                    fpaths_latlon_existing.append(fpaths_latlon[plevel])
             else:
-                print("skipping existing file... ", end="", flush=True)
-                skip[plevel] = True
-                # existing_EASE_fpaths.append(fpaths_EASE[plevel])
-                existing_latlon_fpaths.append(fpaths_latlon[plevel])
-        else:
-            skip[plevel] = False
+                skip[plevel] = False
 
+    # TODO: ??
     skipall = all([skip_bool for skip_bool in skip.values()])
-
     if skipall:
         print(
-            "skipping due to existing files {}".format(existing_latlon_fpaths),
+            "skipping due to existing files {}".format(fpaths_latlon_existing),
             end="",
             flush=True,
         )
         continue
 
+    ### DOWNLOAD
     if do_download:
         print("searching ESGF... ", end="", flush=True)
         results = []
@@ -434,7 +402,6 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
             experiment_id_results = []
             for data_node in source_id_dict["data_nodes"]:
                 query["data_node"] = data_node
-                # print(query)
                 experiment_id_results.extend(esgf_search(**query))
 
                 # Keep looping over possible data nodes until the experiment data is found
@@ -467,7 +434,7 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
 
             print("loading metadata... ", end="", flush=True)
 
-            if do_download_ind:
+            if do_download_ind:  # download individual files (by time)
                 seafloor_indices = None
 
                 print("downloading individual files... ", end="", flush=True)
@@ -476,11 +443,22 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
                     os.makedirs(ind_download_folder)
 
                 for i, result in enumerate(results):
-                    date = result.split("_")[-1].split(".")[0]
-                    ind_fname = fname.split(".")[0] + "_" + date + ".nc"
+                    date = result.split("_")[-1].split(".")[0]  # name?
+                    ind_fname = (
+                        fname.split(".")[0] + "_" + date + ".nc"
+                    )  # name of individual file
                     save_fp = os.path.join(ind_download_folder, ind_fname)
 
-                    # TODO: sort out naming
+                    # check if file already exists before continuing
+                    # TODO: check that this continue breaks the loop as required. GPT says yes
+                    if os.path.exists(save_fp):
+                        print(
+                            f"\n{i}: skipping {ind_fname} due to existing file: {save_fp}",
+                            end="",
+                            flush=True,
+                        )
+                        continue
+
                     ds = xa.open_dataset(
                         result,
                         decode_times=True,
@@ -488,29 +466,13 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
                         chunks={"i": 200, "j": 200},
                         # chunks = {"lev": "499MB"}
                         # chunks=None
-                    ).isel(lev=slice(0, 2))
-
-                    # print('\ndownloading with xarray... ', end='', flush=True)
-                    # ds.compute()
-
-                    # print('\nsaving to process without size restrictions... ', end='', flush=True)
-                    # ds.to_netcdf(fpaths_tripolar[plevel])
-
-                    # ds = xa.open_dataset(fpaths_tripolar[plevel], chunks=None)
+                    ).isel(
+                        lev=slice(0, 2)
+                    )  # PROBLEM: too shallow
 
                     if plevel is not None:
-                        if plevel == -1:
-                            # #  Assign the numpy array to a new variable in the new dataset
-                            #     new_dataset[var_name] = (['time', 'j', 'i'], values)
-
-                            #     # Assign coordinates to the new dataset based on an existing dataset
-                            #     new_dataset[var_name].coords['i'] = ds['i']
-                            #     new_dataset[var_name].coords['j'] = ds['j']
-                            #     new_dataset[var_name].coords['time'] = ds['time']
-
-                            # ds_copy = ds.copy()[["i", "j", "time"]]
-                            # ds_copy[variable_id] = cmip6_da
-
+                        if plevel == -1:  # if seafloor level
+                            # if seafloor indices for region not yet calculated, calculate
                             if seafloor_indices is None:
                                 print(
                                     "determining seafloor indices... ",
@@ -525,12 +487,13 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
                                     (len(ds.time), len(ds.j), len(ds.i)),
                                 )
 
+                            # index to get seafloor values
                             print("\textracting seafloor values...", end="", flush=True)
-                            cmip6_array = extract_seafloor_vals(
+                            cmip6_seafloor_array = extract_seafloor_vals(
                                 ds[variable_id], seafloor_indices
                             )
                             ds = ds.copy()[["time", "i", "j"]]
-                            ds[variable_id] = (["time", "j", "i"], cmip6_array)
+                            ds[variable_id] = (["time", "j", "i"], cmip6_seafloor_array)
 
                         else:
                             cmip6_da = cmip6_da.sel(
@@ -538,26 +501,18 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
                             )  # this would have to be changed for models with different vertical coordinate names. Possibly in preprocessing
 
                     # TODO: overwrite saved file with selected level
-
                     if do_crop:
                         ds = _spatial_crop(ds)
 
-                    if os.path.exists(save_fp):
-                        print(
-                            f"\n{i}: skipping {ind_fname} due to existing file: {save_fp}",
-                            end="",
-                            flush=True,
-                        )
-                        continue
-                    else:
-                        print(
-                            f"\n{i}: saving {ind_fname} to .nc file: {save_fp}",
-                            end="",
-                            flush=True,
-                        )
-                        ds.to_netcdf(save_fp)
-
+                    print(
+                        f"\n{i}: saving {ind_fname} to .nc file: {save_fp}",
+                        end="",
+                        flush=True,
+                    )
+                    ds.to_netcdf(save_fp)
+            # major issues here with handling over-large files. Commented is what I've tried so far
             else:
+                print("Problems with handling large files")
                 # test_xa = print(xa.open_dataset(results[0], decode_times=False))
                 # Avoid 500MB DAP request limit
                 # cmip6_da = xa.open_mfdataset(
@@ -602,36 +557,8 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
                 print("saving to regrid via cdo... ", end="", flush=True)
                 cmip6_da.to_netcdf(fpaths_tripolar[plevel])
 
-                # decoded_datasets = []
-                # for ds in results:
-                #     ds = xa.open_dataset(ds, decode_times=True)
-                #     # Assign the modified time coordinates back to the dataset
-                #     ds["time"] = ds.indexes["time"].to_datetimeindex()
-
-                #     decoded_datasets.append(ds)
-
-                # cmip6_da = xa.merge(decoded_datasets)[variable_id].chunk({"time": "auto"})
-
-                # cmip6_da.compute()
-
-                # if crop:
-                #     print("cropping... ", end="", flush=True)
-                #     cmip6_da = cmip6_da.sel(
-                #         lat=slice(min(lats), max(lats)), lon=slice(min(lons), max(lons))
-                #     )
-                #     parent_dir = os.path.dirname(fpaths_latlon[plevel])
-                #     fname = fname + "_cropped.nc"
-                #     save_fp = "/".join((parent_dir, fname))
-                # else:
-                #     save_fp = fpaths_latlon[plevel]
-
-                # save_fp = fpaths[plevel]
-                # print(f"saving to nc file... {save_fp}", end="", flush=True)
-
-                # cmip6_da.to_netcdf(save_fp)
-
     if do_regrid:
-        # initialise instance of Cdo for regridding
+        # initialise instance of CDO for regridding
         cdo = Cdo()
         for plevel in variable_id_dict["plevels"]:
             if skip[plevel]:
@@ -646,10 +573,11 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
 
             regrid_fname = fpaths_latlon[plevel] + ".nc"  # check this
             # TODO: allow customisation of regridding method and resolution
+            # currently using bilinear interpolation to 0.25x0.25 degree (native) grid
             cdo.remapbil(
                 "r1440x720", input=fpaths_tripolar[plevel], output="regrid_fname"
             )
-
+            # TODO: check if this actually removes files
             if delete_tripolar_data:
                 os.remove(fpaths_tripolar[plevel])
 
@@ -659,117 +587,104 @@ for variable_id, variable_id_dict in source_id_dict["variable_dict"].items():
         if not os.path.exists(conc_var_dir):
             os.makedirs(conc_var_dir)
 
-        for variable_id in list(source_id_dict["variable_dict"].keys()):
-            print(variable_id)
-        print("source_id_dict", source_id_dict["variable_dict"].keys())
+        # for variable_id in list(source_id_dict["variable_dict"].keys()):
+        #     print(variable_id)
+        # print("source_id_dict", source_id_dict["variable_dict"].keys())
         # get variable subdirs
-        for variable_id in list(source_id_dict["variable_dict"].keys()):
-            print("variable_id", variable_id)
-            # directory with individual files for single variable
-            variable_dir = os.path.join(download_folder, variable_id)
-            print("variable_dir", variable_dir)
 
-            if do_crop:
-                fname = variable_id + "_" + tuples_to_string(lats, lons) + ".nc"
-            else:
-                fname = variable_id + ".nc"
-            print("fname", fname)
-            save_fp = os.path.join(conc_var_dir, fname)
-            print("save_path", save_fp)
+        if do_crop:
+            conc_fname = variable_id + "_" + tuples_to_string(lats, lons) + ".nc"
+        else:
+            conc_fname = variable_id + ".nc"
+        print("conc_fname", conc_fname)
+        save_fp = os.path.join(conc_var_dir, conc_fname)
+        print("save_path", save_fp)
 
-            # if dir containing individual files not found
-            if not os.path.exists(variable_dir):
-                print(f"{variable_dir} does not exist, skipping", end="", flush=True)
-                continue
-            # found files to concatenate
-            else:
-                # if concatenated file already exists, don't do anything
-                if os.path.exists(save_fp):
-                    print(
-                        f"concatenated file already exists at {save_fp}",
-                        end="",
-                        flush=True,
-                    )
-                # concatenate and save file
-                else:
-                    print("concatenating files by time... ", end="", flush=True)
-                    nc_fs = list(Path(variable_dir).glob("*.nc"))
-                    concatted = xa.open_mfdataset(nc_fs)
+        # if dir containing individual files not found
+        if not os.path.exists(variable_dir):
+            print(f"{variable_dir} does not exist, skipping", end="", flush=True)
+            continue
+        # if concatenated file already exists, don't do anything
+        elif os.path.exists(save_fp):
+            print(
+                f"concatenated file already exists at {save_fp}",
+                end="",
+                flush=True,
+            )
+        # otherwise, concatenate and save to file
+        else:
+            print("concatenating files by time... ", end="", flush=True)
+            nc_fs = list(Path(ind_download_folder).glob("*.nc"))
+            concatted = xa.open_mfdataset(nc_fs).convert_calendar(
+                "gregorian", dim="time"
+            )  # may not be universal for all models
 
-                    print(variable_dir)
-                    print(save_fp)
-                    print(concatted)
-                    # decode time
-                    concatted = concatted.convert_calendar(
-                        "gregorian", dim="time"
-                    )  # may not be universal for all models
-                    print(
-                        f"saving concatenated file to {save_fp}... ", end="", flush=True
-                    )
-                    concatted.to_netcdf(save_fp)
+            print(f"saving concatenated file to {save_fp}... ", end="", flush=True)
+            concatted.to_netcdf(save_fp)
 
-        # for plevel in variable_id_dict["plevels"]:
-        #     if skip[plevel]:
-        #         print(
-        #             "skipping this plevel due to existing file {}".format(
-        #                 fpaths_EASE[plevel]
-        #             ),
-        #             end="",
-        #             flush=True,
-        #         )
+        # for variable_id in list(source_id_dict["variable_dict"].keys()):
+        #     print("variable_id", variable_id)
+        #     # directory with individual files for single variable
+        #     variable_dir = os.path.join(download_folder, variable_id)   # ind_download_folder
+        #     print("variable_dir", variable_dir)
+
+        #     if do_crop:
+        #         fname = variable_id + "_" + tuples_to_string(lats, lons) + ".nc"
+        #     else:
+        #         fname = variable_id + ".nc"
+        #     print("fname", fname)
+        #     save_fp = os.path.join(conc_var_dir, fname)
+        #     print("save_path", save_fp)
+
+        #     # if dir containing individual files not found
+        #     if not os.path.exists(variable_dir):
+        #         print(f"{variable_dir} does not exist, skipping", end="", flush=True)
         #         continue
+        #     # found files to concatenate
+        #     else:
+        #         # if concatenated file already exists, don't do anything
+        #         if os.path.exists(save_fp):
+        #             print(
+        #                 f"concatenated file already exists at {save_fp}",
+        #                 end="",
+        #                 flush=True,
+        #             )
+        #         # concatenate and save file
+        #         else:
+        #             print("concatenating files by time... ", end="", flush=True)
+        #             nc_fs = list(Path(variable_dir).glob("*.nc"))
+        #             concatted = xa.open_mfdataset(nc_fs)
 
-        #     cmip6_cube = iris.load_cube(fpaths_latlon[plevel])
-        #     cmip6_ease = regrid_cmip6(cmip6_cube, sic_EASE_cube, verbose=True)
-        #     print("rhubarb. Shouldn't be getting to this statement")
-        #     # Preprocessing
-        #     if variable_id == "siconca":
-        #         cmip6_ease.data[cmip6_ease.data > 500] = 0.0
-        #         cmip6_ease.data[:, land_mask] = 0.0
-        #         if source_id == "MRI-ESM2-0":
-        #             cmip6_ease.data = cmip6_ease.data / 100.0
-        #     elif variable_id == "tos":
-        #         cmip6_ease.data[cmip6_ease.data > 500] = 0.0
-        #         cmip6_ease.data[:, land_mask] = 0.0
-
-        #     if cmip6_ease.data.dtype != np.float32:
-        #         cmip6_ease.data = cmip6_ease.data.astype(np.float32)
-
-        #     fpaths_EASE[plevel]
-        #     mip6_ease, fpaths_EASE[plevel], compress, verbose=True)
+        #             print(variable_dir)
+        #             print(save_fp)
+        #             print(concatted)
+        #             # decode time
+        #             concatted = concatted.convert_calendar(
+        #                 "gregorian", dim="time"
+        #             )  # may not be universal for all models
+        #             print(
+        #                 f"saving concatenated file to {save_fp}... ", end="", flush=True
+        #             )
+        #             concatted.to_netcdf(save_fp)
 
         #     if delete_latlon_data:
         #         os.remove(fpaths_latlon[plevel])
 
-    if gen_video:
-        print("video functionality removed")
-        # if (source_id, member_id) == ('MRI-ESM2-0', 'r2i1p1f1') or \
-        #         (source_id, member_id) == ('EC-Earth3', 'r2i1p1f1'):
-        #     print('\nGenerating video... ')
-        #     xarray_to_video(
-        #         da=next(iter(xa.open_dataset(fpaths_EASE[plevel]).data_vars.values())),
-        #         video_path=video_fpaths[plevel],
-        #         fps=30,
-        #         mask=land_mask,
-        #         figsize=7,
-        #         dpi=150,
-        #     )
-
-
 if do_merge_by_vars:
     concatted_var_dir = os.path.join(download_folder, "concatted_vars")
+    # TODO: remove assertion
     assert os.path.exists(concatted_var_dir) and os.path.isdir(
         concatted_var_dir
     ), f"{concatted_var_dir} does not exist or is not a directory"
-    var_nc_fs = list(Path(concatted_var_dir).glob("*.nc"))
+    var_nc_fps = list(Path(concatted_var_dir).glob("*.nc"))
 
-    vars = [str(fname.name).split("_")[0] for fname in var_nc_fs]
+    vars = [str(var_nc_fp.name).split("_")[0] for var_nc_fp in var_nc_fps]
     merged_name = "_".join(vars) + ".nc"
     merged_fp = os.path.join(download_folder, merged_name)
 
     if not os.path.exists(merged_fp):
         print(f"merging variable files... ", end="", flush=True)
-        dss = [xa.open_dataset(fname) for fname in var_nc_fs]
+        dss = [xa.open_dataset(fname) for fname in var_nc_fps]
         merged = xa.merge(dss)
         merged.to_netcdf(merged_fp)
     else:

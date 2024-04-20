@@ -572,7 +572,130 @@ def rf_search_grid(
     return random_grid
 
 
-def boosted_regression_search_grid(
+def make_vals_list(val_lims: tuple, num_vals: int, spacing: str = "linear") -> list:
+    if spacing == "linear":
+        return equal_spacing(val_lims, num_vals)
+    elif spacing == "log":
+        return log_spacing(val_lims, num_vals)
+    else:
+        raise ValueError("Spacing must be either 'linear' or 'log'.")
+
+
+def equal_spacing(val_lims: tuple, num_vals: int) -> list:
+    if all(isinstance(x, int) for x in val_lims):
+        return np.linspace(
+            start=val_lims[0], stop=val_lims[1], num=num_vals, dtype=int
+        ).tolist()
+    elif any(isinstance(x, float) for x in val_lims):
+        return np.linspace(start=val_lims[0], stop=val_lims[1], num=num_vals).tolist()
+    else:
+        raise ValueError("Values in val_lims must be either floats or integers.")
+
+
+# np.logspace(*np.log10(learning_rate_lims), num=10).tolist()
+
+
+def log_spacing(val_lims: tuple, num_vals: int) -> list:
+    if all(isinstance(x, int) for x in val_lims):
+        return [
+            int(val) for val in np.logspace(*np.log10(val_lims), num=num_vals).tolist()
+        ]
+    else:
+        return np.logspace(*np.log10(val_lims), num=num_vals).tolist()
+
+
+def mlp_search_grid(
+    hidden_layer_sizes=[
+        (500,), (100,), (50, 30, 20)
+    ],
+    activation: list[str] = ["identity", "logistic", "tanh", "relu"],
+    solver: list[str] = ["adam", "sgd", "lbfgs"],
+    alpha_lims: tuple[float] = (0.000001, 0.001),
+    batch_size=["auto"],
+    learning_rate=["adaptive"],
+    learning_rate_init_lims: tuple[float] = (0.0001, 0.01),
+    max_iter_lims: tuple[int] = (50, 500),
+    shuffle: tuple[bool] = [True, False],
+    momentum_lims: tuple[float] = (0.8, 1),
+    nesterovs_momentum: tuple[bool] = [True, False],
+    # max_fun=15000,
+    n_trials=3,
+) -> dict:
+    # TODO: change hidden layer sizes
+    alpha = make_vals_list(alpha_lims, n_trials, "log")
+    learning_rate_init = make_vals_list(learning_rate_init_lims, n_trials)
+    max_iter = make_vals_list(max_iter_lims, n_trials)
+    momentum = make_vals_list(momentum_lims, n_trials)
+
+    return {
+        "hidden_layer_sizes": hidden_layer_sizes,
+        "activation": activation,
+        "solver": solver,
+        "alpha": alpha,
+        "batch_size": batch_size,
+        "learning_rate": learning_rate,
+        "learning_rate_init": learning_rate_init,
+        "max_iter": max_iter,
+        "shuffle": shuffle,
+        "momentum": momentum,
+        "nesterovs_momentum": nesterovs_momentum,
+        # "max_fun": max_fun,
+    }
+
+
+def boosted_search_grid(
+    loss: list[str] = ["squared_error", "absolute_error", "huber", "quantile"],
+    learning_rate_lims: tuple[float] = (0.001, 1.0),
+    n_estimators_lims: tuple[int] = (100, 2000),
+    subsample_lims: tuple[float] = (0.1, 1.0),
+    criterion: list[str] = ["friedman_mse", "squared_error"],
+    min_samples_split_lims: tuple[int] = (2, 20),
+    min_samples_leaf_lims: tuple[float] = (0.0, 1.0),
+    min_weight_fraction_leaf_lims: tuple[float] = (0, 0.5),
+    max_depth_lims: tuple[int] = (1, 10),
+    min_impurity_decrease: tuple[float] = (0.001, 10000),
+    max_features: list[str] = ["sqrt", "log2", None],
+    max_leaf_nodes_lims: list[int] = [2, 1000],
+    ccp_alpha_lims: tuple[float] = (0.001, 10000),
+    model_type: str = "classifier",
+    n_trials: int = 3,
+) -> dict:
+    # Learning rate (shrinkage)
+    learning_rate = make_vals_list(learning_rate_lims, n_trials, "log")
+    # Number of trees in the ensemble
+    n_estimators = make_vals_list(n_estimators_lims, n_trials)
+    # Fraction of samples to be used for training each tree
+    subsample = make_vals_list(subsample_lims, n_trials)
+    min_samples_split = make_vals_list(min_samples_split_lims, n_trials)
+    min_samples_leaf = make_vals_list(min_samples_leaf_lims, n_trials)
+    min_weight_fraction_leaf = make_vals_list(min_weight_fraction_leaf_lims, n_trials)
+    max_depth = make_vals_list(max_depth_lims, n_trials, "log")
+    min_impurity_decrease = make_vals_list(min_impurity_decrease, n_trials, "log")
+    max_leaf_nodes = make_vals_list(max_leaf_nodes_lims, n_trials, "log")
+    ccp_alpha_lims = make_vals_list(ccp_alpha_lims, n_trials, "log")
+
+    # Loss function to optimize
+    if model_type == "classifier":
+        loss = ["exponential", "log_loss"]
+
+    # Create the random grid
+    return {
+        "loss": loss,
+        "learning_rate": learning_rate,
+        "n_estimators": n_estimators,
+        "subsample": subsample,
+        "criterion": criterion,
+        "min_samples_split": min_samples_split,
+        "min_samples_leaf": min_samples_leaf,
+        "min_weight_fraction_leaf": min_weight_fraction_leaf,
+        "max_depth": max_depth,
+        "min_impurity_decrease": min_impurity_decrease,
+        "max_leaf_nodes": max_leaf_nodes,
+        "max_features": max_features,
+    }
+
+
+def xgb_search_grid(
     n_estimators_lims: tuple[int] = (100, 2000),
     learning_rate_lims: tuple[float] = (0.001, 1.0),
     max_depth_lims: tuple[int] = (1, 10),
@@ -582,6 +705,7 @@ def boosted_regression_search_grid(
     loss: list[str] = ["ls", "lad", "huber", "quantile"],
     subsample_lims: tuple[float] = (0.1, 1.0),
     criterion: list[str] = ["friedman_mse", "mse"],
+    model_type: str = "classifier",
 ) -> dict:
     # Number of trees in the ensemble
     n_estimators = [
@@ -599,7 +723,7 @@ def boosted_regression_search_grid(
             start=min(max_depth_lims), stop=max(max_depth_lims), num=10
         )
     ]
-    max_depth.append(None)
+    max_depth.append(None)  # what is this doing?
     # Minimum number of samples required to split a node
     min_samples_split = min_samples_split
     # Minimum number of samples required at each leaf node
@@ -607,13 +731,13 @@ def boosted_regression_search_grid(
     # Maximum number of features to consider at each split
     max_features = max_features
     # Loss function to optimize
-    loss = loss
+    if model_type == "classifier":
+        loss = ["exponential", "log_loss"]
+        criterion = ["friedman_mse", "squared_error"]
     # Fraction of samples to be used for training each tree
     subsample = np.linspace(
         start=subsample_lims[0], stop=subsample_lims[1], num=10
     ).tolist()
-    # Splitting criterion
-    criterion = criterion
 
     # Create the random grid
     random_grid = {
@@ -630,44 +754,54 @@ def boosted_regression_search_grid(
     return random_grid
 
 
-def maximum_entropy_search_grid(
-    penalty: list[str] = ["l1", "l2", "elasticnet", "none"],
-    dual: list[bool] = [True, False],
+def logreg_search_grid(
+    penalty: list[str] = [
+        # "l1", "elasticnet"
+        "l2"
+    ],
+    dual: list[bool] = [
+        # True,
+        False  # clashes with solver
+    ],
     tol: list[float] = [1e-4, 1e-3, 1e-2],
     C: list[float] = [0.1, 1.0, 10.0],
     fit_intercept: list[bool] = [True, False],
     intercept_scaling: list[float] = [1.0, 2.0, 5.0],
-    solver: list[str] = ["sag", "saga", "newton-cholesky"],
+    solver: list[str] = [
+        "sag",
+        "saga",
+        # , "newton-cholesky" # some clashes with penalties
+    ],
     max_iter: list[int] = [100, 200, 500],
     multi_class: list[str] = ["auto", "ovr", "multinomial"],
     verbose: list[int] = [0, 1, 2],
     warm_start: list[bool] = [True, False],
 ) -> dict:
-    # Regularization penalty
-    penalty = penalty
-    # Dual formulation
-    dual = dual
-    # Convergence tolerance
-    tol = tol
-    # Inverse of regularization strength
-    C = C
-    # Fit intercept
-    fit_intercept = fit_intercept
-    # Intercept scaling
-    intercept_scaling = intercept_scaling
-    # Solver algorithm
-    solver = solver
-    # Maximum number of iterations
-    max_iter = max_iter
-    # Multi-class option
-    multi_class = multi_class
-    # Verbosity level
-    verbose = verbose
-    # Warm start
-    warm_start = warm_start
+    # # Regularization penalty
+    # penalty = penalty
+    # # Dual formulation
+    # dual = dual
+    # # Convergence tolerance
+    # tol = tol
+    # # Inverse of regularization strength
+    # C = C
+    # # Fit intercept
+    # fit_intercept = fit_intercept
+    # # Intercept scaling
+    # intercept_scaling = intercept_scaling
+    # # Solver algorithm
+    # solver = solver
+    # # Maximum number of iterations
+    # max_iter = max_iter
+    # # Multi-class option
+    # multi_class = multi_class
+    # # Verbosity level
+    # verbose = verbose
+    # # Warm start
+    # warm_start = warm_start
 
-    # Create the random grid
-    random_grid = {
+    # Create the grid
+    grid = {
         "penalty": penalty,
         "dual": dual,
         "tol": tol,
@@ -681,7 +815,7 @@ def maximum_entropy_search_grid(
         "warm_start": warm_start,
     }
 
-    return random_grid
+    return grid
 
 
 def n_random_runs_preds(

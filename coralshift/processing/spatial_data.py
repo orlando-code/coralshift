@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import xarray as xa
 
-import rioxarray as rio
+# import rioxarray as rio
 import numpy as np
 import rasterio
 import pandas as pd
@@ -10,9 +10,27 @@ import haversine
 
 from rasterio import features
 from tqdm import tqdm
-from scipy.ndimage import binary_dilation, generic_filter
+
+# from scipy.ndimage import binary_dilation, generic_filter
 from pathlib import Path
 from coralshift.utils import file_ops, utils
+
+
+def spatial_predictions_from_data(y, predictions):
+    predictions = pd.Series(predictions, index=y.index)
+
+    # join dataframes on index
+    merged = pd.concat(
+        [pd.Series(y, name="label"), pd.Series(predictions, name="predictions")],
+        axis=1,
+    )
+
+    return spatially_reform_data(merged)
+
+
+def spatially_reform_data(df):
+    # convert from pandas dataframe to xarray dataset
+    return df.to_xarray().sortby(["latitude", "longitude"])
 
 
 def resample_xarray_to_target(
@@ -405,42 +423,42 @@ def min_max_of_all_spatial_coords(
     return (np.min(lats), np.max(lats)), (np.min(lons), np.max(lons))
 
 
-def return_pixels_closest_to_value(
-    array: np.ndarray,
-    central_value: float,
-    tolerance: float = 0.5,
-    buffer_pixels: int = 10,
-    bathymetry_only: bool = True,
-) -> np.ndarray:
-    """Returns a 1D array of all the pixels in the input array that are closest to a specified central value within a
-    given tolerance and within a pixel buffer zone.
+# def return_pixels_closest_to_value(
+#     array: np.ndarray,
+#     central_value: float,
+#     tolerance: float = 0.5,
+#     buffer_pixels: int = 10,
+#     bathymetry_only: bool = True,
+# ) -> np.ndarray:
+#     """Returns a 1D array of all the pixels in the input array that are closest to a specified central value within a
+#     given tolerance and within a pixel buffer zone.
 
-    Parameters
-    ----------
-        array (np.ndarray): The input array of pixel values.
-        central_value (float): The central value to which the pixels should be compared.
-        tolerance (float, optional): The tolerance within which the pixels are considered to be "close" to the central
-            value. Defaults to 0.5.
-        buffer_pixels (int, optional): The size of the buffer zone around the pixels. Defaults to 10.
-        bathymetry_only (bool, optional): Whether to only consider bathymetric data, i.e., values less than zero.
-            Defaults to True.
+#     Parameters
+#     ----------
+#         array (np.ndarray): The input array of pixel values.
+#         central_value (float): The central value to which the pixels should be compared.
+#         tolerance (float, optional): The tolerance within which the pixels are considered to be "close" to the central
+#             value. Defaults to 0.5.
+#         buffer_pixels (int, optional): The size of the buffer zone around the pixels. Defaults to 10.
+#         bathymetry_only (bool, optional): Whether to only consider bathymetric data, i.e., values less than zero.
+#             Defaults to True.
 
-    Returns
-    -------
-        np.ndarray: A 1D array of all the pixels in the input array that are closest to the specified central value
-        within the given tolerance and within the pixel buffer zone.
-    """
-    binary = np.isclose(array, central_value, atol=0.5)
-    # morphological dilation operation
-    dilated = binary_dilation(binary, iterations=buffer_pixels)
+#     Returns
+#     -------
+#         np.ndarray: A 1D array of all the pixels in the input array that are closest to the specified central value
+#         within the given tolerance and within the pixel buffer zone.
+#     """
+#     binary = np.isclose(array, central_value, atol=0.5)
+#     # morphological dilation operation
+#     dilated = binary_dilation(binary, iterations=buffer_pixels)
 
-    array_vals = array[dilated]
-    # if specifying only bathymetric data
-    if bathymetry_only:
-        array_vals = array_vals[array_vals < 0]
+#     array_vals = array[dilated]
+#     # if specifying only bathymetric data
+#     if bathymetry_only:
+#         array_vals = array_vals[array_vals < 0]
 
-    # return only non-zero values as 1d array
-    return array_vals[np.nonzero(array_vals)]
+#     # return only non-zero values as 1d array
+#     return array_vals[np.nonzero(array_vals)]
 
 
 # def tif_to_xarray(tif_path: Path | str, renamed: str = None) -> xa.DataArray:
@@ -462,39 +480,39 @@ def return_pixels_closest_to_value(
 #         return process_xa_d(xa_da)
 
 
-def return_distance_closest_to_value(
-    array: np.ndarray,
-    central_value: float,
-    tolerance: float = 0.5,
-    buffer_distance: float = 300,
-    distance_per_pixel: float = 30,
-    bathymetry_only: bool = True,
-) -> np.ndarray:
-    """Wrapper for return_pixels_closest_to_value() allowing specification by distance from thresholded values rather
-    than number of pixels
+# def return_distance_closest_to_value(
+#     array: np.ndarray,
+#     central_value: float,
+#     tolerance: float = 0.5,
+#     buffer_distance: float = 300,
+#     distance_per_pixel: float = 30,
+#     bathymetry_only: bool = True,
+# ) -> np.ndarray:
+#     """Wrapper for return_pixels_closest_to_value() allowing specification by distance from thresholded values rather
+#     than number of pixels
 
-    Returns a 1D array of all the pixels in the input array that are closest to a specified central value within a
-    given tolerance and within a distance buffer zone.
+#     Returns a 1D array of all the pixels in the input array that are closest to a specified central value within a
+#     given tolerance and within a distance buffer zone.
 
-    Parameters
-    ----------
-        array (np.ndarray): The input array of pixel values.
-        central_value (float): The central value to which the pixels should be compared.
-        tolerance (float, optional): The tolerance within which the pixels are considered to be "close" to the central
-            value. Defaults to 0.5.
-        buffer_distance (float, optional): The size of the buffer zone around the pixels. Defaults to 300.
-        bathymetry_only (bool, optional): Whether to only consider bathymetric data, i.e., values less than zero.
-            Defaults to True.
+#     Parameters
+#     ----------
+#         array (np.ndarray): The input array of pixel values.
+#         central_value (float): The central value to which the pixels should be compared.
+#         tolerance (float, optional): The tolerance within which the pixels are considered to be "close" to the central
+#             value. Defaults to 0.5.
+#         buffer_distance (float, optional): The size of the buffer zone around the pixels. Defaults to 300.
+#         bathymetry_only (bool, optional): Whether to only consider bathymetric data, i.e., values less than zero.
+#             Defaults to True.
 
-    Returns
-    -------
-        np.ndarray: A 1D array of all the pixels in the input array that are closest to the specified central value
-        within the given tolerance and within the distance buffer zone.
-    """
-    buffer_pixels = buffer_distance / distance_per_pixel
-    return return_pixels_closest_to_value(
-        array, central_value, tolerance, buffer_pixels, bathymetry_only
-    )
+#     Returns
+#     -------
+#         np.ndarray: A 1D array of all the pixels in the input array that are closest to the specified central value
+#         within the given tolerance and within the distance buffer zone.
+#     """
+#     buffer_pixels = buffer_distance / distance_per_pixel
+#     return return_pixels_closest_to_value(
+#         array, central_value, tolerance, buffer_pixels, bathymetry_only
+#     )
 
 
 # def upsample_xa_array(
@@ -634,7 +652,7 @@ def rasterize_shapely_df(
             out_shape=(height, width),
             transform=transform,
             fill=0,
-            all_touched=True,
+            all_touched=False,
             merge_alg=rasterio.enums.MergeAlg.replace,
         )
         raster[rasterized == 1] = int(class_value)
@@ -797,7 +815,7 @@ def check_nc_exists_generate_raster_xa(
         return xa.open_dataset(filepath)
 
 
-def choose_resolution(resolution: float, unit: str = "m") -> float:
+def process_resolution_input(resolution: float, unit: str = "m") -> float:
     """
     Convert the input resolution from the specified unit to degrees or return the resolution as is.
 
@@ -813,11 +831,16 @@ def choose_resolution(resolution: float, unit: str = "m") -> float:
         float: The converted resolution in degrees or the original resolution if the unit is 'd' or 'degrees'.
 
     """
-    if unit.lower() in ["m", "metres", "metre"]:
-        _, _, av_degrees = distance_to_degrees(resolution)
-        return resolution, av_degrees
+    if unit.lower() in ["km", "kilometers"]:
+        _, _, degree_resolution = distance_to_degrees(resolution * 1000)
+    elif unit.lower() in ["m", "metres", "metre"]:
+        _, _, degree_resolution = distance_to_degrees(resolution)
     elif unit.lower() in ["d", "degrees", "degree"]:
-        return degrees_to_distances(resolution)[2], resolution
+        degree_resolution = resolution
+    else:
+        raise ValueError(f"Unit string {unit} not recognised.")
+
+    return degree_resolution
 
 
 def degrees_to_distances(
@@ -841,7 +864,7 @@ def degrees_to_distances(
     Returns
     -------
         tuple[float]: A tuple containing the converted distances in meters
-        (latitude distance, longitude distance).
+        (latitude distance, longitude distance, mean distance).
 
     Notes
     -----
@@ -1272,10 +1295,12 @@ def process_xa_d(
         "lon": "longitude",
         "y": "latitude",
         "x": "longitude",
+        "i": "longitude",
+        "j": "latitude",
         "lev": "depth",
     },
     squeeze_coords: str | list[str] = None,
-    chunk_dict: dict = {"latitude": 100, "longitude": 100, "time": 100},
+    # chunk_dict: dict = {"latitude": 100, "longitude": 100, "time": 100},
     crs: str = "EPSG:4326",
 ):
     """
@@ -1322,13 +1347,14 @@ def process_xa_d(
     else:
         temp_xa_d = temp_xa_d.transpose("latitude", "longitude")
 
-    if "grid_mapping" in xa_d.attrs:
-        del xa_d.attrs["grid_mapping"]
+    if "grid_mapping" in temp_xa_d.attrs:
+        del temp_xa_d.attrs["grid_mapping"]
     # add crs
-#     temp_xa_d.rio.write_crs(crs, inplace=True)
-    chunked_xa_d = chunk_as_necessary(temp_xa_d, chunk_dict)
+    #     temp_xa_d.rio.write_crs(crs, inplace=True)
+    # if chunk_dict is not None:
+    #     temp_xa_d = chunk_as_necessary(temp_xa_d, chunk_dict)
     # sort coords by ascending values
-    return chunked_xa_d.sortby(list(temp_xa_d.dims))
+    return temp_xa_d.sortby(list(temp_xa_d.dims))
 
 
 def xa_region_from_coord_bounds(xa_d, coord_bounds_dict):
@@ -2108,6 +2134,23 @@ def index_pair_to_lats_lons_pair(
     return lats, lons
 
 
+def calculate_coord_resolution(
+    xa_d: xa.Dataset | xa.DataArray, coord: str
+) -> tuple[float]:
+    """Calculate the spatial resolution of latitude and longitude in an xarray Dataset or DataArray.
+
+    Parameters
+    ----------
+    xa_d (xa.Dataset | xa.DataArray): Input xarray Dataset or DataArray.
+    coord (str): Coordinate to calculate the resolution of.
+
+    Returns
+    -------
+    tuple[float]: Spatial resolution of latitude and longitude.
+    """
+    return np.mean(np.diff(xa_d[coord].values))
+
+
 def calculate_spatial_resolution(xa_d: xa.Dataset | xa.DataArray) -> tuple[float]:
     """Calculate the spatial resolution of latitude and longitude in an xarray Dataset or DataArray.
 
@@ -2120,9 +2163,9 @@ def calculate_spatial_resolution(xa_d: xa.Dataset | xa.DataArray) -> tuple[float
     tuple[float]: Spatial resolution of latitude and longitude.
     """
     # average latitudinal resolution
-    lat_resolution = np.mean(np.diff(xa_d.latitude.values))
+    lat_resolution = calculate_coord_resolution(xa_d, "latitude")
     # average longitudinal resolution
-    lon_resolution = np.mean(np.diff(xa_d.longitude.values))
+    lon_resolution = calculate_coord_resolution(xa_d, "longitude")
 
     return lat_resolution, lon_resolution
 
@@ -2306,40 +2349,40 @@ def generate_var_mask(
         )
 
 
-def resample_list_xa_ds_into_dict(
-    xa_das: list[xa.DataArray],
-    target_resolution: float,
-    unit: str = "m",
-    lat_lims: tuple[float] = (-10, -17),
-    lon_lims: tuple[float] = (142, 147),
-) -> dict:
-    """
-    Resample a list of xarray DataArrays to the target resolution and merge them.
+# def resample_list_xa_ds_into_dict(
+#     xa_das: list[xa.DataArray],
+#     target_resolution: float,
+#     unit: str = "m",
+#     lat_lims: tuple[float] = (-10, -17),
+#     lon_lims: tuple[float] = (142, 147),
+# ) -> dict:
+#     """
+#     Resample a list of xarray DataArrays to the target resolution and merge them.
 
-    Parameters
-    ----------
-        xa_das (list[xa.DataArray]): A list of xarray DataArrays to be resampled and merged.
-        target_resolution (float): The target resolution for resampling.
-        unit (str, defaults to "m"): The unit of the target resolution.
-        interp_method: (str, defaults to "linear") The interpolation method for resampling.
+#     Parameters
+#     ----------
+#         xa_das (list[xa.DataArray]): A list of xarray DataArrays to be resampled and merged.
+#         target_resolution (float): The target resolution for resampling.
+#         unit (str, defaults to "m"): The unit of the target resolution.
+#         interp_method: (str, defaults to "linear") The interpolation method for resampling.
 
-    Returns
-    -------
-        A dictionary containing the resampled xarray DataArrays merged by their names.
-    """
-    # TODO: will probably need to save to individual files/folders and combine at test/train time
-    # may need to go to target array here
-    target_resolution_d = choose_resolution(target_resolution, unit)[1]
+#     Returns
+#     -------
+#         A dictionary containing the resampled xarray DataArrays merged by their names.
+#     """
+#     # TODO: will probably need to save to individual files/folders and combine at test/train time
+#     # may need to go to target array here
+#     target_resolution_d = choose_resolution(target_resolution, unit)[1]
 
-    # dummy_xa = generate_dummy_xa(target_resolution_d, lat_lims, lon_lims)
+#     # dummy_xa = generate_dummy_xa(target_resolution_d, lat_lims, lon_lims)
 
-    resampled_xa_das_dict = {}
-    for xa_da in tqdm(xa_das, desc="Resampling xarray DataArrays"):
-        # xa_resampled = resample_xa_d_to_other(xa_da, dummy_xa, name=xa_da.name)
-        xa_resampled = resample_xarray_to_target(xa_da, target_resolution_d)
-        resampled_xa_das_dict[xa_da.name] = xa_resampled
+#     resampled_xa_das_dict = {}
+#     for xa_da in tqdm(xa_das, desc="Resampling xarray DataArrays"):
+#         # xa_resampled = resample_xa_d_to_other(xa_da, dummy_xa, name=xa_da.name)
+#         xa_resampled = resample_xarray_to_target(xa_da, target_resolution_d)
+#         resampled_xa_das_dict[xa_da.name] = xa_resampled
 
-    return resampled_xa_das_dict
+#     return resampled_xa_das_dict
 
 
 def combine_ds_tiles(
