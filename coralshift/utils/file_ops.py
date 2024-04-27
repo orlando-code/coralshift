@@ -1,86 +1,41 @@
-from __future__ import annotations
+# general
+import pandas as pd
+import numpy as np
 
+# spatial
+import xarray as xa
+import geopandas as gpd
+
+# file ops
 from pathlib import Path
 from tqdm import tqdm
 import urllib
 import json
-import xarray as xa
-import pandas as pd
-import geopandas as gpd
 import yaml
 import os
 import pickle
 
-# import rasterio
-# import rioxarray as rio
-import numpy as np
-
+# custom
 from coralshift.processing import spatial_data
-from coralshift.utils import utils, directories, config
+from coralshift.utils import utils
 
 
-def check_file_exists(
-    filepath: Path | str = None,
-    dir_path: Path | str = None,
-    filename: str = None,
-    suffix: str = None,
-) -> bool:
-    """Check if a file with the specified filename and optional suffix exists in the given directory.
-    # TODO: potentially more checking required
-    Parameters
-    ----------
-    dir_path (Path | str): Path to the directory where the file should be located.
-    filename (str): Name of the file to check for.
-    suffix (str, optional) Optional suffix for the filename, by default None.
+def guarantee_existence(path: Path | str) -> Path:
+    """Checks if string is an existing directory path, else creates it
+
+    Parameter
+    ---------
+    path (str)
 
     Returns
     -------
-    bool: True if the file exists, False otherwise.
+    Path
+        pathlib.Path object of path
     """
-    # if filepath argument not provided, try to create from directory path and filename
-    if not filepath:
-        filepath = Path(dir_path) / filename
-    # if suffix argument provided (likely in conjunction with a "filename", append)
-    if suffix:
-        filepath = Path(filepath).with_suffix(pad_suffix(suffix))
-    return filepath.is_file()
-
-
-def save_nc(
-    save_dir: Path | str,
-    filename: str,
-    xa_d: xa.DataArray | xa.Dataset,
-    return_array: bool = False,
-) -> xa.DataArray | xa.Dataset:
-    """
-    Save the given xarray DataArray or Dataset to a NetCDF file iff no file with the same
-    name already exists in the directory.
-    # TODO: issues when suffix provided
-    Parameters
-    ----------
-        save_dir (Path or str): The directory path to save the NetCDF file.
-        filename (str): The name of the NetCDF file.
-        xa_d (xarray.DataArray or xarray.Dataset): The xarray DataArray or Dataset to be saved.
-
-    Returns
-    -------
-        xarray.DataArray or xarray.Dataset: The input xarray object.
-    """
-    filename = remove_suffix(utils.replace_dot_with_dash(filename))
-    save_path = (Path(save_dir) / filename).with_suffix(".nc")
-    if not save_path.is_file():
-        if "grid_mapping" in xa_d.attrs:
-            del xa_d.attrs["grid_mapping"]
-        print(f"Writing {filename} to file at {save_path}")
-        spatial_data.process_xa_d(xa_d).to_netcdf(save_path)
-        print("Writing complete.")
-    else:
-        print(f"{filename} already exists in {save_dir}")
-
-    if return_array:
-        return save_path, xa.open_dataset(save_path, decode_coords="all")
-    else:
-        return save_path
+    path_obj = Path(path)
+    if not path_obj.exists():
+        path_obj.mkdir(parents=True, exist_ok=True)
+    return path_obj.resolve()
 
 
 def check_exists_save(
@@ -212,35 +167,6 @@ def check_path_suffix(path: Path | str, comparison: str) -> bool:
         return False
 
 
-# def load_merge_nc_files(
-#     nc_dir: Path | str, incl_subdirs: bool = True, concat_dim: str = "time"
-# ):
-#     """Load and merge all netCDF files in a directory.
-
-#     Parameters
-#     ----------
-#         nc_dir (Path | str): directory containing the netCDF files to be merged.
-
-#     Returns
-#     -------
-#         xr.Dataset: merged xarray Dataset object containing the data from all netCDF files.
-#     """
-#     # specify whether searching subdirectories as well
-#     files = return_list_filepaths(nc_dir, ".nc", incl_subdirs)
-#     # if only a single file present (no need to merge)
-#     if len(files) == 1:
-#         return xa.open_dataset(files[0])
-#     # combine nc files by time
-#     ds = xa.open_mfdataset(
-#         files,
-#         decode_cf=False,
-#         concat_dim=concat_dim,
-#         combine="nested",
-#         coords="minimal",
-#     )
-#     return xa.decode_cf(ds).sortby("time", ascending=True)
-
-
 def merge_nc_files_in_dir(
     nc_dir: Path | str,
     filename: str = None,
@@ -302,16 +228,6 @@ def merge_nc_files_in_dir(
         print(f"{merged_save_path} already exists.")
     return merged_save_path
 
-    # # combine nc files by time
-    # ds = xa.open_mfdataset(
-    #     filepaths,
-    #     decode_cf=False,
-    #     concat_dim=concat_dim,
-    #     combine="nested",
-    #     coords="minimal",
-    # )
-    # return xa.decode_cf(ds).sortby("time", ascending=True)
-
 
 def merge_nc_files_in_dirs(
     parent_dir: Path | str, filename: str = "placeholder", concat_dim: str = "time"
@@ -334,23 +250,6 @@ def merge_nc_files_in_dirs(
         return merge_nc_files_in_dir(
             nc_dir, filename, include_subdirs=True, concat_dim=concat_dim
         )
-        # merged_name = f"{str(dir.stem)}_time_merged.nc"
-        # merged_path = dir / merged_name
-        # print(f"Merging .nc files into {merged_path}")
-
-        # # if merged doesn't already exist
-        # if not merged_path.is_file():
-        #     files = return_list_filepaths(dir, ".nc", incl_subdirs=False)
-        #     if len(files) == 1:
-        #         ds = xa.open_dataset(files[0])
-        #     else:
-        #         # combine nc files by time
-        #         ds = xa.open_mfdataset(
-        #             files, decode_cf=False, concat_dim=concat_dim, combine="nested"
-        #         ).sortby("time", ascending=True)
-        #     ds.to_netcdf(merged_path)
-        # else:
-        #     print(f"{merged_path} already exists.")
 
 
 def merge_from_dirs(parent_dir: Path | str, concat_files_common: str):
@@ -366,47 +265,6 @@ def merge_from_dirs(parent_dir: Path | str, concat_files_common: str):
             merged_data = xa.merge([merged_data, dataset])
 
     return merged_data
-
-    # # specify whether searching subdirectories as well
-    # files = return_list_filepaths(nc_dir, ".nc", incl_subdirs)
-    # # if only a single file present (no need to merge)
-    # if len(files) == 1:
-    #     return xa.open_dataset(files[0])
-    # # combine nc files by time
-    # ds = xa.open_mfdataset(
-    #     files, decode_cf=False, concat_dim=concat_dim, combine="nested"
-    # )
-    # return xa.decode_cf(ds).sortby("time", ascending=True)
-
-    # for each subdir in turn, get list of files
-    # merge files in list with distinct name
-    # concatenate merged files
-
-
-# def merge_save_nc_files(download_dir: Path | str, filename: str):
-#     # read relevant .nc files and merge to return master xarray
-#     xa_ds = load_merge_nc_files(Path(download_dir))
-#     save_path = Path(Path(download_dir), filename).with_suffix(".nc")
-#     xa_ds.to_netcdf(save_path)
-#     print(f"Combined nc file written to {save_path}.")
-#     return xa_ds
-
-
-# hopefully isn't necessary, since loading all datasets into memory is very intensive and not scalable
-# def naive_nc_merge(dir: Path | str):
-#     file_paths = return_list_filepaths(dir, ".nc")
-#     # get names of files
-#     filenames = [file_path.stem for file_path in file_paths]
-#     # load in files to memory as xarray
-#     das = [xa.load_dataset(file_path) for file_path in file_paths]
-
-#     combined = xa.merge([da for da in das], compat="override")
-
-#     # save combined file
-#     save_name = filenames[0] + "&" + filenames[-1] + "_merged.nc"
-#     save_path = Path(dir) / save_name
-#     combined.to_netcdf(path=save_path)
-#     print(f"{save_name} saved successfully")
 
 
 def pad_suffix(suffix: str) -> str:
@@ -642,22 +500,6 @@ def add_suffix_if_necessary(filepath: Path | str, suffix_to_add: str) -> Path:
         )
 
 
-def generate_filepath(
-    dir_path: str | Path, filename: str = None, suffix: str = None
-) -> Path:
-    """Generates directory path if non-existant; if filename provided, generates filepath, adding suffix if
-    necessary."""
-    # if generating/ensuring directory path
-    if not filename:
-        return config.guarantee_existence(dir_path)
-    # if filename provided, seemingly with suffix included
-    elif not suffix:
-        return Path(dir_path) / filename
-    # if filename and suffix provided
-    else:
-        return (Path(dir_path) / filename).with_suffix(pad_suffix(suffix))
-
-
 class NpEncoder(json.JSONEncoder):
     """
     Custom JSON encoder to handle NumPy types.
@@ -706,21 +548,6 @@ def save_json(
         print(f"Dictionary saved as json file at {filepath}")
 
 
-# def tif_to_xa_array(tif_path) -> xa.DataArray:
-#     return spatial_data.process_xa_d(rio.open_rasterio(rasterio.open(tif_path)))
-
-
-def save_dict_xa_ds_to_nc(
-    xa_d_dict: dict, save_dir: Path | str, target_resolution: float = None
-) -> None:
-    for filename, array in tqdm(xa_d_dict.items(), desc="Writing tifs to nc files"):
-        if target_resolution:
-            spatial_data.upsample_xarray_to_target(
-                xa_array=array, target_resolution=target_resolution
-            )
-        save_nc(save_dir, filename, array)
-
-
 def resample_list_xa_ds_into_dict(
     xa_das: list[xa.DataArray],
     target_resolution: float,
@@ -759,142 +586,6 @@ def resample_list_xa_ds_into_dict(
     return resampled_xa_das_dict
 
 
-def resample_dir_ncs(ncs_dir, target_resolution_d=1 / 27):
-    nc_files = return_list_filepaths(ncs_dir, ".nc", incl_subdirs=False)
-    res_string = utils.generate_resolution_str(target_resolution_d)
-
-    save_dir = config.guarantee_existence(ncs_dir / f"{res_string}_arrays")
-    for nc in nc_files:
-        nc_xa = open_xa_file(nc).astype("float32")
-        new_name = f"{str(nc.stem)}_{res_string}"
-        # resample to res
-        resampled = spatial_data.resample_xarray_to_target(
-            xa_d=nc_xa, target_resolution_d=target_resolution_d, name=new_name
-        )
-        # save
-        save_nc(save_dir, new_name, resampled)
-
-
-def tifs_to_resampled_ncs(
-    tifs_dir: Path | str = None,
-    target_resolution_d: float = 1 / 27,
-):
-    if not tifs_dir:
-        tifs_dir = (directories.get_reef_baseline_dir(),)
-    tif_files = return_list_filepaths(tifs_dir, ".tif")
-
-    res_string = utils.generate_resolution_str(target_resolution_d)
-
-    save_dir = config.guarantee_existence(tifs_dir / f"{res_string}_arrays")
-    for tif in tif_files:
-        c_xa = open_xa_file(tif)
-        new_name = f"{str(c_xa.stem)}_{res_string}"
-        # resample to res
-        resampled = spatial_data.resample_xarray_to_target(
-            xa_d=c_xa, target_resolution_d=target_resolution_d, name=new_name
-        )
-        # save
-        save_nc(save_dir, new_name, resampled)
-
-
-def resample_list_xa_ds_to_target_res_and_save(
-    xa_das: list[xa.DataArray],
-    target_resolution_d: float,
-    unit: str = "m",
-    lat_lims: tuple[float] = (-10, -17),
-    lon_lims: tuple[float] = (142, 147),
-) -> None:
-    """
-    Resamples a list of xarray DataArrays to a target resolution, and saves the resampled DataArrays to NetCDF files.
-
-    Parameters
-    ----------
-        xa_das (list[xa.DataArray]): A list of xarray DataArrays to be resampled.
-        target_resolution_d (float): The target resolution in degrees or meters, depending on the unit specified.
-        unit (str, optional): The unit of the target resolution. Defaults to "m".
-        lat_lims (tuple[float], optional): Latitude limits for the dummy DataArray used for resampling.
-            Defaults to (-10, -17).
-        lon_lims (tuple[float], optional): Longitude limits for the dummy DataArray used for resampling.
-            Defaults to (142, 147).
-
-    Returns
-    -------
-        None
-    """
-
-    dummy_xa = spatial_data.generate_dummy_xa(target_resolution_d, lat_lims, lon_lims)
-
-    save_dir = generate_filepath(
-        (
-            directories.get_comparison_dir()
-            / utils.replace_dot_with_dash(f"{target_resolution_d:.05f}d_arrays")
-        )
-    )
-
-    for xa_da in tqdm(
-        xa_das,
-        desc=f"Resampling xarray DataArrays to {target_resolution_d:.05f}d",
-        position=1,
-        leave=True,
-    ):
-        filename = utils.replace_dot_with_dash(
-            f"{xa_da.name}_{target_resolution_d:.05f}d"
-        )
-        save_path = (save_dir / filename).with_suffix(".nc")
-
-        if not save_path.is_file():
-            xa_resampled = spatial_data.process_xa_d(
-                spatial_data.upsample_xa_d_to_other(
-                    spatial_data.process_xa_d(xa_da), dummy_xa, name=xa_da.name
-                )
-            )
-            # causes problems with saving
-            if "grid_mapping" in xa_resampled.attrs:
-                del xa_resampled.attrs["grid_mapping"]
-
-            xa_resampled.to_netcdf(save_path)
-        else:
-            print(f"{filename} already exists in {save_dir}")
-
-
-# def resample_list_xa_ds_to_target_resolution_and_merge(
-#     xa_das: list[xa.DataArray],
-#     target_resolution: float,
-#     unit: str = "m",
-#     lat_lims: tuple[float] = (-10, -17),
-#     lon_lims: tuple[float] = (142, 147),
-# ) -> dict:
-#     """
-#     Resample a list of xarray DataArrays to the target resolution and merge them.
-
-#     Parameters
-#     ----------
-#         xa_das (list[xa.DataArray]): A list of xarray DataArrays to be resampled and merged.
-#         target_resolution (float): The target resolution for resampling.
-#         unit (str, defaults to "m"): The unit of the target resolution.
-#         interp_method: (str, defaults to "linear") The interpolation method for resampling.
-
-#     Returns
-#     -------
-#         A dictionary containing the resampled xarray DataArrays merged by their names.
-#     """
-#     # TODO: will probably need to save to individual files/folders and combine at test/train time
-#     # may need to go to target array here
-#     target_resolution_d = spatial_data.choose_resolution(target_resolution, unit)[1]
-
-#     dummy_xa = spatial_data.generate_dummy_xa(target_resolution_d, lat_lims, lon_lims)
-
-#     resampled_xa_das_dict = {}
-#     for xa_da in tqdm(xa_das, desc="Resampling xarray DataArrays"):
-#         xa_resampled = spatial_data.resample_xa_d_to_other(
-#             xa_da, dummy_xa, name=xa_da.name
-#         )
-#         # xa_resampled = spatial_data.upsample_xarray_to_target(xa_da, target_resolution_d)
-#         resampled_xa_das_dict[xa_da.name] = xa_resampled
-
-#     return resampled_xa_das_dict, unit
-
-
 def extract_variable(xa_d: xa.Dataset | xa.DataArray, name=None):
     """
     Extract the first data variable from an xarray dataset that isn't "spatial_ref".
@@ -923,15 +614,6 @@ def extract_variable(xa_d: xa.Dataset | xa.DataArray, name=None):
         return variable
     else:
         return xa_d
-
-
-def open_xa_file(xa_path: Path | str) -> xa.Dataset | xa.DataArray:
-    try:
-        return spatial_data.process_xa_d(
-            xa.open_dataarray(xa_path, decode_coords="all")
-        )
-    except ValueError:
-        return spatial_data.process_xa_d(xa.open_dataset(xa_path, decode_coords="all"))
 
 
 ####
@@ -1009,7 +691,7 @@ def uniquify_file_numerically(dir_path: str | Path, filename: str):
     counter = 1
     new_filename = f"{filename}_000"
     while (dir_path / new_filename).exists():
-        new_filename = f"{Path(filename).stem}_{utils.pad_number_with_zeros(counter, resulting_len=3)}{Path(filename).suffix}"
+        new_filename = f"{Path(filename).stem}_{utils.pad_number_with_zeros(counter, resulting_len=3)}{Path(filename).suffix}"  # noqa
         counter += 1
     return new_filename
 

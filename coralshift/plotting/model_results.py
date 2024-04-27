@@ -9,15 +9,169 @@ import matplotlib.cm as mcm
 from matplotlib import gridspec
 import pandas as pd
 
+# from tqdm.auto import tqdm
+
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import sklearn.metrics as sklmetrics
 
 from coralshift.plotting import spatial_plots
-from coralshift.machine_learning import baselines
-from coralshift.utils import utils
-from coralshift import functions_creche
+from coralshift.machine_learning import static_models
+from coralshift.utils import utils, file_ops, config
+from coralshift.processing import ml_processing
+
+# from coralshift import functions_creche
 from coralshift.processing import spatial_data
+
+import xgboost as xgb
+
+
+class AnalyseResults:
+    def __init__(
+        self,
+        model,
+        trains: tuple[pd.DataFrame, pd.DataFrame] = None,
+        tests: tuple[pd.DataFrame, pd.DataFrame] = None,
+        vals: tuple[pd.DataFrame, pd.DataFrame] = None,
+        save_graphs: bool = True,
+        config_info: dict = None,
+        presentation_format: bool = False,
+    ):
+        self.model = model
+        self.trains = trains
+        self.tests = tests
+        self.vals = vals
+        self.save_graphs = save_graphs
+        self.config_info = config_info
+        self.ds_type = None
+        self.presentation_format = presentation_format
+
+    def make_predictions(self, X):
+        num_points = X.shape[0]
+        # convert data to DMatrix format if necessary
+        if "xgb" in self.config_info["model_code"]:
+            X = xgb.DMatrix(X)
+            num_points = X.num_row()
+
+        # if self.predictions is None:  # changed to compute predictions anew each time from model
+        print(f"\tRunning inference on {num_points} datapoints...")
+        return self.model.predict(X)
+
+    def record_metrics(self, y, predictions):
+        data_type = static_models.ModelInitializer(
+            self.config_info["model_code"]
+        ).get_data_type()
+
+        metric_header = f"{self.ds_type}_metrics" if self.ds_type else "metrics"
+        metric_info = {f"{metric_header}": {}}
+        if data_type == "continuous":
+            # regression metrics
+            metric_info[metric_header]["r2_score"] = float(
+                sklmetrics.r2_score(y, predictions)
+            )
+            metric_info[metric_header]["mse"] = float(
+                sklmetrics.mean_squared_error(y, predictions)
+            )
+            metric_info[metric_header]["mae"] = float(
+                sklmetrics.mean_absolute_error(y, predictions)
+            )
+
+        elif data_type == "discrete":
+            [y, predictions] = [
+                ml_processing.cont_to_class(
+                    y, self.config_info["regressor_classification_threshold"]
+                ),
+                ml_processing.cont_to_class(
+                    predictions, self.config_info["regressor_classification_threshold"]
+                ),
+            ]
+            # classification metrics
+            metric_info[metric_header]["f1_score"] = float(
+                sklmetrics.f1_score(y, predictions)
+            )
+            metric_info[metric_header]["accuracy"] = sklmetrics.accuracy_score(
+                y, predictions
+            )
+            metric_info[metric_header]["balanced_accuracy"] = float(
+                sklmetrics.balanced_accuracy_score(y, predictions)
+            )
+        else:
+            raise ValueError(f"Data type {data_type} not recognised.")
+
+        # write metric info to config file
+        config_fp = self.config_info["file_paths"]["config"]
+        print(f"Saving {metric_header} to {config_fp}...")
+        file_ops.edit_yaml(config_fp, metric_info)
+
+    def get_plot_dir(self):
+        runs_dir = config.runs_dir
+        plot_dir_id = self.config_info["file_paths"]["config"].split("_CONFIG")[0]
+        plot_dir_child = (
+            f"{plot_dir_id}/{self.ds_type}" if self.ds_type else plot_dir_id
+        )
+        plot_dir = runs_dir / "plots" / plot_dir_child
+        plot_dir.mkdir(parents=True, exist_ok=True)
+
+        return plot_dir
+
+    def save_fig(self, fn: str):
+        if self.save_graphs:
+            plot_dir = self.get_plot_dir()
+            plt.savefig(plot_dir / f"{fn}.png")
+
+    def plot_confusion_matrix(self, y, predictions):
+        plot_confusion_matrix(
+            labels=y,
+            predictions=predictions,
+            label_threshold=self.config_info["regressor_classification_threshold"],
+            presentation_format=self.presentation_format,
+        )
+        self.save_fig(fn="confusion_matrix")
+
+    def plot_regression(self, y, predictions):
+        plot_regression_histograms(
+            y, predictions, presentation_format=self.presentation_format
+        )
+        self.save_fig(fn="regression")
+
+    def plot_spatial_inference_comparison(self, y, predictions):
+        plot_spatial_inference_comparison(y, predictions, self.presentation_format)
+        self.save_fig(fn="spatial_inference_comparison")
+
+    def plot_spatial_confusion_matrix(self, y, predictions):
+
+        confusion_values = plot_spatial_confusion_matrix(
+            y,
+            predictions,
+            self.config_info["regressor_classification_threshold"],
+            presentation_format=self.presentation_format,
+        )
+        self.save_fig(fn="spatial_confusion_matrix")
+
+        return confusion_values
+
+    def produce_metrics(self, y, predictions):
+        self.record_metrics(y, predictions)
+
+    def produce_plots(self, y, predictions):
+        data_type = static_models.ModelInitializer(
+            self.config_info["model_code"]
+        ).get_data_type()
+
+        if data_type == "continuous":
+            self.plot_regression(y, predictions)
+        self.plot_confusion_matrix(y, predictions)
+        self.plot_spatial_inference_comparison(y, predictions)
+        self.plot_spatial_confusion_matrix(y, predictions)
+
+    def analyse_results(self):
+        ds_types = ["trains", "tests", "vals"]
+        for i, ds in enumerate([self.trains, self.tests, self.vals]):
+            self.ds_type = ds_types[i]
+            predictions = self.make_predictions(ds[0])
+
+            self.produce_plots(ds[1], predictions)
+            self.produce_metrics(ds[1], predictions)
 
 
 def generate_spatial_confusion_matrix_da(
@@ -58,6 +212,7 @@ def get_confusion_vals_dict():
     }
 
 
+# literally generated by running models on a loop in a ntoebook and printing: automate
 def plot_regression_histograms(
     actual, predicted, n_bins: int = 20, presentation_format: bool = False
 ):
@@ -85,7 +240,7 @@ def plot_regression_histograms(
     ax[1].set_xlabel("Actual coral presence")
 
     if presentation_format:
-        [functions_creche.customize_plot_colors(fig, a) for a in [ax[0], ax[1]]]
+        [spatial_plots.customize_plot_colors(fig, a) for a in [ax[0], ax[1]]]
         [a.legend(facecolor="#212121", labelcolor="white") for a in [ax[0], ax[1]]]
     else:
         [a.legend() for a in [ax[0], ax[1]]]
@@ -157,7 +312,7 @@ def plot_performance_vs_resolution():
     # Adding legend
     ax.legend(loc="upper right", facecolor="#212121", labelcolor="white")
 
-    functions_creche.customize_plot_colors(fig, ax)
+    spatial_plots.customize_plot_colors(fig, ax)
 
 
 def plot_spatial_confusion(
@@ -212,7 +367,7 @@ def plot_spatial_confusion(
 
     if presentation_format:
         label_style_dict = {"fontsize": 12, "color": "white", "rotation": 45}
-        functions_creche.customize_plot_colors(fig, ax)
+        spatial_plots.customize_plot_colors(fig, ax)
         cbar_label_color = "white"
     else:
         label_style_dict = None
@@ -444,12 +599,16 @@ def plot_spatial_confusion_matrix(
 ):
     spatial_predictions_ds = spatial_data.spatial_predictions_from_data(y, predictions)
 
+    spatial_predictions_ds = spatial_predictions_ds.sel(
+        latitude=slice(-15, -10), longitude=slice(140, 145)
+    )
+
     # Threshold the values while retaining NaNs
-    thresholded_predictions_values = functions_creche.cont_to_class(
+    thresholded_predictions_values = ml_processing.cont_to_class(
         spatial_predictions_ds["predictions"].values,
         threshold,
     )
-    thresholded_labels_values = functions_creche.cont_to_class(
+    thresholded_labels_values = ml_processing.cont_to_class(
         spatial_predictions_ds["label"].values,
         threshold,
     )
@@ -501,8 +660,10 @@ def plot_confusion_matrix(
     cmap = spatial_plots.get_cbar()
 
     if not utils.check_discrete(predictions) or not utils.check_discrete(labels):
-        labels = baselines.threshold_array(labels, threshold=label_threshold)
-        predictions = baselines.threshold_array(predictions, threshold=label_threshold)
+        labels = ml_processing.cont_to_class(labels, threshold=label_threshold)
+        predictions = ml_processing.cont_to_classy(
+            predictions, threshold=label_threshold
+        )
 
     classes = ["coral absent", "coral present"]
     # initialise confusion matrix
@@ -518,103 +679,7 @@ def plot_confusion_matrix(
     disp.plot(cmap=cmap, colorbar=colorbar, text_kw={"color": "black"}, ax=fax[1])
 
     if presentation_format:
-        functions_creche.customize_plot_colors(fax[0], fax[1])
-
-
-def model_output_to_spatial_confusion(
-    label: pd.Series | np.ndarray,
-    prediction: pd.Series | np.ndarray,
-    threshold: float = 0.25,
-    lat_lims: tuple[float] = None,
-    lon_lims: tuple[float] = None,
-    fax=None,
-    cbar_pad=0.1,
-) -> None:
-    """
-    Generates a spatial confusion matrix plot based on label and prediction arrays.
-
-    Parameters
-    ----------
-        label (pd.Series or np.ndarray): True labels.
-        prediction (pd.Series or np.ndarray): Predicted labels.
-        threshold (float, optional): Threshold value for discretizing the prediction and label arrays. Defaults to 0.25.
-        lat_lims (tuple[float], optional): Latitude limits for defining a spatial region. Defaults to None.
-        lon_lims (tuple[float], optional): Longitude limits for defining a spatial region. Defaults to None.
-        fax (object, optional): Fax object for plotting. Defaults to None.
-        cbar_pad (float, optional): Padding between the colorbar and the plot. Defaults to 0.1.
-
-    Returns
-    -------
-        None
-    """
-    if not utils.check_discrete(prediction) or not utils.check_discrete(label):
-        prediction = baselines.threshold_array(prediction, threshold=threshold)
-        label = baselines.threshold_array(label, threshold=threshold)
-
-    ds = baselines.outputs_to_xa_ds(label, prediction)
-    confusion_values, vals_dict = spatial_confusion_matrix_da(
-        ds["predictions"], ds["labels"]
-    )
-    if lat_lims and lon_lims:
-        region = {
-            "latitude": slice(min(lat_lims), max(lat_lims)),
-            "longitude": slice(min(lon_lims), max(lon_lims)),
-        }
-        ds = confusion_values.sel(region)
-    ds["comparison"] = confusion_values
-
-    plot_spatial_confusion(
-        ds, "labels", "predictions", vals_dict=vals_dict, fax=fax, cbar_pad=cbar_pad
-    )
-
-
-def plot_pixelwise_model_result(
-    all_data,
-    labels,
-    predictions,
-    model_type: str = " ",
-    figsize=[20, 20],
-    thresh_val=-0.25,
-    lat_lims=None,
-    lon_lims=None,
-):
-    """
-    Plot the pixel-wise model result.
-
-    Parameters
-    ----------
-        all_data (Any): Data for plotting (gt values).
-        labels (Any): Labels for comparison.
-        predictions (Any): Model predictions.
-        model_type (str, optional): Model type. Defaults to " ".
-        figsize (List[int], optional): Figure size. Defaults to [20, 20].
-        thresh_val (float, optional): Threshold value. Defaults to -0.25.
-        lat_lims (List[float], optional): Latitude limits. Defaults to None.
-        lon_lims (List[float], optional): Longitude limits. Defaults to None.
-
-    Returns
-    -------
-        None
-    """
-    fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(2, 2)
-
-    # left plot (total map)
-    # ax_context = fig.add_subplot(gs[:, 0], projection=ccrs.PlateCarree())
-    # spatial_plots.plot_spatial(fax=(fig, ax_context), xa_da=all_data["gt"], cbar=False)
-    if model_type == "brt" or model_type == "rf_reg":
-        predictions = baselines.threshold_array(predictions, thresh_val)
-
-    # right plots (spatial cm, cm)
-    ax_spatial_cm = fig.add_subplot(gs[0, 0], projection=ccrs.PlateCarree())
-    model_output_to_spatial_confusion(
-        labels,
-        predictions,
-        lat_lims=lat_lims,
-        lon_lims=lon_lims,
-        fax=(fig, ax_spatial_cm),
-        cbar_pad=0.11,
-    )
+        spatial_plots.customize_plot_colors(fax[0], fax[1])
 
 
 def plot_train_test_spatial(
@@ -707,6 +772,271 @@ def plot_spatial_inference_comparison(y, predictions, presentation_format: bool 
     return f, ax
 
 
+# from baselines.py May come in useful
+####################################################################################################
+
+
+# def n_random_runs_preds(
+#     model,
+#     xa_dss: list[xa.Dataset],
+#     runs_n: int = 10,
+#     data_type: str = "continuous",
+#     test_fraction: float = 0.25,
+#     split_type: str = "pixel",
+#     train_test_lat_divide: int = float,
+#     train_direction: str = "N",
+#     bath_mask: bool = True,
+# ) -> list[tuple[list]]:
+#     """
+#     Perform multiple random test runs for inference using a model.
+
+#     Parameters
+#     ----------
+#         model: The model used for inference.
+#         runs_n: The number of random test runs.
+#         xa_ds: The xarray Dataset containing the data.
+#         test_fraction (optional): The fraction of data to use for testing. Defaults to 0.25.
+#         bath_mask (optional): Whether to apply a bathymetry mask during splitting. Defaults to True.
+
+#     Returns
+#     -------
+#         run_outcomes: A list of tuples containing the true labels and predicted values for each test run.
+#     """
+#     # TODO: allow spatial splitting, perhaps using **kwarg functionality to declare lat/lon limits
+#     # prediction_list = []
+#     run_outcomes = []
+#     for run in tqdm(
+#         range(runs_n),
+#         desc=f"Inference on {runs_n} train-test splits",
+#     ):
+#         # select test data
+#         _, X_test, _, y_test, _, _ = spatial_split_train_test(
+#             xa_dss=xa_dss,
+#             data_type=data_type,
+#             test_fraction=test_fraction,
+#             split_type=split_type,
+#             train_test_lat_divide=train_test_lat_divide,
+#             train_direction=train_direction,
+#             bath_mask=bath_mask,
+#         )
+
+#         pred = model.predict(X_test)
+#         run_outcomes.append((y_test, pred))
+
+#     return run_outcomes
+
+
+# def rocs_n_runs(
+#     run_outcomes: tuple[list[float]], binarize_threshold: float = 0, figsize=[7, 7]
+# ):
+#     """
+#     Plot ROC curves for multiple random test runs.
+
+#     Parameters
+#     ----------
+#         run_outcomes: A list of tuples containing the true labels and predicted values for each test run.
+#         binarize_threshold (optional): The threshold value for binarizing the labels. Defaults to 0.
+
+#     Returns
+#     -------
+#         None
+#     """
+#     # colour formatting
+#     color_map = spatial_plots.get_cbar("seq")
+#     num_colors = len(run_outcomes)
+#     colors = [color_map(i / num_colors) for i in range(num_colors)]
+
+#     f, ax = plt.subplots(figsize=figsize)
+#     roc_aucs = []
+#     for c, outcome in enumerate(run_outcomes):
+#         # cast regression to binary classification for plotting
+#         binary_y_labels, binary_predictions = threshold_label(
+#             outcome[0], outcome[1], binarize_threshold
+#         )
+
+#         fpr, tpr, _ = sklmetrics.roc_curve(
+#             binary_y_labels, binary_predictions, drop_intermediate=False
+#         )
+#         roc_auc = sklmetrics.auc(fpr, tpr)
+#         roc_aucs.append(roc_auc)
+
+#         label = f"{roc_auc:.05f}"
+#         ax.plot(fpr, tpr, label=label, color=colors[c])
+
+#     # determine minimum and maximumm auc
+#     min_auc, max_auc = np.min(roc_aucs), np.max(roc_aucs)
+#     # return mean roc
+#     mean_auc = np.mean(roc_aucs)
+
+#     # Set legend labels for min and max AUC lines only
+#     handles, legend_labels = ax.get_legend_handles_labels()
+#     filtered_handles = []
+#     filtered_labels = []
+#     for handle, label in zip(handles, legend_labels):
+#         if label in [f"{min_auc:.05f}", f"{max_auc:.05f}"]:
+#             filtered_handles.append(handle)
+#             filtered_labels.append(label)
+
+#     if len(filtered_handles) > 1:
+#         filtered_handles, filtered_labels = [filtered_handles[0]], [filtered_labels[0]]
+#     ax.legend(
+#         filtered_handles,
+#         filtered_labels,
+#         title="Maximum and minimum AUC scores",
+#         loc="lower right",
+#     )
+
+#     n_runs = len(run_outcomes)
+#     # format
+#     model_results.format_roc(
+#         ax=ax,
+#         title=f"""Receiver Operating Characteristic (ROC) Curve\n for {n_runs} randomly initialised test datasets.
+#         \nMean AUC {mean_auc:.05f}""",
+#     )
+
+
+# def investigate_label_thresholds(
+#     thresholds: list[float],
+#     y_test: np.ndarray | pd.Series,
+#     y_predictions: np.ndarray | pd.Series,
+#     figsize=[7, 7],
+# ):
+#     """Plot ROC curves with multiple lines for different label thresholds.
+
+#     Parameters
+#     ----------
+#         thresholds (list[float]): List of label thresholds.
+#         y_test (np.ndarray or pd.Series): True labels.
+#         y_predictions (np.ndarray or pd.Series): Predicted labels.
+#         figsize (list, optional): Figure size for the plot. Default is [7, 7].
+
+#     Returns
+#     -------
+#         None
+#     """
+#     f, ax = plt.subplots(figsize=figsize)
+#     # prepare colour assignment
+#     color_map = spatial_plots.get_cbar("seq")
+#     num_colors = len(thresholds)
+#     colors = [color_map(i / num_colors) for i in range(num_colors)]
+
+#     # plot ROC curves
+#     for c, thresh in enumerate(thresholds):
+#         binary_y_labels, binary_predictions = threshold_label(
+#             y_test, y_predictions, thresh
+#         )
+#         fpr, tpr, _ = sklmetrics.roc_curve(
+#             binary_y_labels, binary_predictions, drop_intermediate=False
+#         )
+#         roc_auc = sklmetrics.auc(fpr, tpr)
+
+#         label = f"{thresh:.01f} | {roc_auc:.02f}"
+#         ax.plot(fpr, tpr, label=label, color=colors[c])
+
+#     # format
+#     model_results.format_roc(
+#         ax=ax,
+#         title="Receiver Operating Characteristic (ROC) Curve\nfor several coral presence/absence thresholds",
+#     )
+#     ax.legend(title="threshold value | auc")
+
+
+# def n_random_runs_preds_across_models(
+#     model_types: list[str],
+#     models: list,
+#     xa_dss: list[xa.Dataset],
+#     runs_n: int = 10,
+#     test_fraction: float = 0.25,
+#     split_type: str = "pixel",
+#     train_test_lat_divide: int = float,
+#     train_direction: str = "N",
+#     bath_mask: bool = True,
+# ):
+#     model_class = ModelInitializer()
+#     outcomes_dict = {}
+#     for i, model_type in enumerate(model_types):
+#         model = models[i]
+#         data_type = model_class.get_data_type(model_type)
+#         outcomes = n_random_runs_preds(
+#             model=model,
+#             xa_dss=xa_dss,
+#             runs_n=runs_n,
+#             data_type=data_type,
+#             test_fraction=test_fraction,
+#             split_type=split_type,
+#             train_test_lat_divide=train_test_lat_divide,
+#             train_direction=train_direction,
+#             bath_mask=bath_mask,
+#         )
+#         outcomes_dict[model_type] = outcomes
+
+#     return outcomes_dict
+
+
+# def models_rocs_n_runs(
+#     model_outcomes: dict[list[float]], binarize_threshold: float = 0, figsize=[7, 7]
+# ):
+#     """
+#     Plot ROC curves for multiple models' outcomes.
+
+#     Parameters
+#     ----------
+#         model_outcomes: A dictionary where keys are model names and values are lists of outcomes containing the true
+#             labels and predicted values for each test run.
+#         binarize_threshold (optional): The threshold value for binarizing the labels. Defaults to 0.
+
+#     Returns
+#     -------
+#         None
+#     """
+#     # Colour formatting
+#     color_map = spatial_plots.get_cbar("seq")
+#     num_models = len(model_outcomes)
+#     colors = [color_map(i / num_models) for i in range(num_models)]
+
+#     f, ax = plt.subplots(figsize=figsize)
+#     roc_aucs = []
+#     legend_labels = []
+
+#     for c, (model_name, outcomes) in tqdm(
+#         enumerate(model_outcomes.items()),
+#         total=len(model_outcomes),
+#         desc="Iterating over models",
+#     ):
+#         roc_aucs = []
+
+#         for i, outcome in enumerate(outcomes):
+#             # Cast regression to binary classification for plotting
+#             binary_y_labels, binary_predictions = threshold_label(
+#                 outcome[0], outcome[1], binarize_threshold
+#             )
+#             fpr, tpr, _ = sklmetrics.roc_curve(
+#                 binary_y_labels, binary_predictions, drop_intermediate=False
+#             )
+#             roc_auc = sklmetrics.auc(fpr, tpr)
+#             roc_aucs.append(roc_auc)
+
+#             # plot final label
+#             if i == (len(outcomes) - 2):
+#                 # Calculate mean AUC
+#                 mean_auc = np.mean(roc_aucs)
+#                 # Show label only for the last outcome of each model
+#                 label = f"{model_name} | {mean_auc:.03f}"
+#                 ax.plot(fpr, tpr, label=label, color=colors[c])
+#                 legend_labels.append(label)
+#             else:
+#                 # Hide label for other outcomes
+#                 ax.plot(fpr, tpr, color=colors[c])
+
+#     ax.legend(title="Mean model AUC scores", loc="lower right")
+#     # Format the plot
+#     n_runs = len(outcomes)
+#     format_roc(
+#         ax=ax,
+#         title=f"Receiver Operating Characteristic (ROC) Curve\n for {n_runs} randomly initialized test datasets.",
+#     )
+
+
 ############
 # DEPRECATED
 ############
@@ -743,3 +1073,100 @@ def plot_spatial_inference_comparison(y, predictions, presentation_format: bool 
 #         [vmin + (vmax - vmin) / num_ticks * (0.5 + i) for i in range(num_ticks)]
 #     )
 #     colorbar.set_ticklabels(list(vals_dict.keys()))
+
+
+# def model_output_to_spatial_confusion(
+#     label: pd.Series | np.ndarray,
+#     prediction: pd.Series | np.ndarray,
+#     threshold: float = 0.25,
+#     lat_lims: tuple[float] = None,
+#     lon_lims: tuple[float] = None,
+#     fax=None,
+#     cbar_pad=0.1,
+# ) -> None:
+#     """
+#     Generates a spatial confusion matrix plot based on label and prediction arrays.
+
+#     Parameters
+#     ----------
+#         label (pd.Series or np.ndarray): True labels.
+#         prediction (pd.Series or np.ndarray): Predicted labels.
+#         threshold (float, optional): Threshold value for discretizing the prediction and label arrays. Defaults to
+# 0.25.
+#         lat_lims (tuple[float], optional): Latitude limits for defining a spatial region. Defaults to None.
+#         lon_lims (tuple[float], optional): Longitude limits for defining a spatial region. Defaults to None.
+#         fax (object, optional): Fax object for plotting. Defaults to None.
+#         cbar_pad (float, optional): Padding between the colorbar and the plot. Defaults to 0.1.
+
+#     Returns
+#     -------
+#         None
+#     """
+#     if not utils.check_discrete(prediction) or not utils.check_discrete(label):
+#         prediction = baselines.threshold_array(prediction, threshold=threshold)
+#         label = baselines.threshold_array(label, threshold=threshold)
+
+#     ds = baselines.outputs_to_xa_ds(label, prediction)
+#     confusion_values, vals_dict = spatial_confusion_matrix_da(
+#         ds["predictions"], ds["labels"]
+#     )
+#     if lat_lims and lon_lims:
+#         region = {
+#             "latitude": slice(min(lat_lims), max(lat_lims)),
+#             "longitude": slice(min(lon_lims), max(lon_lims)),
+#         }
+#         ds = confusion_values.sel(region)
+#     ds["comparison"] = confusion_values
+
+#     plot_spatial_confusion(
+#         ds, "labels", "predictions", vals_dict=vals_dict, fax=fax, cbar_pad=cbar_pad
+#     )
+
+# # a spatial confusion matrix by any other name would small so sweet...
+# def plot_pixelwise_model_result(
+#     all_data,
+#     labels,
+#     predictions,
+#     model_type: str = " ",
+#     figsize=[20, 20],
+#     thresh_val=-0.25,
+#     lat_lims=None,
+#     lon_lims=None,
+# ):
+#     """
+#     Plot the pixel-wise model result.
+
+#     Parameters
+#     ----------
+#         all_data (Any): Data for plotting (gt values).
+#         labels (Any): Labels for comparison.
+#         predictions (Any): Model predictions.
+#         model_type (str, optional): Model type. Defaults to " ".
+#         figsize (List[int], optional): Figure size. Defaults to [20, 20].
+#         thresh_val (float, optional): Threshold value. Defaults to -0.25.
+#         lat_lims (List[float], optional): Latitude limits. Defaults to None.
+#         lon_lims (List[float], optional): Longitude limits. Defaults to None.
+
+#     Returns
+#     -------
+#         None
+#     """
+#     fig = plt.figure(figsize=figsize)
+#     gs = gridspec.GridSpec(2, 2)
+
+#     # left plot (total map)
+#     # ax_context = fig.add_subplot(gs[:, 0], projection=ccrs.PlateCarree())
+#     # spatial_plots.plot_spatial(fax=(fig, ax_context), xa_da=all_data["gt"], cbar=False)
+#     if model_type == "brt" or model_type == "rf_reg":
+#         predictions = baselines.threshold_array(predictions, thresh_val)
+
+#     # right plots (spatial cm, cm)
+#     ax_spatial_cm = fig.add_subplot(gs[0, 0], projection=ccrs.PlateCarree())
+#     model_output_to_spatial_confusion(
+#         labels,
+#         predictions,
+#         lat_lims=lat_lims,
+#         lon_lims=lon_lims,
+#         fax=(fig, ax_spatial_cm),
+#         cbar_pad=0.11,
+#     )

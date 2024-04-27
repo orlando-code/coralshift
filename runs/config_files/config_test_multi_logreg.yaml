@@ -1,0 +1,57 @@
+# test comment
+# min_depth_mask_ratio: 0.1
+depth_mask_lims:
+- -1000
+- 0
+model_code: logreg
+regressor_classification_threshold: 0.1
+ds_type: static
+predictand: UNEP_GDCR # TODO: make more formal
+datasets: 
+- cmip6
+- unep
+- gebco
+# TODO: add slopes
+env_vars:
+- mlotst
+- rsdo
+- so
+- thetao
+- tos
+- uo
+- vo
+random_state: 42
+resolution: 0.05
+resolution_unit: d
+pos_neg_ratio: 0.3
+year_range_to_include: [1950, 2014] # TODO: revise for future
+upsample_method: "linear"
+downsample_method: "mean"
+spatial_buffer: 3
+save_figs: True
+do_train: True
+do_save_model: True
+# spatial extent
+lats:
+- -32
+- 0
+lons:
+- 130
+- 170
+levs:
+- 0
+- 20
+split_type: pixelwise
+train_test_val_frac: [0.8, 0.2, 0]
+predictor_scaler: minmax
+predictand_scaler: log
+hyperparameter_search:
+  cv_folds: 3
+  n_samples: -1
+  n_iter: 100
+  type: random
+  do_search: True
+  n_trials: 3
+  search_types:
+  # - grid
+  - random

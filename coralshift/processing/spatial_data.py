@@ -1,22 +1,24 @@
-from __future__ import annotations
-
-import xarray as xa
-
-# import rioxarray as rio
+# general
 import numpy as np
-import rasterio
 import pandas as pd
-import haversine
 
-from rasterio import features
-from tqdm import tqdm
+# spatial
+import xarray as xa
+import rasterio
+import haversine
+from rasterio import features as rfeatures
 
 # from scipy.ndimage import binary_dilation, generic_filter
+
+# file ops
+from tqdm import tqdm
 from pathlib import Path
+
+# custom
 from coralshift.utils import file_ops, utils
 
 
-def spatial_predictions_from_data(y, predictions):
+def spatial_predictions_from_data(y: pd.Series, predictions: np.ndarray) -> pd.Series:
     predictions = pd.Series(predictions, index=y.index)
 
     # join dataframes on index
@@ -647,7 +649,7 @@ def rasterize_shapely_df(
         shapes = [
             (row[shapes_col], 1)
         ]  # the second value (1) represents the value to assign to the raster cell
-        rasterized = features.rasterize(
+        rasterized = rfeatures.rasterize(
             shapes=shapes,
             out_shape=(height, width),
             transform=transform,
@@ -1349,6 +1351,14 @@ def process_xa_d(
 
     if "grid_mapping" in temp_xa_d.attrs:
         del temp_xa_d.attrs["grid_mapping"]
+
+    # drop variables which will never be variables
+    # TODO: add as argument with default
+    drop_vars = ["time_bnds"]
+    temp_xa_d = temp_xa_d.drop_vars(
+        [var for var in drop_vars if var in temp_xa_d.variables]
+    )
+
     # add crs
     #     temp_xa_d.rio.write_crs(crs, inplace=True)
     # if chunk_dict is not None:

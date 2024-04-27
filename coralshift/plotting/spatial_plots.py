@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+# plotting
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
@@ -7,24 +6,60 @@ from matplotlib import animation, colors
 import matplotlib.gridspec as gridspec
 import matplotlib.colors as mcolors
 
+# general
+import pandas as pd
+import numpy as np
 
+# file ops
 from pathlib import Path
+from tqdm import tqdm
+
+# spatial
 import xarray as xa
 import cartopy.crs as ccrs
-
 import cartopy.feature as cfeature
 import cartopy.mpl.ticker as cticker
 
-import numpy as np
-from tqdm import tqdm
-
+# custom
 from coralshift.processing import spatial_data
 from coralshift.dataloading import bathymetry
 from coralshift.utils import file_ops
 
 
-def simple_plot(ds):
-    ds.plot()
+# TODO: not working universally
+def customize_plot_colors(fig, ax, background_color="#212121", text_color="white"):
+    # Set figure background color
+    fig.patch.set_facecolor(background_color)
+
+    # Set axis background color (if needed)
+    ax.set_facecolor(background_color)
+
+    # Set text color for all elements in the plot
+    for text in fig.texts:
+        text.set_color(text_color)
+    for text in ax.texts:
+        text.set_color(text_color)
+    for text in ax.xaxis.get_ticklabels():
+        text.set_color(text_color)
+    for text in ax.yaxis.get_ticklabels():
+        text.set_color(text_color)
+    ax.title.set_color(text_color)
+    ax.xaxis.label.set_color(text_color)
+    ax.yaxis.label.set_color(text_color)
+
+    # Set legend text color
+    legend = ax.get_legend()
+    if legend:
+        for text in legend.get_texts():
+            text.set_color(text_color)
+    # # set cbar labels
+    # cbar = ax.collections[0].colorbar
+    # cbar.set_label(color=text_color)
+    # cbar.ax.yaxis.label.set_color(text_color)
+    ax.tick_params(axis="x", colors="white")
+    ax.tick_params(axis="y", colors="white")
+
+    return fig, ax
 
 
 def hex_to_rgb(value):
@@ -149,7 +184,8 @@ def get_cbar(cbar_type: str = "seq"):
     elif cbar_type == "spatial_conf_matrix":
         # TODO: correct (for plot_spatial_confusion)
         colors = ["#EEEEEE", "#3B9AB2", "#cae7ed", "#d83c04", "#E1AF00"]
-        return mpl.colors.ListedColormap(colors)
+        # return mpl.colors.ListedColormap(colors)
+        return mcolors.ListedColormap(colors)
     elif isinstance(cbar_type, list):
         return get_continuous_cmap(cbar_type)
     else:
@@ -350,7 +386,7 @@ def format_spatial_plot(
             plt.setp(cbar_ticks, color="white")
             cb.set_label("colorbar label", color="white")
 
-    if labels:
+    if labels:  # TODO: not sure that this is being passed through correctly
         # convert labels to relevant boolean: ["t","r","b","l"]
         gl.top_labels = "t" in labels
         gl.bottom_labels = "b" in labels
@@ -359,36 +395,6 @@ def format_spatial_plot(
 
     gl.xlabel_style = default_label_style_dict
     gl.ylabel_style = default_label_style_dict
-
-    return fig, ax
-
-
-def customize_plot_colors(fig, ax, background_color="#212121", text_color="white"):
-    # Set figure background color
-    fig.patch.set_facecolor(background_color)
-
-    # Set axis background color (if needed)
-    # ax.set_facecolor(background_color)
-
-    # Set text color for all elements in the plot
-    for text in fig.texts:
-        text.set_color(text_color)
-    for text in ax.texts:
-        text.set_color(text_color)
-    for text in ax.xaxis.get_ticklabels():
-        text.set_color(text_color)
-    for text in ax.yaxis.get_ticklabels():
-        text.set_color(text_color)
-    ax.title.set_color(text_color)
-    ax.xaxis.label.set_color(text_color)
-    ax.yaxis.label.set_color(text_color)
-
-    # Set legend text color
-    legend = ax.get_legend()
-    if legend:  # this isn't actually doing anything
-        for text in legend.get_texts():
-            text.set_color("text_color")
-        legend(facecolor=background_color)
 
     return fig, ax
 
