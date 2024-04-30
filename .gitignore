@@ -32,6 +32,7 @@ __pycache__/
 /runs/*
 !/runs/config_files/
 !/runs/config_files/*
+/runs/config_files/multi_config/*    
 
 # ignore any installation-specific directories egg
 **/*egg*/
