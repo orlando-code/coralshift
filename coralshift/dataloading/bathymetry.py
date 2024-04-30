@@ -3,8 +3,9 @@ import xarray as xa
 from scipy.ndimage import gaussian_gradient_magnitude
 
 # custom
-from coralshift.utils import config, file_ops
+from coralshift.utils import config
 from coralshift.processing import spatial_data
+from coralshift.cmipper import file_ops as cmipper_file_ops
 
 
 def generate_gebco_xarray(
@@ -18,7 +19,7 @@ def generate_gebco_xarray(
 
     # check if there exists a file spanning an adequate spatial extent
     nc_fps = list(gebco_xa_dir.glob("*.nc"))
-    subset_fps = file_ops.find_files_for_area(nc_fps, lats, lons)
+    subset_fps = cmipper_file_ops.find_files_for_area(nc_fps, lats, lons)
     if len(subset_fps) > 0:
         # arbitrarily select first suitable file
         gebco_fp = subset_fps[0]
@@ -45,7 +46,7 @@ def generate_gebco_slopes_xarray(
     # check if there exists a file spanning an adequate spatial extent
     # TODO: ideally need to buffer to allow calculation of edge cases
     nc_fps = list(gebco_xa_dir.glob("*.nc"))
-    subset_fps = file_ops.find_files_for_area(nc_fps, lats, lons)
+    subset_fps = cmipper_file_ops.find_files_for_area(nc_fps, lats, lons)
     # select fps from subset_fps which contain "slope"
     subset_slope_fps = [fp for fp in subset_fps if "slope" in str(fp)]
 
