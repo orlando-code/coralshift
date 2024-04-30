@@ -3,13 +3,13 @@ depth_mask_lims:
 - 0
 model_code: xgb_cf
 regressor_classification_threshold: 0.25
-ds_type: timeseries
+ds_type: static
 predictand: UNEP_GDCR
 datasets: 
 - cmip6
 - unep
 - gebco
-# TODO: add slopes
+- gebco_slope
 env_vars:
 - mlotst
 - rsdo
@@ -18,6 +18,10 @@ env_vars:
 - tos
 - uo
 - vo
+- hfds
+- vmo
+- umo
+- wfo
 random_state: 42
 resolution: 0.05
 resolution_unit: d
@@ -49,7 +53,7 @@ hyperparameter_search:
   n_iter: 10
   type: random
   do_search: True
-  n_trials: 4
+  n_trials: 3
   search_types:
   # - grid
   - random
