@@ -13,6 +13,28 @@ import xarray as xa
 from coralshift.processing import spatial_data
 
 
+def flatten_dict(dictionary: dict, parent_key: str = "", sep: str = "_"):
+    """
+    Recursively flattens a nested dictionary into a single-level dictionary.
+
+    Args:
+        dictionary (dict): The nested dictionary to be flattened.
+        parent_key (str, optional): The parent key to be used for the flattened keys. Defaults to an empty string.
+        sep (str, optional): The separator to be used between the parent key and the child key. Defaults to '_'.
+
+    Returns:
+        dict: The flattened dictionary.
+    """
+    items = []
+    for k, v in dictionary.items():
+        new_key = parent_key + sep + k if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+
 def is_type_or_list_of_type(obj, target_type) -> bool:
     """Checks if an object or a list/tuple of objects is of a specific type.
 
@@ -357,11 +379,13 @@ def lat_lon_vals_from_geo_df(geo_df: gpd.geodataframe, resolution: float = 1.0):
 
 
 def calc_non_zero_ratio(df, predictand=None):
-    # if df a series
     if isinstance(df, pd.Series):
         return np.where(df > 0, 1, 0).sum() / len(df)
     else:
-        return np.where(df[predictand] > 0, 1, 0).sum() / len(df)
+        try:
+            return np.where(df[predictand] > 0, 1, 0).sum() / len(df)
+        except KeyError:
+            raise ValueError(f"Predictand {predictand} not found in DataFrame")
 
 
 def lat_lon_string_from_tuples(
@@ -404,116 +428,6 @@ def extract_seafloor_vals(xa_da, indices_array):
     t_grid, j_grid, i_grid = np.ogrid[:t, :j, :i]
     # select values from vals_array using indices_array
     return vals_array[t_grid, indices_array, j_grid, i_grid]
-
-
-class FileName:
-    def __init__(
-        self,
-        variable_id: str | list,
-        grid_type: str,
-        fname_type: str,
-        date_range: str = None,
-        lats: list[float, float] = None,
-        lons: list[float, float] = None,
-        levs: list[int, int] = None,
-        plevels: list[float, float] = None,
-    ):
-        """
-        Args:
-            source_id (str): name of climate model
-            member_id (str): model run
-            variable_id (str): variable name
-            grid_type (str): type of grid (tripolar or latlon)
-            fname_type (str): type of file (individual, time-concatted, var_concatted) TODO
-            lats (list[float, float], optional): latitude range. Defaults to None.
-            lons (list[float, float], optional): longitude range. Defaults to None.
-            plevels (list[float, float], optional): pressure level range. Defaults to None.
-            fname (str, optional): filename. Defaults to None to allow construction.
-        """
-        self.variable_id = variable_id
-        self.grid_type = grid_type
-        self.fname_type = fname_type
-        self.date_range = date_range
-        self.lats = lats
-        self.lons = lons
-        self.levs = levs
-        self.plevels = plevels
-
-    def get_spatial(self):
-        if self.lats and self.lons:  # if spatial range specified (i.e. cropping)
-            # cast self.lats and self.lons lists to integers. A little crude, but avoids decimals in filenames
-            lats = [int(lat) for lat in self.lats]
-            lons = [int(lon) for lon in self.lons]
-            return lat_lon_string_from_tuples(lats, lons).upper()
-        else:
-            return "uncropped"
-
-    def get_plevels(self):
-        if self.plevels == [-1] or self.plevels == -1:  # seafloor
-            return f"sfl-{max(self.levs)}"
-        elif not self.plevels:
-            return "sfc"
-            if self.plevels[0] is None:
-                return "sfc"
-        elif isinstance(self.plevels, float):  # specified pressure level
-            return "{:.0f}".format(self.plevels / 100)
-        elif isinstance(self.plevels, list):  # pressure level range
-            if self.plevels[0] is None:  # if plevels is list of None, surface
-                return "sfc"
-            return f"levs_{min(self.plevels)}-{max(self.plevels)}"
-        else:
-            raise ValueError(
-                f"plevel must be one of [-1, float, list]. Instead received '{self.plevels}'"
-            )
-
-    def get_var_str(self):
-        if isinstance(self.variable_id, list):
-            return "_".join(self.variable_id)
-        else:
-            return self.variable_id
-
-    def get_grid_type(self):
-        if self.grid_type == "tripolar":
-            return "tp"
-        elif self.grid_type == "latlon":
-            return "ll"
-        else:
-            raise ValueError(
-                f"grid_type must be 'tripolar' or 'latlon'. Instead received '{self.grid_type}'"
-            )
-
-    def get_date_range(self):
-        if not self.date_range:
-            return None
-        if self.fname_type == "time_concatted" or self.fname_type == "var_concatted":
-            # Can't figure out how it's being done currently
-            return str("-".join((str(self.date_range[0]), str(self.date_range[1]))))
-        else:
-            return self.date_range
-
-    def join_as_necessary(self):
-        var_str = self.get_var_str()
-        spatial = self.get_spatial()
-        plevels = self.get_plevels()
-        grid_type = self.get_grid_type()
-        date_range = self.get_date_range()
-
-        # join these variables separated by '_', so long as the variable is not None
-        return "_".join(
-            [i for i in [var_str, spatial, plevels, grid_type, date_range] if i]
-        )
-
-    def construct_fname(self):
-
-        if self.fname_type == "var_concatted":
-            if not isinstance(self.variable_id, list):
-                raise TypeError(
-                    f"Concatted variable requires multiple variable_ids. Instead received '{self.variable_id}'"
-                )
-
-        self.fname = self.join_as_necessary()
-
-        return f"{self.fname}.nc"
 
 
 def year_to_datetime(year: int, xa_d: xa.DataArray | xa.Dataset = None) -> datetime:

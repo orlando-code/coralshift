@@ -160,7 +160,7 @@ def download_cmip_variable_data(
             for i, result in enumerate(relevant_results):
                 date_range = result.split("_")[-1].split(".")[0]
 
-                fname_og = utils.FileName(
+                fname_og = file_ops.FileName(
                     variable_id=variable_id,
                     grid_type="tripolar",  # TODO: get this info from the associated dataset
                     fname_type="individual",
@@ -251,7 +251,7 @@ def download_cmip_variable_data(
                     # initialise instance of Cdo for regridding
                     cdo = Cdo()
 
-                    fname_regrid = utils.FileName(
+                    fname_regrid = file_ops.FileName(
                         variable_id=variable_id,
                         grid_type="latlon",
                         fname_type="individual",
@@ -307,7 +307,7 @@ def download_cmip_variable_data(
                     if not cropped_dir_fp.exists():
                         cropped_dir_fp.mkdir(parents=True, exist_ok=True)
 
-                    fname_cropped = utils.FileName(
+                    fname_cropped = file_ops.FileName(
                         variable_id=variable_id,
                         grid_type="latlon",
                         fname_type="individual",
@@ -424,7 +424,7 @@ def concat_cmip_files_by_time(source_id, experiment_id, member_id, variable_id):
         oldest_date = str(oldest_file.name).split("_")[-1].split("-")[0]
         newest_date = str(newest_file.name).split("_")[-1].split("-")[1].split(".")[0]
 
-    fname = utils.FileName(
+    fname = file_ops.FileName(
         variable_id=variable_id,
         grid_type="latlon",
         fname_type="time_concatted",
@@ -511,7 +511,7 @@ def merge_cmip_data_by_variables(source_id, experiment_id, member_id):
     # sort vars in alphabetical for consistency between files
     vars.sort()
 
-    merged_fname = utils.FileName(
+    merged_fname = file_ops.FileName(
         variable_id=vars,
         grid_type="latlon",
         fname_type="var_concatted",
