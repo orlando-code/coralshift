@@ -1,6 +1,7 @@
 # import importlib
 # import inspect
 from pathlib import Path
+import subprocess
 
 
 # def get_coralshift_dir():
@@ -10,12 +11,23 @@ from pathlib import Path
 # setup(name="coralshift", version="0.1.0", packages=find_packages())
 
 
-def get_coralshift_module_dir():
-    return Path(__file__).resolve().parent.parent
+# def get_coralshift_module_dir():
+#     return Path(__file__).resolve().parent.parent
 
 
-def get_repo_dir():
-    return get_coralshift_module_dir().parent
+# def get_repo_dir():
+#     return get_coralshift_module_dir().parent
+
+
+def get_repo_root():
+    # Run 'git rev-parse --show-toplevel' command to get the root directory of the Git repository
+    git_root = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True
+    )
+    if git_root.returncode == 0:
+        return Path(git_root.stdout.strip())
+    else:
+        raise RuntimeError("Unable to determine Git repository root directory.")
 
 
 """
@@ -26,10 +38,11 @@ Defines globals used throughout the codebase.
 # Folder structure naming system
 ###############################################################################
 
-repo_dir = get_repo_dir()
+repo_dir = get_repo_root()
 data_dir = repo_dir / "data"
 logs_dir = repo_dir / "logs"
 runs_dir = repo_dir / "runs" / "first_run"
+runs_csv = runs_dir / "runs.csv"
 
 cmip6_data_dir = data_dir / "env_vars" / "cmip6"
 static_cmip6_data_dir = cmip6_data_dir / "EC-Earth3P-HR/r1i1p2f1_latlon"
