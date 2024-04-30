@@ -33,6 +33,7 @@ class AnalyseResults:
         trains: tuple[pd.DataFrame, pd.DataFrame] = None,
         tests: tuple[pd.DataFrame, pd.DataFrame] = None,
         vals: tuple[pd.DataFrame, pd.DataFrame] = None,
+        do_plot: bool = True,
         save_graphs: bool = True,
         config_info: dict = None,
         presentation_format: bool = False,
@@ -41,6 +42,7 @@ class AnalyseResults:
         self.trains = trains
         self.tests = tests
         self.vals = vals
+        self.do_plot: do_plot
         self.save_graphs = save_graphs
         self.config_info = config_info
         self.ds_type = None
@@ -128,15 +130,22 @@ class AnalyseResults:
         )
         self.save_fig(fn="confusion_matrix")
 
+        if not self.do_plot:
+            plt.close()
+
     def plot_regression(self, y, predictions):
         plot_regression_histograms(
             y, predictions, presentation_format=self.presentation_format
         )
         self.save_fig(fn="regression")
+        plt.close()
 
     def plot_spatial_inference_comparison(self, y, predictions):
         plot_spatial_inference_comparison(y, predictions, self.presentation_format)
         self.save_fig(fn="spatial_inference_comparison")
+
+        if not self.do_plot:
+            plt.close()
 
     def plot_spatial_confusion_matrix(self, y, predictions):
 
@@ -147,6 +156,9 @@ class AnalyseResults:
             presentation_format=self.presentation_format,
         )
         self.save_fig(fn="spatial_confusion_matrix")
+
+        if not self.do_plot:
+            plt.close()
 
         return confusion_values
 
@@ -657,11 +669,11 @@ def plot_confusion_matrix(
     -------
         None
     """
-    cmap = spatial_plots.get_cbar()
+    cmap = spatial_plots.ColourBarGenerator().get_cmap("seq")
 
     if not utils.check_discrete(predictions) or not utils.check_discrete(labels):
         labels = ml_processing.cont_to_class(labels, threshold=label_threshold)
-        predictions = ml_processing.cont_to_classy(
+        predictions = ml_processing.cont_to_class(
             predictions, threshold=label_threshold
         )
 
@@ -703,7 +715,7 @@ def plot_train_test_spatial(
         figsize=figsize, subplot_kw=dict(projection=ccrs.PlateCarree())
     )
 
-    cmap = spatial_plots.get_cbar()
+    cmap = spatial_plots.ColourBarGenerator().get_cmap("seq")
     bounds = [0, 0.5, 1]
     if bath_mask.any():
         xa_da = xa_da.where(bath_mask, np.nan)
