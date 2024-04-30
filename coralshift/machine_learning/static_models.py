@@ -369,6 +369,11 @@ class RunStaticML:
             "additional_info": self.additional_info if self.additional_info else None,
         }
         file_ops.edit_yaml(config_fp, file_info)
+        yaml_dict = file_ops.read_yaml(config_fp)
+        # write updated yaml to csv
+        file_ops.write_yaml_to_csv(
+            yaml_dict, config.runs_csv
+        )
         return model
 
 
