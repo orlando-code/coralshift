@@ -231,7 +231,11 @@ class ReturnRaster:
             # TODO: potentially tidy variable assignment in find_intersecting_cmip
             # TODO: this returns all variables in the file searched, not the subset. Also returns tim_bnds as a variable
             raster, _ = cmipper_file_ops.find_intersecting_cmip(
-                self.env_vars, lats=self.lats, lons=self.lons, levs=self.levs
+                self.env_vars,
+                lats=self.lats,
+                lons=self.lons,
+                year_range=self.year_range_to_include,
+                levs=self.levs,
             )
 
             if self.ds_type == "static":

@@ -15,7 +15,8 @@ import xarray as xa
 
 # custom
 # from coralshift.dataloading import get_data
-from coralshift.dataloading.get_data import ReturnRaster, adaptive_depth_mask
+# from coralshift.dataloading.get_data import ReturnRaster, adaptive_depth_mask
+from coralshift.dataloading import get_data
 from coralshift.utils import utils
 
 
@@ -93,7 +94,7 @@ class ProcessMLData:
         for dataset in self.datasets:
             # TODO: other ways to handle this for timeseries i.e. combining static and timeseries
             dss.append(
-                ReturnRaster(
+                get_data.ReturnRaster(
                     dataset=dataset,
                     lats=self.lats,
                     lons=self.lons,
@@ -278,7 +279,7 @@ def ds_to_ml_ready(
         pred for pred in df.columns if pred != predictand and pred not in exclude_list
     ]
 
-    df_masked = adaptive_depth_mask(
+    df_masked = get_data.adaptive_depth_mask(
         df,
         depth_mask_lims=depth_mask_lims,
         pos_neg_ratio=pos_neg_ratio,
