@@ -158,7 +158,7 @@ def get_n_colors_from_hexes(
     return hex_codes
 
 
-def get_cbar(cbar_type: str = "seq"):
+class ColourBarGenerator:
     """
     Get a colormap for colorbar based on the specified type.
 
@@ -171,25 +171,31 @@ def get_cbar(cbar_type: str = "seq"):
     -------
     matplotlib.colors.LinearSegmentedColormap: The colormap object.
     """
-    if cbar_type == "seq":
-        return get_continuous_cmap(
-            ["#3B9AB2", "#78B7C5", "#EBCC2A", "#E1AF00", "#d83c04"]
-        )
-    elif cbar_type == "div":
-        return get_continuous_cmap(
-            ["#3B9AB2", "#78B7C5", "#FFFFFF", "#E1AF00", "#d83c04"]
-        )
-    elif cbar_type == "lim":
-        return get_continuous_cmap(["#78B7C5", "#EBCC2A", "#E1AF00"])
-    elif cbar_type == "spatial_conf_matrix":
-        # TODO: correct (for plot_spatial_confusion)
-        colors = ["#EEEEEE", "#3B9AB2", "#cae7ed", "#d83c04", "#E1AF00"]
-        # return mpl.colors.ListedColormap(colors)
-        return mcolors.ListedColormap(colors)
-    elif isinstance(cbar_type, list):
-        return get_continuous_cmap(cbar_type)
-    else:
-        raise ValueError(f"{cbar_type} not recognised.")
+
+    def __init__(self):
+        self.sequential_hexes = ["#3B9AB2", "#78B7C5", "#EBCC2A", "#E1AF00", "#d83c04"]
+        self.diverging_hexes = ["#3B9AB2", "#78B7C5", "#FFFFFF", "#E1AF00", "#d83c04"]
+        self.conf_mat_hexes = ["#EEEEEE", "#3B9AB2", "#cae7ed", "#d83c04", "#E1AF00"]
+        # self.da = da
+
+    def get_cmap(self, cbar_type, vmin=None, vmax=None):
+        if cbar_type == "seq":
+            return get_continuous_cmap(self.sequential_hexes)
+        elif cbar_type == "div":
+            if not (vmin and vmax):
+                raise ValueError(
+                    "Minimum and maximum values needed for divergent colorbar"
+                )
+            cmap = get_continuous_cmap(self.diverging_hexes)
+            norm = mcolors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
+            return cmap, norm
+            # return get_continuous_cmap(self.diverging_hexes)
+        elif cbar_type == "lim":
+            return get_continuous_cmap(["#78B7C5", "#EBCC2A", "#E1AF00"])
+        elif cbar_type == "spatial_conf_matrix":
+            return mcolors.ListedColormap(self.conf_mat_hexes)
+        else:
+            raise ValueError(f"{cbar_type} not recognised.")
 
 
 def generate_geo_axis(
@@ -202,18 +208,12 @@ def plot_spatial(
     xa_da: xa.DataArray,
     fax: Axes = None,
     title: str = None,
-    cbar_name: str = None,
     figsize: tuple[float, float] = (10, 10),
     val_lims: tuple[float, float] = None,
     cmap_type: str = "seq",
-    symmetric: bool = False,
-    edgecolor: str = "black",
-    cbar: bool = True,
-    cbar_orientation: str = "vertical",
-    cbar_pad: float = 0.1,
-    cbar_frac: float = 0.046,
     presentation_format: bool = False,
     labels: list[str] = False,
+    cbar_dict: dict = None,
     label_style_dict: dict = None,
     map_proj=ccrs.PlateCarree(),
     alpha: float = 1,
@@ -246,12 +246,24 @@ def plot_spatial(
     else:
         fig, ax = fax[0], fax[1]
 
-    # if not name, and data array:
-    if isinstance(xa_da, xa.DataArray) and not cbar_name:
-        cbar_name = xa_da.name
-    elif isinstance(xa_da, xa.Dataset) and not cbar_name:
-        cbar_name = list(xa_da.data_vars)[0]
+    default_cbar_dict = {
+        "cbar_name": None,
+        "cbar": True,
+        "cbar_orientation": "vertical",
+        "cbar_pad": 0.1,
+        # "cbar_frac": 0.046,
+        "cbar_frac": 0.025,
+    }
 
+    if cbar_dict:
+        for k, v in cbar_dict.items():
+            default_cbar_dict[k] = v
+
+    # if not cbarn_name specified, make name of variable
+    if isinstance(xa_da, xa.DataArray) and not default_cbar_dict["cbar_name"]:
+        cbar_name = xa_da.name
+
+    # if title not specified, make title of variable at resolution
     if not title:
         resolution_d = np.mean(spatial_data.calculate_spatial_resolution(xa_da))
         resolution_m = np.mean(spatial_data.degrees_to_distances(resolution_d))
@@ -263,28 +275,25 @@ def plot_spatial(
     else:
         vmin, vmax = min(val_lims), max(val_lims)
 
-    cmap = get_cbar(cmap_type)
-
-    # if choosing colorbar to be centred arouoond zero (e.g. for highlighting residuals)
-    if symmetric:
-        vmin, vmax = (-vmax, vmax) if abs(vmin) > abs(vmax) else (vmin, -vmin)
+    if cmap_type == "div":
+        cmap, norm = ColourBarGenerator().get_cmap(cmap_type, vmin, vmax)
+    else:
+        cmap = ColourBarGenerator().get_cmap(cmap_type)
 
     im = xa_da.plot(
         ax=ax,
         cmap=cmap,
         vmin=vmin,
         vmax=vmax,
-        add_colorbar=False,
+        add_colorbar=False,  # for further formatting later
         transform=ccrs.PlateCarree(),
         alpha=alpha,
+        norm=norm if cmap_type == "div" else None,
     )
 
     if presentation_format:
         fig, ax = customize_plot_colors(fig, ax)
-        # cbar = False
-        ax.tick_params(axis="both", which="both", length=0)
-        # title = None
-        # ax.set_global()  # very cool but usually unnecessary
+        # ax.tick_params(axis="both", which="both", length=0)
 
     # nicely format spatial plot
     format_spatial_plot(
@@ -292,18 +301,83 @@ def plot_spatial(
         fig=fig,
         ax=ax,
         title=title,
-        cbar_name=cbar_name,
-        cbar=cbar,
-        cbar_orientation=cbar_orientation,
-        cbar_pad=cbar_pad,
-        cbar_frac=cbar_frac,
-        edgecolor=edgecolor,
+        # cbar_name=cbar_name,
+        cbar=default_cbar_dict["cbar"],
+        # cbar_orientation=default_cbar_dict["cbar_orientation"],
+        # cbar_pad=default_cbar_dict["cbar_pad"],
+        # cbar_frac=default_cbar_dict["cbar_frac"],
         presentation_format=presentation_format,
         labels=labels,
+        cbar_dict=default_cbar_dict,
         label_style_dict=label_style_dict,
     )
 
     return fig, ax, im
+
+
+def format_cbar(image, fig, ax, cbar_dict, labels):
+
+    if cbar_dict["cbar_orientation"] == "vertical":
+        cbar_rect = [
+            ax.get_position().x1 + 0.01,
+            ax.get_position().y0,
+            0.02,
+            ax.get_position().height,
+        ]
+        labels = [el if el != "r" else "l" for el in labels]
+    else:
+        cbar_rect = [
+            ax.get_position().x0,
+            ax.get_position().y0 - 0.04,
+            ax.get_position().width,
+            0.02,
+        ]
+        labels = [el if el != "b" else "t" for el in labels]
+    cax = fig.add_axes(cbar_rect)
+
+    cb = plt.colorbar(
+        image,
+        orientation=cbar_dict["cbar_orientation"],
+        label=cbar_dict["cbar_name"],
+        cax=cax,
+    )
+    if cbar_dict["cbar_orientation"] == "horizontal":
+        cbar_ticks = cb.ax.get_xticklabels()
+    else:
+        cbar_ticks = cb.ax.get_yticklabels()
+
+    return cb, cbar_ticks, labels
+
+
+def format_cartopy_display(ax, cartopy_dict: dict = None):
+
+    default_cartopy_dict = {
+        "category": "physical",
+        "name": "land",
+        "scale": "10m",
+        "edgecolor": "black",
+        "facecolor": (0, 0, 0, 0),  # "none"
+        "linewidth": 0.5,
+        "alpha": 0.3,
+    }
+
+    if cartopy_dict:
+        for k, v in cartopy_dict.items():
+            default_cartopy_dict[k] = v
+
+    ax.add_feature(
+        cfeature.NaturalEarthFeature(
+            default_cartopy_dict["category"],
+            default_cartopy_dict["name"],
+            default_cartopy_dict["scale"],
+            edgecolor=default_cartopy_dict["edgecolor"],
+            facecolor=default_cartopy_dict["facecolor"],
+            linewidth=default_cartopy_dict["linewidth"],
+            alpha=default_cartopy_dict["alpha"],
+        )
+    )
+
+    return ax
 
 
 def format_spatial_plot(
@@ -311,14 +385,12 @@ def format_spatial_plot(
     fig: Figure,
     ax: Axes,
     title: str = None,
-    cbar_name: str = "",
     cbar: bool = True,
-    cbar_orientation: str = "horizontal",
-    cbar_pad: float = 0.1,
-    cbar_frac: float = 0.046,
-    edgecolor: str = "black",
+    cmap_type: str = "seq",
     presentation_format: bool = False,
     labels: list[str] = False,
+    cbar_dict: dict = None,
+    cartopy_dict: dict = None,
     label_style_dict: dict = None,
 ) -> tuple[Figure, Axes]:
     """Format a spatial plot with a colorbar, title, coastlines and landmasses, and gridlines.
@@ -343,30 +415,9 @@ def format_spatial_plot(
         Figure, Axes
     """
     if cbar:
-        cb = plt.colorbar(
-            image,
-            orientation=cbar_orientation,
-            label=cbar_name,
-            pad=cbar_pad,
-            fraction=cbar_frac,
-        )
-        if cbar_orientation == "horizontal":
-            cbar_ticks = cb.ax.get_xticklabels()
-        else:
-            cbar_ticks = cb.ax.get_yticklabels()
+        cb, cbar_ticks, labels = format_cbar(image, fig, ax, cbar_dict, labels)
 
-    ax.add_feature(
-        cfeature.NaturalEarthFeature(
-            "physical",
-            "land",
-            "10m",
-            edgecolor="black",
-            # facecolor=(0, 0, 0, 0),
-            facecolor="none",
-            linewidth=0.5,
-            alpha=1,
-        )
-    )
+    ax = format_cartopy_display(ax, cartopy_dict)
     ax.set_title(title)
 
     # format ticks, gridlines, and colours
@@ -374,7 +425,9 @@ def format_spatial_plot(
     default_label_style_dict = {"fontsize": 12, "color": "black", "rotation": 45}
 
     gl = ax.gridlines(
-        crs=ccrs.PlateCarree(), draw_labels=True, x_inline=False, y_inline=False
+        crs=ccrs.PlateCarree(),
+        draw_labels=True,
+        # x_inline=False, y_inline=False
     )
 
     if label_style_dict:
@@ -384,17 +437,17 @@ def format_spatial_plot(
         default_label_style_dict["color"] = "white"
         if cbar:
             plt.setp(cbar_ticks, color="white")
-            cb.set_label("colorbar label", color="white")
+            cb.set_label(cbar_dict["cbar_name"], color="white")
 
-    if labels:  # TODO: not sure that this is being passed through correctly
+    gl.xlabel_style = default_label_style_dict
+    gl.ylabel_style = default_label_style_dict
+
+    if labels:
         # convert labels to relevant boolean: ["t","r","b","l"]
         gl.top_labels = "t" in labels
         gl.bottom_labels = "b" in labels
         gl.left_labels = "l" in labels
         gl.right_labels = "r" in labels
-
-    gl.xlabel_style = default_label_style_dict
-    gl.ylabel_style = default_label_style_dict
 
     return fig, ax
 
