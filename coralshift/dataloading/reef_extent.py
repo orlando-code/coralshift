@@ -1,8 +1,8 @@
 import json
 import pandas as pd
 import geopandas as gpd
-import numpy as np
-import rasterio
+# import numpy as np
+# import rasterio
 import xarray as xa
 from tqdm import tqdm
 
@@ -118,52 +118,52 @@ def process_benthic_pd(
     return gpd.GeoDataFrame(filtered_df, geometry=geometry_col)
 
 
-def rasterize_gdf(gdf: gpd.GeoDataFrame, chunk_size: int = 100):
-    """Rasterizes a GeoDataFrame into a raster array.
-    N.B. prohibitively computationally-expensive to run locally
+# def rasterize_gdf(gdf: gpd.GeoDataFrame, chunk_size: int = 100):
+#     """Rasterizes a GeoDataFrame into a raster array.
+#     N.B. prohibitively computationally-expensive to run locally
 
-    Parameters
-    ----------
-        gdf (gpd.GeoDataFrame): The GeoDataFrame containing the geometries to rasterize.
-        chunk_size (int, optional): The size of the chunks to process the GeoDataFrame. Defaults to 100.
+#     Parameters
+#     ----------
+#         gdf (gpd.GeoDataFrame): The GeoDataFrame containing the geometries to rasterize.
+#         chunk_size (int, optional): The size of the chunks to process the GeoDataFrame. Defaults to 100.
 
-    Returns
-    -------
-        np.ndarray: The rasterized array representing the GeoDataFrame.
-    """
+#     Returns
+#     -------
+#         np.ndarray: The rasterized array representing the GeoDataFrame.
+#     """
 
-    # Prepare raster parameters
-    lon_min, lat_min, lon_max, lat_max = gdf.total_bounds
-    (lat_distance, lon_distance) = spatial_data.degrees_to_distances(
-        lat_max - lat_min,
-        lon_max - lon_min,
-        np.mean((lat_min, lat_max)),
-        np.mean((lon_max, lon_min)),
-    )
-    width = int(lon_distance)
-    height = int(lat_distance)
-    pixel_size = 5
-    transform = rasterio.transform.from_origin(
-        lon_min, lat_max, xsize=pixel_size, ysize=pixel_size
-    )
+#     # Prepare raster parameters
+#     lon_min, lat_min, lon_max, lat_max = gdf.total_bounds
+#     (lat_distance, lon_distance) = spatial_data.degrees_to_distances(
+#         lat_max - lat_min,
+#         lon_max - lon_min,
+#         np.mean((lat_min, lat_max)),
+#         np.mean((lon_max, lon_min)),
+#     )
+#     width = int(lon_distance)
+#     height = int(lat_distance)
+#     pixel_size = 5
+#     transform = rasterio.transform.from_origin(
+#         lon_min, lat_max, xsize=pixel_size, ysize=pixel_size
+#     )
 
-    # Create an empty raster array
-    raster_array = np.zeros((height, width), dtype=np.uint8)  # Use the desired dtype
+#     # Create an empty raster array
+#     raster_array = np.zeros((height, width), dtype=np.uint8)  # Use the desired dtype
 
-    # Process the geodataframe in chunks
-    for i in tqdm(range(0, len(gdf), chunk_size), desc="Rasterizing chunks"):
-        # Get the chunk of data
-        chunk = gdf.iloc[i : i + chunk_size]  # noqa
+#     # Process the geodataframe in chunks
+#     for i in tqdm(range(0, len(gdf), chunk_size), desc="Rasterizing chunks"):
+#         # Get the chunk of data
+#         chunk = gdf.iloc[i : i + chunk_size]  # noqa
 
-        # Get the shapes and values for the chunk
-        shapes = (
-            (geom, value) for geom, value in zip(chunk.geometry, chunk["class_val"])
-        )
+#         # Get the shapes and values for the chunk
+#         shapes = (
+#             (geom, value) for geom, value in zip(chunk.geometry, chunk["class_val"])
+#         )
 
-        # Rasterize the shapes in the chunk
-        out = rasterio.rasterize(shapes=shapes, out=raster_array, transform=transform)
+#         # Rasterize the shapes in the chunk
+#         out = rasterio.rasterize(shapes=shapes, out=raster_array, transform=transform)
 
-    return out
+#     return out
 
 
 def process_coral_gt_tifs(tif_dir_name=None, target_resolution_d: float = None):

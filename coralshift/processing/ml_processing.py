@@ -2,16 +2,21 @@
 import numpy as np
 import pandas as pd
 
+# from shapely.geometry import Point
+
 # file handling
 import calendar
 from tqdm.auto import tqdm
+from pathlib import Path
 
 # machine learning
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, FunctionTransformer
 from sklearn.model_selection import train_test_split
+import elapid as ela
 
 # spatial
 import xarray as xa
+import geopandas as gpd
 
 # custom
 # from coralshift.dataloading import get_data
@@ -38,76 +43,36 @@ class ProcessMLData:
 
     def __init__(
         self,
-        model_data: str = "static",
-        datasets: list[str] = ["cmip6", "unep", "gebco"],
-        train_test_val_frac: list = [0.8, 0.2, 0],
-        X_scaler: str = "minmax",
-        y_scaler: str = "log",
-        split_type: str = "pixelwise",
-        depth_mask_lims: list[float, float] = [
-            -50,
-            0,
-        ],  # TODO: user-specified or calculated as a fraction of class imbalance?
-        lats: list[float, float] = [-40, 0],
-        lons: list[float, float] = [130, 170],
-        levs: list[int, int] = [0, 20],
-        resolution: float = 1,
-        pos_neg_ratio: float = 0.1,
-        resolution_unit: str = "d",
-        upsample_method: str = "linear",
-        downsample_method: str = "mean",
-        env_vars: list[str] = [
-            "rsdo",
-            # "mlotst", "so", "thetao", "uo", "vo", "tos"
-        ],
-        predictand: str = "UNEP_GDCR",
-        year_range_to_include: list[int, int] = [1950, 2014],
-        random_state: int = 42,
         config_info: dict = None,
     ):
-        self.model_data = model_data
-        self.datasets = datasets
-        self.train_test_val_frac = train_test_val_frac
-        self.X_scaler = X_scaler
-        self.y_scaler = y_scaler
-        self.split_type = split_type
-        self.depth_mask_lims = depth_mask_lims
-        self.lats = lats
-        self.lons = lons
-        self.levs = levs
-        self.resolution = resolution
-        self.resolution_unit = resolution_unit
-        self.upsample_method = upsample_method
-        self.downsample_method = downsample_method
-        self.env_vars = env_vars
-        self.predictand = predictand
-        self.year_range_to_include = year_range_to_include
-        self.random_state = random_state
-        self.config_info = config_info
-        self.pos_neg_ratio = pos_neg_ratio
+        # self.config_info = config_info
 
         if config_info:
             self.__dict__.update(config_info)
+        self.config_info = config_info
 
     def get_merged_datasets(self):
         dss = []
-        for dataset in self.datasets:
+        datasets = self.datasets
+        if not ("gebco" in datasets or "bathymetry" in datasets):
+            datasets.append("gebco")
+
+        for dataset in datasets:
             # TODO: other ways to handle this for timeseries i.e. combining static and timeseries
             dss.append(
                 get_data.ReturnRaster(
-                    dataset=dataset,
                     lats=self.lats,
                     lons=self.lons,
                     levs=self.levs,
                     resolution=self.resolution,
                     upsample_method=self.upsample_method,
                     downsample_method=self.downsample_method,
-                    ds_type=self.model_data,
+                    ds_type=self.ds_type,
                     env_vars=self.env_vars,
                     year_range_to_include=self.year_range_to_include,
                     resolution_unit=self.resolution_unit,
                     config_info=self.config_info,
-                ).return_raster()
+                ).return_raster(dataset=dataset)
             )
 
         return xa.merge(dss)
@@ -122,32 +87,70 @@ class ProcessMLData:
         df_X, df_y = ds_to_ml_ready(
             xa_ds,
             predictand=self.return_predictand(),
-            pos_neg_ratio=self.pos_neg_ratio,
-            depth_mask_lims=self.depth_mask_lims,
+            depth_mask=self.config_info["depth_mask"]
         )
+        # if elevation not requested, drop (needed to be included to generate the shallow water mask)
+        if not ("gebco" in self.datasets or "bathymetry" in self.datasets):
+            print("\nDropping elevation since not a specified covariate")
+            df_X.drop(columns="elevation", inplace=True)
 
-        trains, tests, vals = train_test_val_split(
-            df_X,
-            df_y,
-            ttv_fractions=self.train_test_val_frac,
-            split_method=self.split_type,
-            random_state=self.random_state,
-        )
+        if self.split_type == "pixelwise":
+            trains, tests, vals = train_test_val_split(
+                df_X,
+                df_y,
+                ttv_fractions=self.train_test_val_frac,
+                split_method=self.split_type,
+                random_state=self.random_state,
+            )
+        elif self.split_type == "checkerboard":
+            grid_size = 1  # 1 degree grid  # TODO: make adjustable?
+            if grid_size <= self.resolution:
+                grid_size *= 2
+
+            merged_df = pd.concat([df_X, df_y], axis=1)
+            loose_index_df = merged_df.reset_index()
+            # create geometry column from latitude longitude index
+            geo_df = gpd.GeoDataFrame(
+                loose_index_df,
+                geometry=gpd.points_from_xy(
+                    loose_index_df.longitude, loose_index_df.latitude
+                ),
+                crs="EPSG:4326",
+            )
+
+            trains_Xy, tests_Xy = ela.checkerboard_split(geo_df, grid_size=grid_size)
+            # return geo_df, geo_df, geo_df
+
+            trains = (
+                trains_Xy.drop(columns=[self.predictand, "geometry"]).set_index(
+                    ["latitude", "longitude"]
+                ),
+                trains_Xy.drop(columns="geometry").set_index(["latitude", "longitude"])[
+                    self.predictand
+                ],
+            )
+            tests = (
+                tests_Xy.drop(columns=[self.predictand, "geometry"]).set_index(
+                    ["latitude", "longitude"]
+                ),
+                tests_Xy.drop(columns="geometry").set_index(["latitude", "longitude"])[
+                    self.predictand
+                ],
+            )
+            vals = tests
 
         return trains, tests, vals
 
-    def initialise_data_scaler(self):
-        scaler_type = self.X_scaler
-        if scaler_type == "minmax":
+    def initialise_data_scaler(self, scaler):
+        if scaler == "minmax":
             return MinMaxScaler()
-        elif scaler_type == "standard":
+        elif scaler == "standard":
             return StandardScaler()
-        elif scaler_type == "log":
+        elif scaler == "log":   # functioning weirdly
             return FunctionTransformer(log_transform)
 
     def get_fitted_scaler(self, trains=None, tests=None, vals=None):
-        X_scaler = self.initialise_data_scaler()
-        # y_scaler = self.initialise_data_scaler(self.y_scaler)
+        X_scaler = self.initialise_data_scaler(self.X_scaler)
         # fit scaler
         if (trains and tests and vals) is None:
             trains, tests, vals = self.split_dataset()
@@ -162,7 +165,8 @@ class ProcessMLData:
         # trains, tests, vals = self.split_dataset()
 
         if self.y_scaler:
-            y_scaler = self.initialise_data_scaler()
+            # if not self.y_scaler:
+            y_scaler = self.initialise_data_scaler(self.y_scaler)
             # fit scaler
             print("\tfitting scaler to y data...")
             y_scaler.fit(pd.DataFrame(trains[1]))
@@ -173,15 +177,16 @@ class ProcessMLData:
         X_test_scaled = X_scaler.transform(tests[0])
         X_val_scaled = X_scaler.transform(vals[0])
 
-        y_train_scaled = y_scaler.transform(
-            pd.DataFrame(trains[1]) if y_scaler else pd.DataFrame(trains[1])
-        )
-        y_test_scaled = y_scaler.transform(
-            pd.DataFrame(tests[1]) if y_scaler else pd.DataFrame(tests[1])
-        )
-        y_val_scaled = y_scaler.transform(
-            pd.DataFrame(vals[1]) if y_scaler else pd.DataFrame(vals[1])
-        )
+        # return y_scaler
+
+        if self.y_scaler:
+            y_train_scaled = y_scaler.transform(pd.DataFrame(trains[1]))
+            y_test_scaled = y_scaler.transform(pd.DataFrame(tests[1]))
+            y_val_scaled = y_scaler.transform(pd.DataFrame((vals[1])))
+        else:
+            y_train_scaled = trains[1].to_numpy().flatten()
+            y_test_scaled = tests[1].to_numpy().flatten()
+            y_val_scaled = vals[1].to_numpy().flatten()
 
         # return scaled dataframes (now np arrays) as dataframes with their original indices
         return (
@@ -189,19 +194,19 @@ class ProcessMLData:
                 pd.DataFrame(
                     X_train_scaled, index=trains[0].index, columns=trains[0].columns
                 ),
-                pd.Series(y_train_scaled.flatten(), index=trains[1].index),
+                pd.Series(y_train_scaled[:, 0], index=trains[1].index),
             ),
             (
                 pd.DataFrame(
                     X_test_scaled, index=tests[0].index, columns=tests[0].columns
                 ),
-                pd.Series(y_test_scaled.flatten(), index=tests[1].index),
+                pd.Series(y_test_scaled[:, 0], index=tests[1].index),
             ),
             (
                 pd.DataFrame(
                     X_val_scaled, index=vals[0].index, columns=vals[0].columns
                 ),
-                pd.Series(y_val_scaled.flatten(), index=vals[1].index),
+                pd.Series(y_val_scaled[:, 0], index=vals[1].index),
             ),
         )
 
@@ -213,38 +218,50 @@ class ProcessMLData:
                 "val_pos_neg_ratio": float(utils.calc_non_zero_ratio(vals[1])),
             },
             # TODO: get actual values here somehow
-            "balanced_depth_lims": {
-                "train": [
-                    min(trains[0]["elevation"]),
-                    max(trains[0]["elevation"]),
-                ],
-                "test": [
-                    min(tests[0]["elevation"]),
-                    max(tests[0]["elevation"]),
-                ],
-                "val": [
-                    min(vals[0]["elevation"]),
-                    max(vals[0]["elevation"]),
-                ],
-            },
+            # TODO: removed this since not always wanting to include elevation
+            # "balanced_depth_lims": {
+            #     "train": [
+            #         min(trains[0]["elevation"]),
+            #         max(trains[0]["elevation"]),
+            #     ],
+            #     "test": [
+            #         min(tests[0]["elevation"]),
+            #         max(tests[0]["elevation"]),
+            #     ],
+            #     "val": [
+            #         min(vals[0]["elevation"]),
+            #         max(vals[0]["elevation"]),
+            #     ],
+            # },
         }
 
-    def generate_ml_ready_data(self):
+    def generate_ml_ready_data_from_multifiles(self, dp):
         # get merged datasets
-        ds = self.get_merged_datasets()
+        ds = xa.open_mfdataset(Path(dp).rglob("*.nc"))
         # split and scale dataset
+        # return ds
         trains, tests, vals = self.split_dataset(ds)
         ds_info = self.get_ds_info(trains, tests, vals)
         # scale data
         return self.scale_data(trains, tests, vals), ds_info
 
+    def generate_ml_ready_data(self):
+        # get merged datasets
+        ds = self.get_merged_datasets()
+        # split and scale dataset
+        # return ds
+        trains, tests, vals = self.split_dataset(ds)
+        ds_info = self.get_ds_info(trains, tests, vals)
+        # scale data
+        return self.scale_data(trains, tests, vals), ds_info
+        # return trains, tests, vals, ds_info
 
-# TODO: should this be separated out into multiple functions?
+
 def ds_to_ml_ready(
     xa_ds: xa.Dataset,
     predictand: str = "UNEP_GDCR",
-    pos_neg_ratio: float = 0.1,
-    depth_mask_lims: tuple[float, float] = [-50, 0],
+    target_pos_neg_ratio: float = 0.1,
+    initial_depth_mask_lims: tuple[float, float] = [0, 10],
     exclude_list: list[str] = [
         "latitude",
         "longitude",
@@ -255,6 +272,7 @@ def ds_to_ml_ready(
         "spatial_ref",
     ],
     remove_rows: bool = True,
+    depth_mask: bool = [-100, 25],
 ) -> tuple[pd.DataFrame, pd.Series]:
     """
     Convert an xarray Dataset to a format suitable for machine learning.
@@ -271,33 +289,152 @@ def ds_to_ml_ready(
     Returns:
         tuple[pd.DataFrame, pd.Series]: The converted features (X) and target variable (y).
     """
-    # de-dask and convert to dataframe
-    df = xa_ds.compute().to_dataframe()
-    # TODO: implement checking for empty dfs
+    # check for predictand and depth variable
+    if predictand not in xa_ds:
+        raise ValueError("Predictand variable not found in xarray dataset")
+    if "elevation" not in xa_ds:
+        raise ValueError("Depth variable not found in xarray dataset")
 
     predictors = [
-        pred for pred in df.columns if pred != predictand and pred not in exclude_list
+        pred for pred in xa_ds.variables if pred != predictand and pred not in exclude_list
     ]
 
-    df_masked = get_data.adaptive_depth_mask(
-        df,
-        depth_mask_lims=depth_mask_lims,
-        pos_neg_ratio=pos_neg_ratio,
-        remove_rows=remove_rows,
-        predictand=predictand,
-        depth_var="elevation",
-    )
+    if isinstance(depth_mask, list):
+        xa_masked = xa_ds.where((xa_ds["elevation"] >= depth_mask[0]) & (xa_ds["elevation"] <= depth_mask[1]))
+    elif depth_mask == "adaptive":
+        xa_masked = adaptive_xarray_depth_mask(
+            xa_ds,
+            initial_depth_mask_lims=initial_depth_mask_lims,
+            predictand=predictand,
+            depth_var="elevation",
+        )
+    else:
+        depth_mask = xa_ds
 
-    df_nanned = onehot_nan(df_masked, discard_nanrows=remove_rows)
-    # # encode any rows containing nans to additional column
-    # df_masked["nan_onehot"] = df_masked.isna().any(axis=1).astype(int)
-    # # fill any nans with zeros
-    # df_masked = df_masked.fillna(0)
+    df = xa_masked.to_dataframe()
+    # remove nans
+    df_nanned = onehot_nan(df, discard_nanrows=remove_rows)
+    return df_nanned[predictors], df_nanned[predictand]
 
-    X = df_nanned[predictors]
-    y = df_nanned[predictand]
 
-    return X, y
+def adaptive_xarray_depth_mask(
+    xa_ds,
+    initial_depth_mask_lims=[0, 10],
+    predictand="UNEP_GDCR",
+    depth_var="elevation",
+    tolerance=0.0001  # Tolerance for detecting significant changes in ratio
+):
+    """
+    Adaptively mask an xarray dataset based on depth, aiming to maximize the positive/negative ratio.
+    """
+    lower_limit, upper_limit = initial_depth_mask_lims
+    step_size = 10  # Initial step size for decreasing the lower limit
+    max_iterations = 1000  # Maximum number of iterations to prevent infinite loops
+    no_change_limit = 20  # Number of iterations to wait before stopping if no significant change
+    iteration = 0
+    last_ratios = []
+
+    while iteration < max_iterations:
+        # Create the mask based on current limits
+        elevation_mask = (xa_ds[depth_var] >= lower_limit) & (xa_ds[depth_var] <= upper_limit)
+        masked = xa_ds[predictand].where(elevation_mask, np.nan)    # limit to predictand to save compute
+
+        # Calculate the ratio of non-zero, non-NaN values in the predictand
+        num_non_zero = np.count_nonzero(~np.isnan(masked.values) & (masked.values != 0))
+        total_points = masked.sizes["latitude"] * masked.sizes["longitude"]
+        current_ratio = num_non_zero / total_points
+
+        # Print the current ratio for debugging purposes
+        # print(f"Iteration {iteration}: lower_limit={lower_limit}, current_ratio={current_ratio:.4f}")
+
+        # Track changes in ratio
+        last_ratios.append(current_ratio)
+        if len(last_ratios) > no_change_limit:
+            last_ratios.pop(0)
+
+        # Check if there is no significant change in the ratio
+        if len(last_ratios) == no_change_limit and max(last_ratios) - min(last_ratios) < tolerance:
+            # print("No significant change detected, stopping search.")
+            return xa_ds.where(elevation_mask, np.nan)
+
+        # Decrease the lower limit
+        lower_limit -= step_size
+
+        iteration += 1
+
+    # If the loop completes without finding a significant maximum, return the last masked dataset
+    # print(f"Maximum iterations reached. Final ratio: {current_ratio:.4f}")
+    return xa_ds.where(elevation_mask, np.nan)
+
+
+# TODO: should this be separated out into multiple functions?
+# def ds_to_ml_ready(
+#     xa_ds: xa.Dataset,
+#     predictand: str = "UNEP_GDCR",
+#     pos_neg_ratio: float = 0.1,
+#     depth_mask_lims: tuple[float, float] = [-50, 0],
+#     exclude_list: list[str] = [
+#         "latitude",
+#         "longitude",
+#         "latitude_grid",
+#         "longitude_grid",
+#         "crs",
+#         "depth",
+#         "spatial_ref",
+#     ],
+#     remove_rows: bool = True,
+# ) -> tuple[pd.DataFrame, pd.Series]:
+#     """
+#     Convert an xarray Dataset to a format suitable for machine learning.
+
+#     Args:
+#         xa_ds (xa.Dataset): The xarray Dataset to convert.
+#         predictand (str, optional): The name of the ground truth variable. Defaults to "UNEP_GDCR".
+#         pos_neg_ratio (float, optional): The ratio of positive to negative samples for classification.
+#   Defaults to 0.1.
+#         depth_mask_lims (tuple[float, float], optional): The depth limits to use for masking. Defaults to [-50, 0].
+#         exclude_list (list[str], optional): List of variables to exclude from the conversion.
+#             Defaults to ["latitude", "longitude", "latitude_grid", "longitude_grid", "crs", "depth", "spatial_ref"].
+#         remove_rows (bool, optional): Whether to remove rows beyond depth limits. Defaults to True.
+
+#     Returns:
+#         tuple[pd.DataFrame, pd.Series]: The converted features (X) and target variable (y).
+#     """
+#     # de-dask and convert to dataframe
+#     df = xa_ds.compute().to_dataframe()
+#     # checking for empty dfs
+#     if len(df) == 0:
+#         raise ValueError("Empty dataframe returned from xarray dataset")
+
+#     df["latitude"] = df.index.get_level_values("latitude").round(5)
+#     df["longitude"] = df.index.get_level_values("longitude").round(5)
+
+#     # assign rounded values to multiindex of df
+#     df = df.set_index(["latitude", "longitude"])
+
+#     predictors = [
+#         pred for pred in df.columns if pred != predictand and pred not in exclude_list
+#     ]
+
+#     df_masked = get_data.adaptive_depth_mask(
+#         df,
+#         depth_mask_lims=depth_mask_lims,
+#         pos_neg_ratio=pos_neg_ratio,
+#         remove_rows=remove_rows,
+#         predictand=predictand,
+#         depth_var="elevation",
+#     )
+
+#     df_nanned = onehot_nan(df_masked, discard_nanrows=remove_rows)
+#     # # encode any rows containing nans to additional column
+#     # df_masked["nan_onehot"] = df_masked.isna().any(axis=1).astype(int)
+#     # # fill any nans with zeros
+#     # df_masked = df_masked.fillna(0)
+
+#     X = df_nanned[predictors]
+#     y = df_nanned[predictand]
+
+#     return X, y
 
 
 def onehot_nan(df, discard_nanrows: bool = True):
@@ -411,6 +548,7 @@ def calculate_statistics(
     years_window: tuple[int] = None,
 ) -> xa.Dataset:
     """
+    # TODO:
     Calculate statistics for each variable in the dataset, similar to Couce (2012, 2023).
 
     Args:

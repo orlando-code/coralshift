@@ -18,7 +18,7 @@ import csv
 
 # custom
 from coralshift.processing import spatial_data
-from coralshift.utils import utils
+from coralshift.utils import utils, config
 
 
 class FileName:
@@ -131,32 +131,225 @@ class FileName:
         return f"{self.fname}.nc"
 
 
-def write_yaml_to_csv(yaml_dict: dict, csv_fp: str | Path):
+def combine_dataframes(df1, df2):
+    # Get shared columns
+    # shared_cols = set(df1.columns) & set(df2.columns)
+
+    # Add new columns from df2 to df1
+    new_cols_df2 = set(df2.columns) - set(df1.columns)
+    for col in new_cols_df2:
+        df1[col] = np.nan  # Add new column with NaN values
+
+    # Concatenate data frames along rows
+    combined_df = pd.concat([df1, df2], ignore_index=True, sort=False)
+
+    # Reorder columns based on original header (df1)
+    combined_df = combined_df.reindex(columns=df1.columns)
+
+    return combined_df
+
+
+def write_dict_to_csv(dict_info, csv_fp):
+    csv_fp = Path(csv_fp)
+    # read new data
+    flattened_data = utils.flatten_dict(dict_info)
+    df_new = pd.DataFrame([flattened_data])
+    if csv_fp.exists():
+        df = pd.read_csv(csv_fp)
+    else:
+        df_new.to_csv(csv_fp, index=False)
+        return
+
+    combined_df = combine_dataframes(df, df_new)
+    combined_df.to_csv(csv_fp, index=False)
+
+
+# def write_dict_to_csv(yaml_dict: dict, csv_fp: str | Path):
+#     """
+#     Writes data from a YAML file to a CSV file.
+
+#     Args:
+#         yaml_fp (str or Path): The file path of the YAML configuration file.
+
+#     Raises:
+#         FileNotFoundError: If the YAML file specified by `yaml_fp` does not exist.
+
+#     """
+#     flattened_data = utils.flatten_dict(yaml_dict)
+
+#     # Create DataFrame from flattened dictionary
+#     df = pd.DataFrame([flattened_data])
+
+#     # Check if CSV file exists
+#     file_exists = Path(csv_fp).exists()
+
+#     # Read existing header from CSV file if it exists
+#     existing_header = []
+#     if file_exists:
+#         existing_df = pd.read_csv(csv_fp)
+#         existing_header = existing_df.columns.tolist()
+
+#     # Add new columns to the DataFrame and update header
+#     for col in df.columns:
+#         if col not in existing_header:
+#             existing_header.append(col)
+#             if file_exists:
+#                 existing_df[col] = pd.NA  # Add new column with NaN values
+
+#     # Concatenate existing DataFrame and new DataFrame
+#     if file_exists:
+#         # df = pd.concat([existing_df, df], ignore_index=True, sort=False)
+#         df = existing_df.merge(df, sort=False)
+
+#     # Write DataFrame to CSV
+#     # df.to_csv(csv_fp, mode='a', index=False, header=not file_exists)
+#     df.to_csv(csv_fp, mode='a', index=False, header=existing_header)
+
+# # Flatten nested dictionaries
+# flattened_data = utils.flatten_dict(yaml_dict)
+
+# # Extract keys and values
+# keys = list(flattened_data.keys())
+# values = list(flattened_data.values())
+
+# # Check if CSV file exists
+# csv_file = Path(csv_fp)
+# file_exists = csv_file.exists()
+
+# # Open CSV file in append mode
+# # with open(csv_fp, "a", newline="") as csv_f:
+# #     csv_writer = csv.writer(csv_f)
+
+# #     # Write header if CSV file is newly created
+# #     if not file_exists:
+# #         csv_writer.writerow(keys)
+
+# #     header = read_csv_header(csv_fp)
+# #     # if keys contains values not in header, append these values to the original header (overwrite original)
+# #     for key in keys:
+# #         if key not in header:
+# #             header.append(key)
+# #     ### This line should overwrite csv header with updated header
+
+# #     # Write values to CSV
+# #     csv_writer.writerow(values)
+# # Open CSV file in read mode to read the existing content
+# existing_content = []
+# if file_exists:
+#     with open(csv_fp, "r", newline="") as csv_f:
+#         reader = csv.reader(csv_f)
+#         # Read existing content line by line
+#         existing_content = list(reader)
+
+# # Open CSV file in write mode to write the updated content
+# with open(csv_fp, "w", newline="") as csv_f:
+#     csv_writer = csv.writer(csv_f)
+
+#     # Write the updated header
+#     if not file_exists:
+#         csv_writer.writerow(keys)
+#     else:
+#         # Update the header with new keys not present in the original header
+#         header = existing_content[0]
+#         for key in keys:
+#             if key not in header:
+#                 header.append(key)
+#         csv_writer.writerow(header)
+
+#         # Write the original data
+#         for row in existing_content[1:]:
+#             csv_writer.writerow(row)
+
+#     # Write values to CSV
+#     csv_writer.writerow(values)
+#####
+
+# # Create CSV file if it doesn't exist
+# if not Path(csv_fp).exists():
+#     with open(csv_fp, "w", newline="") as csv_f:
+#         csv_writer = csv.DictWriter(csv_f, fieldnames=flattened_data.keys())
+#         csv_writer.writeheader()
+
+# # Open CSV file in append mode
+# with open(csv_fp, "a", newline="") as csv_f:
+#     csv_writer = csv.DictWriter(csv_f, fieldnames=flattened_data.keys())
+#     csv_writer.writerow(flattened_data)
+#     # make a list of values in the order of columns and write them
+#     csv_writer.writerow(
+#         [flattened_data.get(col, None) for col in flattened_data.keys()]
+#     )
+
+
+def read_csv_header(csv_fp: str | Path) -> list[str]:
     """
-    Writes data from a YAML file to a CSV file.
+    Reads the header (first line) of a CSV file.
 
     Args:
-        yaml_fp (str or Path): The file path of the YAML configuration file.
+        csv_fp (str or Path): The file path of the CSV file.
 
-    Raises:
-        FileNotFoundError: If the YAML file specified by `yaml_fp` does not exist.
-
+    Returns:
+        list: List containing the header fields.
     """
-    # Flatten nested dictionaries
-    flattened_data = utils.flatten_dict(yaml_dict)
+    # Open CSV file in read mode
+    with open(csv_fp, "r", newline="") as csv_f:
+        csv_reader = csv.reader(csv_f)
+        # Read the first row (header)
+        header = next(csv_reader)
 
-    # Create CSV file if it doesn't exist
-    if not Path(csv_fp).exists():
-        with open(csv_fp, "w", newline="") as csv_f:
-            csv_writer = csv.DictWriter(csv_f, fieldnames=flattened_data.keys())
-            csv_writer.writeheader()
+    return header
 
-    # Open CSV file in append mode
-    with open(csv_fp, "a", newline="") as csv_f:
-        csv_writer = csv.DictWriter(csv_f, fieldnames=flattened_data.keys())
-        csv_writer.writerow(flattened_data)
-        # make a list of values in the order of columns and write them
-        csv_writer.writerow([flattened_data.get(col, None) for col in columns])
+
+class FileHandler:
+    def __init__(self, config_info, model_code, base_dir: str | Path = None):
+        self.config_info = config_info
+        self.model_code = model_code
+        self.base_dir = base_dir
+
+    def construct_fp_dir(self):
+        res_str = utils.replace_dot_with_dash(str(self.config_info["resolution"]))
+        return (
+            Path(Path(self.base_dir) if self.base_dir else config.runs_dir)
+            / f"{res_str}d"
+            / self.model_code
+        )
+
+    def construct_fp_stem(self):
+        return "_".join(self.config_info["datasets"])
+
+    def unique_num(self, fp_dir):
+        """Returns the highest ID number of the same fp_stem (function of datasets) in the IDXXX naming convention"""
+        counter = 0
+        fp_stem = self.construct_fp_stem()
+        new_filename = f"ID000_{fp_stem}"
+        while list(Path(fp_dir).glob(f"{new_filename}*")):
+            counter += 1
+            new_filename = f"ID{utils.pad_number_with_zeros(counter, resulting_len=3)}_{Path(fp_stem).stem}"
+        return counter
+
+    def get_highest_unique_fname(self, fp_dir=None):
+        fp_stem = self.construct_fp_stem()
+        if not fp_dir:
+            fp_dir = self.construct_fp_dir()
+        highest_num = self.unique_num(fp_dir) - 1
+        return (
+            f"ID{utils.pad_number_with_zeros(highest_num, resulting_len=3)}_{fp_stem}"
+        )
+
+    def get_next_unique_fname(self, fp_dir=None):
+        fp_stem = self.construct_fp_stem()
+        if not fp_dir:
+            fp_dir = self.construct_fp_dir()
+        return f"ID{utils.pad_number_with_zeros(self.unique_num(fp_dir), resulting_len=3)}_{fp_stem}"
+
+    def get_next_unique_fp_root(self, fp_dir=None):
+        if not fp_dir:
+            fp_dir = self.construct_fp_dir()
+        return fp_dir / self.get_next_unique_fname(fp_dir)
+
+    def get_highest_unique_fp_root(self, fp_dir=None):
+        if not fp_dir:
+            fp_dir = self.construct_fp_dir()
+        return fp_dir / self.get_highest_unique_fname(fp_dir)
 
 
 def guarantee_existence(path: Path | str) -> Path:
@@ -845,15 +1038,70 @@ def uniquify_file_wordily(dir_path: str | Path, filename: str):
     return new_filename
 
 
-def read_pkl(pkl_path: str | Path):
+def read_pickle(pkl_path: str | Path):
     with open(pkl_path, "rb") as file:
         pkl_info = pickle.load(file)
     return pkl_info
 
 
-def write_pkl(pkl_path: str | Path, info):
+def write_pickle(pkl_path: str | Path, info):
     with open(pkl_path, "wb") as file:
         pickle.dump(info, file)
+
+
+def rename_nc_with_coords(
+    nc_fp: Path | str, lat_coord_name: str = None, lon_coord_name: str = None, delete_og: bool = True
+) -> None:
+    """
+    Renames a NetCDF file with latitude and longitude coordinates.
+
+    Args:
+        nc_fp (Path | str): The file path of the NetCDF file to be renamed.
+        lat_coord_name (str, optional): The name of the latitude coordinate variable. If not provided,
+            common latitude coordinate names will be used.
+        lon_coord_name (str, optional): The name of the longitude coordinate variable. If not provided,
+            common longitude coordinate names will be used.
+        delete_og (bool, optional): Whether to delete the original file after renaming. Defaults to False.
+
+    Raises:
+        ValueError: If the latitude or longitude coordinate is not found in the dataset.
+        FileExistsError: If the new file path already exists.
+
+    Returns:
+        None
+    """
+    nc_fp = Path(nc_fp)
+    nc_xa = xa.open_dataset(nc_fp)
+
+    lat_coord_possibilities = ["lat", "latitude", "y"] if not lat_coord_name else [lat_coord_name]
+    lon_coord_possibilities = ["lon", "longitude", "x"] if not lon_coord_name else [lon_coord_name]
+
+    lat_coord = next((coord for coord in lat_coord_possibilities if coord in nc_xa.coords), None)
+    lon_coord = next((coord for coord in lon_coord_possibilities if coord in nc_xa.coords), None)
+
+    if not lat_coord:
+        raise ValueError("Latitude coordinate not found in the dataset.")
+    if not lon_coord:
+        raise ValueError("Longitude coordinate not found in the dataset.")
+
+    min_lat, max_lat = nc_xa[lat_coord].values.min(), nc_xa[lat_coord].values.max()
+    min_lon, max_lon = nc_xa[lon_coord].values.min(), nc_xa[lon_coord].values.max()
+
+    lats_strs = [f"s{utils.replace_dot_with_dash(str(abs(round(lat, 1))))}" if lat < 0 else f"n{utils.replace_dot_with_dash(str(abs(round(lat, 1))))}" for lat in [min_lat, max_lat]]   # noqa
+    lons_strs = [f"w{utils.replace_dot_with_dash(str(abs(round(lon, 1))))}" if lon < 0 else f"e{utils.replace_dot_with_dash(str(abs(round(lon, 1))))}" for lon in [min_lon, max_lon]]   # noqa
+
+    new_fp = nc_fp.parent / f"{nc_fp.stem}_{lats_strs[1]}_{lats_strs[0]}_{lons_strs[0]}_{lons_strs[1]}.nc"
+
+    if new_fp.exists():
+        raise FileExistsError(f"File {new_fp} already exists.")
+
+    print("Writing file...")
+    nc_xa.to_netcdf(new_fp)
+    print(f"Written {nc_fp} to {new_fp}")
+
+    if delete_og:
+        nc_fp.unlink()
+        print(f"Deleted {nc_fp}")
 
 
 ############

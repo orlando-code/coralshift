@@ -39,18 +39,24 @@ Defines globals used throughout the codebase.
 ###############################################################################
 
 repo_dir = get_repo_root()
+module_dir = repo_dir / "coralshift"
 data_dir = repo_dir / "data"
 logs_dir = repo_dir / "logs"
-runs_dir = repo_dir / "runs" / "first_run"
+run_logs_dir = logs_dir / "runs"
+# runs_dir = repo_dir / "runs" / "first_run"
+runs_dir = repo_dir / "runs"
 runs_csv = runs_dir / "runs.csv"
 
 cmip6_data_dir = data_dir / "env_vars" / "cmip6"
+config_dir = runs_dir / "config_files"
 static_cmip6_data_dir = cmip6_data_dir / "EC-Earth3P-HR/r1i1p2f1_latlon"
 bathymetry_dir = data_dir / "bathymetry"
 gt_data_dir = data_dir / "ground_truth"
 # subdirs
-gdcr_dir = gt_data_dir / "unep_wcmc"
+gdcr_dir = gt_data_dir / "UNEP_GDCR"
+wri_dir = gt_data_dir / "WRI_REEF_EXTENT"
 
+ml_ready_dir = data_dir / "ml_ready"
 
 # dataloader_config_dir = "dataloader_configs"
 

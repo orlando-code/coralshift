@@ -1,3 +1,6 @@
+# general
+import numpy as np
+
 # spatial
 import xarray as xa
 from scipy.ndimage import gaussian_gradient_magnitude
@@ -5,7 +8,9 @@ from scipy.ndimage import gaussian_gradient_magnitude
 # custom
 from coralshift.utils import config
 from coralshift.processing import spatial_data
-from coralshift.cmipper import file_ops as cmipper_file_ops
+
+# from coralshift.cmipper import file_ops as cmipper_file_ops
+from cmipper import file_ops as cmipper_file_ops
 
 
 def generate_gebco_xarray(
@@ -29,11 +34,13 @@ def generate_gebco_xarray(
             Visit: https://download.gebco.net/"""
         )
     print(
-        f"Loading gebco xarray across {lats} latitudes & {lons} longitudes from {gebco_fp}."
+        f"Loading gebco elevation xarray across {lats} latitudes & {lons} longitudes from {gebco_fp}."
     )
-    return spatial_data.process_xa_d(xa.open_dataset(gebco_fp)).sel(
-        latitude=slice(min(lats), max(lats)), longitude=slice(min(lons), max(lons))
-    )  # TODO: proper chunking
+    return spatial_data.process_xa_d(xa.open_dataset(gebco_fp).sel(
+        lat=slice(min(lats), max(lats)), lon=slice(min(lons), max(lons))
+    ).drop_vars("crs").astype(np.float64))  # TODO: proper chunking
+    # this is hacky to drop crs and slice before processing, but this array is huge and crs (str)
+    # interferes with thresholding data
 
 
 def generate_gebco_slopes_xarray(

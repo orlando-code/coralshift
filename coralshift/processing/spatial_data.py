@@ -30,8 +30,56 @@ def spatial_predictions_from_data(y: pd.Series, predictions: np.ndarray) -> pd.S
     return spatially_reform_data(merged)
 
 
-def spatially_reform_data(df):
-    # convert from pandas dataframe to xarray dataset
+# def spatially_reform_data(df, resolution: float = None):
+#     """TODO: docstring
+#     Pretty hacky. Best to specify resolution where possible"""
+#     if not resolution:  # THIS IS THE PROBLEM
+#         lat_diff = abs(np.diff(df.sort_index().index.get_level_values("latitude")))
+#         lon_diff = abs(np.diff(df.sort_index().index.get_level_values("longitude")))
+
+#         # lat_spacing = np.min(lat_diff[np.nonzero(lat_diff)])
+#         # lon_spacing = np.min(lon_diff[np.nonzero(lon_diff)])
+#         lat_spacing = np.mean(lat_diff[np.nonzero(lat_diff)])
+#         lon_spacing = np.mean(lon_diff[np.nonzero(lon_diff)])
+#         lat_spacing, lon_spacing = min([lat_spacing, lon_spacing]), min([lat_spacing, lon_spacing])
+#     else:
+#         lat_spacing, lon_spacing = resolution, resolution
+
+#     # Create arrays of latitude and longitude values using inferred spacing
+#     latitudes = np.arange(
+#         df.index.get_level_values("latitude").min(),
+#         df.index.get_level_values("latitude").max() + lat_spacing,
+#         lat_spacing,
+#     )
+#     longitudes = np.arange(
+#         df.index.get_level_values("longitude").min(),
+#         df.index.get_level_values("longitude").max() + lon_spacing,
+#         lon_spacing,
+#     )
+
+#     # return latitudes, longitudes
+
+#     index = pd.MultiIndex.from_product(
+#         [latitudes, longitudes], names=["approx_latitude", "approx_longitude"]
+#     )
+
+#     if isinstance(df, pd.Series):
+#         new_df = df.reindex(index, fill_value=np.nan).to_frame()
+#     else:
+#         new_df = df.reindex(index, fill_value=np.nan)
+
+#     # new_df = pd.DataFrame()
+#     new_df["latitude"] = new_df.index.get_level_values("approx_latitude").round(5)
+#     new_df["longitude"] = new_df.index.get_level_values("approx_longitude").round(5)
+
+#     new_df = new_df.set_index(["latitude", "longitude"])
+#     new_df = df.reindex(new_df.index)
+
+#     return new_df.to_xarray().sortby(["latitude", "longitude"])
+
+def spatially_reform_data(df, resolution: float = None):
+    """TODO: docstring"""
+
     return df.to_xarray().sortby(["latitude", "longitude"])
 
 
@@ -1361,8 +1409,13 @@ def process_xa_d(
             [var for var in drop_vars if var in temp_xa_d.variables]
         )
 
+    temp_xa_d = utils.mask_above_threshold(temp_xa_d, threshold=1e10)
+
+    # sort coordinate dimensions in order time (if time present), latitude, longitude
+    temp_xa_d = temp_xa_d.sortby(list(temp_xa_d.dims))
+
     # add crs
-    #     temp_xa_d.rio.write_crs(crs, inplace=True)
+    # temp_xa_d.rio.write_crs(crs, inplace=True)    # was messing with fill_loess
     # if chunk_dict is not None:
     #     temp_xa_d = chunk_as_necessary(temp_xa_d, chunk_dict)
     # sort coords by ascending values

@@ -2,6 +2,7 @@
 import numpy as np
 import pandas as pd
 from datetime import datetime
+import os
 
 # spatial
 import geopandas as gpd
@@ -193,6 +194,10 @@ def generate_date_pairs(
     ]
 
 
+def get_buffered_lims(coord_vals, buffer_size):
+    return [min(coord_vals) - buffer_size, max(coord_vals) + buffer_size]
+
+
 def replace_dot_with_dash(string: str) -> str:
     """
     Replace all occurrences of "." with "-" in a string.
@@ -231,6 +236,27 @@ def pad_number_with_zeros(number: str | int, resulting_len: int = 2) -> str:
         number = "".join(("0", number))
 
     return number
+
+
+def mask_above_threshold(xa_d, threshold=10000):
+    """
+    Mask values above a given threshold with np.nan in an xarray Dataset or DataArray.
+
+    Parameters:
+    xr_obj (xarray.Dataset or xarray.DataArray): The input xarray object.
+    threshold (float): The threshold value above which the data will be masked with np.nan. Default is 5000.
+
+    Returns:
+    xarray.Dataset or xarray.DataArray: The masked xarray object.
+    """
+    if isinstance(xa_d, xa.Dataset):
+        # print(type(xa_d))
+        # print(np.min(xa_d.lat.values))
+        return xa_d.map(lambda x: x.where(x <= threshold, np.nan))
+    elif isinstance(xa_d, xa.DataArray):
+        return xa_d.where(xa_d <= threshold, np.nan)
+    else:
+        raise TypeError("Input must be an xarray Dataset or DataArray")
 
 
 def select_df_rows_by_coords(df: pd.DataFrame, coordinates: list) -> pd.DataFrame:
@@ -378,25 +404,76 @@ def lat_lon_vals_from_geo_df(geo_df: gpd.geodataframe, resolution: float = 1.0):
     return lon_min, lat_min, lon_max, lat_max, width, height
 
 
-def calc_non_zero_ratio(df, predictand=None):
-    if isinstance(df, pd.Series):
-        return np.where(df > 0, 1, 0).sum() / len(df)
+def calc_non_zero_ratio(data, predictand=None):
+    if isinstance(data, pd.Series):
+        return np.where(data > 0, 1, 0).sum() / len(data)
+    if isinstance(data, xa.DataArray):
+        np.where(data.flatten() > 0, 1, 0).sum() / len(data.flatten())
     else:
         try:
-            return np.where(df[predictand] > 0, 1, 0).sum() / len(df)
+            return np.where(data[predictand] > 0, 1, 0).sum() / len(data)
         except KeyError:
-            raise ValueError(f"Predictand {predictand} not found in DataFrame")
+            raise ValueError(f"Predictand {predictand} not found in DataFrame/Dataset")
 
+
+# def lat_lon_string_from_tuples(
+#     lats: tuple[float, float], lons: tuple[float, float], dp: int = 0
+# ):
+#     round_lats = iterative_to_string_list(lats, dp)
+#     round_lons = iterative_to_string_list(lons, dp)
+
+#     return (
+#         f"n{max(round_lats)}_s{min(round_lats)}_w{min(round_lons)}_e{max(round_lons)}"
+#     )
 
 def lat_lon_string_from_tuples(
     lats: tuple[float, float], lons: tuple[float, float], dp: int = 0
 ):
-    round_lats = iterative_to_string_list(lats, dp)
-    round_lons = iterative_to_string_list(lons, dp)
+    min_lat, max_lat = min(lats), max(lats)
+    min_lon, max_lon = min(lons), max(lons)
 
-    return (
-        f"n{max(round_lats)}_s{min(round_lats)}_w{min(round_lons)}_e{max(round_lons)}"
-    )
+    lats = [round_to_1_sf_after_decimal(min_lat), round_to_1_sf_after_decimal(max_lat)]
+    lons = [round_to_1_sf_after_decimal(min_lon), round_to_1_sf_after_decimal(max_lon)]
+
+    lats_strs = [f"s{replace_dot_with_dash(str(abs(round(lat, 1))))}" if lat < 0 else f"n{replace_dot_with_dash(str(abs(round(lat, 1))))}" for lat in lats]   # noqa
+    lons_strs = [f"w{replace_dot_with_dash(str(abs(round(lon, 1))))}" if lon < 0 else f"e{replace_dot_with_dash(str(abs(round(lon, 1))))}" for lon in lons]   # noqa
+
+    return "_".join(lats_strs + lons_strs)
+
+
+def round_to_1_sf_after_decimal(num):
+    """
+    Rounds a number to 1 significant figure after the decimal point.
+
+    Args:
+        num (float): The number to be rounded.
+
+    Returns:
+        float: The rounded number.
+
+    Examples:
+        >>> round_to_1_sf_after_decimal(3.14159)
+        3.1
+        >>> round_to_1_sf_after_decimal(10.567)
+        10.6
+        >>> round_to_1_sf_after_decimal(0.005)
+        0.0
+    """
+    parts = str(num).split('.')
+    # if there is a decimal part
+    if len(parts) == 2:
+        dec_part = parts[1]
+
+        # determine number of zeros before first non-zero digit
+        num_zeros = 0
+        for i in range(len(dec_part)):
+            if dec_part[i] == '0':
+                num_zeros += 1
+            else:
+                break
+        return float(parts[0] + '.' + num_zeros*'0' + f"{float(f"{float(dec_part):.1g}"):g}"[0])    # noqa
+    else:
+        return float(parts[0])
 
 
 def iterative_to_string_list(iter_obj: tuple, dp: int = 0):
@@ -452,3 +529,66 @@ def year_to_datetime(year: int, xa_d: xa.DataArray | xa.Dataset = None) -> datet
             raise ValueError(f"Year {year} is outside the dataset's time range")
 
     return datetime(year, 1, 1)
+
+
+def count_nonzero_values(xa_da: xa.DataArray) -> int:
+    """
+    Count the number of nonzero values in a DataArray.
+
+    Parameters
+    ----------
+        xa_da (xa.DataArray): DataArray containing values.
+
+    Returns
+    -------
+        int: Number of nonzero values.
+    """
+    non_zero_count = xa_da.where(xa_da != 0).count().item()
+    return non_zero_count
+
+
+def num_cpus():
+    return os.cpu_count()
+
+
+def calc_worker_memory_lim(n_workers, memory_limit):
+    return memory_limit / n_workers
+    
+
+def memory_string(memory_limit):
+    return str(memory_limit) + "GB"
+
+
+# def round_to_1_sf_after_decimal(num):
+#     """
+#     Rounds a number to 1 significant figure after the decimal point.
+
+#     Args:
+#         num (float): The number to be rounded.
+
+#     Returns:
+#         float: The rounded number.
+
+#     Examples:
+#         >>> round_to_1_sf_after_decimal(3.14159)
+#         3.1
+#         >>> round_to_1_sf_after_decimal(10.567)
+#         10.6
+#         >>> round_to_1_sf_after_decimal(0.005)
+#         0.0
+#     """
+#     parts = str(num).split('.')
+#     # if there is a decimal part
+#     if len(parts) == 2:
+#         dec_part = parts[1]
+
+#         # determine number of zeros before first non-zero digit
+#         num_zeros = 0
+#         for i in range(len(dec_part)):
+#             if dec_part[i] == '0':
+#                 num_zeros += 1
+#             else:
+#                 break
+#         return float(parts[0] + '.' + num_zeros*'0' + f"{float(f"{float(dec_part):.1g}"):g}"[0])    # noqa
+#     else:
+#         return float(parts[0])

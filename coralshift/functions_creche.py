@@ -348,7 +348,7 @@ def investigate_depth_mask(comp_var_xa, mask_var_xa, var_limits: list[tuple[floa
     # TODO: make less janky
     raw_vals = []
     positive_negative_ratio = []
-    x_labels = [str(lim_pair) for lim_pair in var_limits]
+    # x_labels = [str(lim_pair) for lim_pair in var_limits]
 
     for lim_pair in var_limits:
         masked_vals = generate_var_mask(comp_var_xa, mask_var_xa, lim_pair)
@@ -359,6 +359,7 @@ def investigate_depth_mask(comp_var_xa, mask_var_xa, var_limits: list[tuple[floa
             val_sum / np.count_nonzero(masked_vals["elevation"].values == 0)
         )
 
+        utils.calc_non_zero_ratio(masked_vals["elevation_values"])
     return raw_vals, positive_negative_ratio
 
 
