@@ -1,189 +1,30 @@
-import seaborn as sns
-import xarray as xa
+# general
 import numpy as np
+import pandas as pd
+import xarray as xa
+
+# plotting
+import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
-from matplotlib.ticker import PercentFormatter
+
+# from matplotlib.ticker import PercentFormatter
+import matplotlib.ticker as mticker
 import matplotlib.colors as mcolors
 import matplotlib.cm as mcm
-from matplotlib import gridspec
-import pandas as pd
-
-# from tqdm.auto import tqdm
-
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+
+# fitting
+import uncertainties as un
+import uncertainties.unumpy as unp
 import sklearn.metrics as sklmetrics
 
+# custom
 from coralshift.plotting import spatial_plots
-from coralshift.machine_learning import static_models
-from coralshift.utils import utils, file_ops, config
+from coralshift.utils import utils
 from coralshift.processing import ml_processing
-
-# from coralshift import functions_creche
 from coralshift.processing import spatial_data
-
-import xgboost as xgb
-
-
-class AnalyseResults:
-    def __init__(
-        self,
-        model,
-        trains: tuple[pd.DataFrame, pd.DataFrame] = None,
-        tests: tuple[pd.DataFrame, pd.DataFrame] = None,
-        vals: tuple[pd.DataFrame, pd.DataFrame] = None,
-        do_plot: bool = True,
-        save_graphs: bool = True,
-        config_info: dict = None,
-        presentation_format: bool = False,
-    ):
-        self.model = model
-        self.trains = trains
-        self.tests = tests
-        self.vals = vals
-        self.do_plot: do_plot
-        self.save_graphs = save_graphs
-        self.config_info = config_info
-        self.ds_type = None
-        self.presentation_format = presentation_format
-
-    def make_predictions(self, X):
-        num_points = X.shape[0]
-        # convert data to DMatrix format if necessary
-        if "xgb" in self.config_info["model_code"]:
-            X = xgb.DMatrix(X)
-            num_points = X.num_row()
-
-        # if self.predictions is None:  # changed to compute predictions anew each time from model
-        print(f"\tRunning inference on {num_points} datapoints...")
-        return self.model.predict(X)
-
-    def record_metrics(self, y, predictions):
-        data_type = static_models.ModelInitializer(
-            self.config_info["model_code"]
-        ).get_data_type()
-
-        metric_header = f"{self.ds_type}_metrics" if self.ds_type else "metrics"
-        metric_info = {f"{metric_header}": {}}
-        if data_type == "continuous":
-            # regression metrics
-            metric_info[metric_header]["r2_score"] = float(
-                sklmetrics.r2_score(y, predictions)
-            )
-            metric_info[metric_header]["mse"] = float(
-                sklmetrics.mean_squared_error(y, predictions)
-            )
-            metric_info[metric_header]["mae"] = float(
-                sklmetrics.mean_absolute_error(y, predictions)
-            )
-
-        elif data_type == "discrete":
-            [y, predictions] = [
-                ml_processing.cont_to_class(
-                    y, self.config_info["regressor_classification_threshold"]
-                ),
-                ml_processing.cont_to_class(
-                    predictions, self.config_info["regressor_classification_threshold"]
-                ),
-            ]
-            # classification metrics
-            metric_info[metric_header]["f1_score"] = float(
-                sklmetrics.f1_score(y, predictions)
-            )
-            metric_info[metric_header]["accuracy"] = sklmetrics.accuracy_score(
-                y, predictions
-            )
-            metric_info[metric_header]["balanced_accuracy"] = float(
-                sklmetrics.balanced_accuracy_score(y, predictions)
-            )
-        else:
-            raise ValueError(f"Data type {data_type} not recognised.")
-
-        # write metric info to config file
-        config_fp = self.config_info["file_paths"]["config"]
-        print(f"Saving {metric_header} to {config_fp}...")
-        file_ops.edit_yaml(config_fp, metric_info)
-
-    def get_plot_dir(self):
-        runs_dir = config.runs_dir
-        plot_dir_id = self.config_info["file_paths"]["config"].split("_CONFIG")[0]
-        plot_dir_child = (
-            f"{plot_dir_id}/{self.ds_type}" if self.ds_type else plot_dir_id
-        )
-        plot_dir = runs_dir / "plots" / plot_dir_child
-        plot_dir.mkdir(parents=True, exist_ok=True)
-
-        return plot_dir
-
-    def save_fig(self, fn: str):
-        if self.save_graphs:
-            plot_dir = self.get_plot_dir()
-            plt.savefig(plot_dir / f"{fn}.png")
-
-    def plot_confusion_matrix(self, y, predictions):
-        plot_confusion_matrix(
-            labels=y,
-            predictions=predictions,
-            label_threshold=self.config_info["regressor_classification_threshold"],
-            presentation_format=self.presentation_format,
-        )
-        self.save_fig(fn="confusion_matrix")
-
-        if not self.do_plot:
-            plt.close()
-
-    def plot_regression(self, y, predictions):
-        plot_regression_histograms(
-            y, predictions, presentation_format=self.presentation_format
-        )
-        self.save_fig(fn="regression")
-        plt.close()
-
-    def plot_spatial_inference_comparison(self, y, predictions):
-        plot_spatial_inference_comparison(y, predictions, self.presentation_format)
-        self.save_fig(fn="spatial_inference_comparison")
-
-        if not self.do_plot:
-            plt.close()
-
-    def plot_spatial_confusion_matrix(self, y, predictions):
-
-        confusion_values = plot_spatial_confusion_matrix(
-            y,
-            predictions,
-            self.config_info["regressor_classification_threshold"],
-            presentation_format=self.presentation_format,
-        )
-        self.save_fig(fn="spatial_confusion_matrix")
-
-        if not self.do_plot:
-            plt.close()
-
-        return confusion_values
-
-    def produce_metrics(self, y, predictions):
-        self.record_metrics(y, predictions)
-
-    def produce_plots(self, y, predictions):
-        data_type = static_models.ModelInitializer(
-            self.config_info["model_code"]
-        ).get_data_type()
-
-        if data_type == "continuous":
-            self.plot_regression(y, predictions)
-        self.plot_confusion_matrix(y, predictions)
-        self.plot_spatial_inference_comparison(y, predictions)
-        self.plot_spatial_confusion_matrix(y, predictions)
-
-    def analyse_results(self):
-        ds_types = ["trains", "tests", "vals"]
-        for i, ds in enumerate([self.trains, self.tests, self.vals]):
-            self.ds_type = ds_types[i]
-            predictions = self.make_predictions(ds[0])
-
-            self.produce_plots(ds[1], predictions)
-            self.produce_metrics(ds[1], predictions)
 
 
 def generate_spatial_confusion_matrix_da(
@@ -236,14 +77,40 @@ def plot_regression_histograms(
         [0, 1],
         [0, 1],
         color="gray",
+        alpha=0.5,
         linestyle=(5, (10, 3)),
         label=f"Inference R$^2$ = {overfit_r2:.2f}",
     )
     # plot scatter
     ax[0].scatter(actual, predicted, alpha=0.1, color="#d83c04")
+
+    pred_max = np.max(predicted)
+    actual_max = np.max(actual)
+
+    if not pred_max == 0 and not pred_max == 0:
+        # fit line
+        p, cov = np.polyfit(actual, predicted, 1, cov=True)
+        up = un.correlated_values(p, cov)
+        xn = np.linspace(0, np.max([pred_max, actual_max]), 100)
+        pred = np.polyval(up, xn)
+        formatted_fit_deets = (
+            rf"y={up[0].n:0.3f}$\pm{up[0].s:0.2f}x$+{up[1].n:0.3f}$\pm${up[0].s:0.2f}"
+        )
+        ax[0].plot(xn, unp.nominal_values(pred), color="#3B9AB2", label=formatted_fit_deets)
+        ax[0].fill_between(
+            xn,
+            unp.nominal_values(pred) - unp.std_devs(pred),
+            unp.nominal_values(pred) + unp.std_devs(pred),
+            color="#3B9AB2",
+            alpha=0.2,
+        )
+    else:
+        print("No non-zero values in actual or predicted, so can't fit a regression line to scatter plot")
+
     # plot histogram
     ax[1].hist(actual, bins=n_bins, color="#d83c04", alpha=0.5, label="actual")
     ax[1].hist(predicted, bins=n_bins, color="#3B9AB2", alpha=0.5, label="predicted")
+    ax[1].set_yscale("log")
 
     # format
     plt.suptitle("Inferred-actual comparison")
@@ -392,12 +259,13 @@ def plot_spatial_confusion(
         fig,
         ax,
         title="",
-        cbar_name="",
-        cbar=False,
-        edgecolor="black",
+        # cbar_name="",
+        cbar_dict={"cbar": False},
         label_style_dict=label_style_dict,
         presentation_format=presentation_format,
     )
+
+    return fig, ax
 
 
 def format_roc(ax: Axes, title: str = "Receiver Operating Characteristic (ROC) Curve"):
@@ -487,25 +355,9 @@ def visualise_region_class_imbalance(region_imbalance_dict: dict) -> None:
     ax.set_xlabel("GBR Region")
     ax.set_ylabel("Total Grid Cells")
     ax2.set_ylabel("Coral Presence")
-    ax2.yaxis.set_major_formatter(PercentFormatter(1))
+    ax2.yaxis.set_major_formatter(mticker.PercentFormatter(1))
     ax.set_ylim((0, 4500))
     ax2.set_ylim((0, 0.2))
-
-
-def count_nonzero_values(xa_da: xa.DataArray) -> int:
-    """
-    Count the number of nonzero values in a DataArray.
-
-    Parameters
-    ----------
-        xa_da (xa.DataArray): DataArray containing values.
-
-    Returns
-    -------
-        int: Number of nonzero values.
-    """
-    non_zero_count = xa_da.where(xa_da != 0).count().item()
-    return non_zero_count
 
 
 def calculate_total_class_imbalance(
@@ -529,7 +381,7 @@ def calculate_total_class_imbalance(
     for xa_d in xa_ds:
         if var_name:
             xa_d = xa_d[var_name]
-        non_zero_vals.append(count_nonzero_values(xa_d["gt"]))
+        non_zero_vals.append(utils.count_nonzero_values(xa_d["gt"]))
         total_spatial_vals.append(
             len(xa_d.latitude.values) * len(xa_d.longitude.values)
         )
@@ -561,9 +413,9 @@ def calculate_region_class_imbalance(xa_ds_dict: dict) -> dict:
     return imbalance_dict
 
 
-def plot_spatial_diffs(
-    xa_d_pred: xa.DataArray,
-    xa_d_gt: xa.DataArray,
+def plot_spatial_residuals(
+    y: xa.DataArray,
+    predictions: xa.DataArray,
     figsize: tuple[float, float] = (16, 14),
     cbar_pad: float = 0.1,
 ) -> None:
@@ -572,47 +424,50 @@ def plot_spatial_diffs(
 
     Parameters
     ----------
-        xa_d_pred (xa.DataArray): Predicted data.
-        xa_d_gt (xa.DataArray): Ground truth data.
+        xa_pred (xa.DataArray): Predicted data.
+        xa_gt (xa.DataArray): Ground truth data.
         figsize (tuple[float, float], optional): Figure size. Default is (16, 9).
 
     Returns
     -------
         None
     """
-    xa_diff = (xa_d_gt - xa_d_pred).rename("predicted/gt_residuals")
+    xa_ds = spatial_data.spatial_predictions_from_data(y, predictions)
+    xa_gt, xa_pred = xa_ds["label"], xa_ds["predictions"]
 
-    fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(2, 2)
+    xa_diff = (xa_gt - xa_pred).rename("residuals")
 
-    # left plot
-    ax_r = fig.add_subplot(gs[:, 0], projection=ccrs.PlateCarree())
-    spatial_plots.plot_spatial(
-        fax=(fig, ax_r),
-        xa_da=xa_diff,
-        cmap_type="div",
-        symmetric=True,
-        cbar_pad=cbar_pad,
-    )
+    f, ax = plt.subplots(figsize=figsize, subplot_kw={"projection": ccrs.PlateCarree()})
 
-    # right plots
-    ax_l_t = fig.add_subplot(gs[0, 1], projection=ccrs.PlateCarree())
+    if xa_diff.sum() == 0:
+        cbar_type = "seq"
+    else:
+        cbar_type = "res"
+
     spatial_plots.plot_spatial(
-        xa_d_gt, fax=(fig, ax_l_t), title="ground truth", cbar_pad=cbar_pad
+        xa_diff,
+        cbar_dict={
+            "cbar_orientation": "horizontal",
+            "cbar_name": "residuals",
+            "cmap_type": cbar_type
+        },
+        fax=(f, ax),
     )
-    ax_l_b = fig.add_subplot(gs[1, 1], projection=ccrs.PlateCarree())
-    spatial_plots.plot_spatial(
-        xa_d_pred, fax=(fig, ax_l_b), title="inferred label", cbar_pad=cbar_pad
-    )
+    return f, ax
 
 
 def plot_spatial_confusion_matrix(
-    y, predictions, threshold, presentation_format: bool = True
+    y: pd.DataFrame,
+    predictions: np.ndarray,
+    threshold: float,
+    presentation_format: bool = True,
+    lats: tuple[float] = (-15, -10),
+    lons: tuple[float] = (140, 146),
 ):
     spatial_predictions_ds = spatial_data.spatial_predictions_from_data(y, predictions)
-
+    # selecting subset for easy visualisation
     spatial_predictions_ds = spatial_predictions_ds.sel(
-        latitude=slice(-15, -10), longitude=slice(140, 145)
+        latitude=slice(min(lats), max(lats)), longitude=slice(min(lons), max(lons))
     )
 
     # Threshold the values while retaining NaNs
@@ -641,9 +496,11 @@ def plot_spatial_confusion_matrix(
         ground_truth=thresholded_ds["thresholded_labels"],
     )
 
-    plot_spatial_confusion(confusion_values, presentation_format=presentation_format)
+    fig, ax = plot_spatial_confusion(
+        confusion_values, presentation_format=presentation_format
+    )
 
-    return confusion_values
+    return confusion_values, fig, ax
 
 
 def plot_confusion_matrix(
@@ -669,7 +526,7 @@ def plot_confusion_matrix(
     -------
         None
     """
-    cmap = spatial_plots.ColourBarGenerator().get_cmap("seq")
+    cmap = spatial_plots.ColourMapGenerator().get_cmap("seq")
 
     if not utils.check_discrete(predictions) or not utils.check_discrete(labels):
         labels = ml_processing.cont_to_class(labels, threshold=label_threshold)
@@ -715,7 +572,7 @@ def plot_train_test_spatial(
         figsize=figsize, subplot_kw=dict(projection=ccrs.PlateCarree())
     )
 
-    cmap = spatial_plots.ColourBarGenerator().get_cmap("seq")
+    cmap = spatial_plots.ColourMapGenerator().get_cmap("seq")
     bounds = [0, 0.5, 1]
     if bath_mask.any():
         xa_da = xa_da.where(bath_mask, np.nan)
@@ -770,283 +627,95 @@ def plot_spatial_inference_comparison(y, predictions, presentation_format: bool 
     spatial_plots.plot_spatial(
         spatial_predictions["label"],
         fax=(f, ax[0]),
-        cbar_orientation="horizontal",
-        cbar=True,
+        cbar_dict={"cbar_orientation": "horizontal"},
         presentation_format=presentation_format,
     )
     spatial_plots.plot_spatial(
         spatial_predictions["predictions"],
         fax=(f, ax[1]),
-        cbar_orientation="horizontal",
-        cbar=True,
+        cbar_dict={"cbar_orientation": "horizontal"},
         presentation_format=presentation_format,
     )
     return f, ax
 
 
-# from baselines.py May come in useful
-####################################################################################################
+def plot_permutation_importance(
+    perm_imp_df: pd.DataFrame,
+    n_samples: int = 10,
+    split: bool = True,
+    figsize: tuple[float] = (12, 5),
+):
+    # compute mean and std of permutation importance
+    perm_imp_stats_df = perm_imp_df.aggregate(["mean", "std"])
+    ordered_df = perm_imp_stats_df.sort_values(by="mean", axis=1)
 
+    # low_cmap = spatial_plots.ColourMapGenerator().get_cmap("lim_blue")
 
-# def n_random_runs_preds(
-#     model,
-#     xa_dss: list[xa.Dataset],
-#     runs_n: int = 10,
-#     data_type: str = "continuous",
-#     test_fraction: float = 0.25,
-#     split_type: str = "pixel",
-#     train_test_lat_divide: int = float,
-#     train_direction: str = "N",
-#     bath_mask: bool = True,
-# ) -> list[tuple[list]]:
-#     """
-#     Perform multiple random test runs for inference using a model.
+    # high_cmap = spatial_plots.ColourMapGenerator().get_cmap("lim_red")
+    # if splitting into most negative and positive features
+    if split:
+        num_pts = n_samples // 2
+        low_cmap = sns.light_palette(
+            spatial_plots.ColourMapGenerator().lim_blue_hexes[0],
+            input="hex",
+            n_colors=n_samples // 2,
+        )[::-1]
+        high_cmap = sns.light_palette(
+            spatial_plots.ColourMapGenerator().lim_red_hexes[-1],
+            input="hex",
+            n_colors=n_samples // 2,
+        )
+        # plotting
+        f, (low_ax, high_ax) = plt.subplots(1, 2, sharey=True, figsize=figsize)
+        sns.boxplot(ordered_df.iloc[:, :num_pts], ax=low_ax, palette=low_cmap)
+        sns.boxplot(ordered_df.iloc[:, -num_pts:], ax=high_ax, palette=high_cmap)
 
-#     Parameters
-#     ----------
-#         model: The model used for inference.
-#         runs_n: The number of random test runs.
-#         xa_ds: The xarray Dataset containing the data.
-#         test_fraction (optional): The fraction of data to use for testing. Defaults to 0.25.
-#         bath_mask (optional): Whether to apply a bathymetry mask during splitting. Defaults to True.
+        # set axis limits and labels
+        low_ax.set_xlim(-0.5, num_pts - 0.5)
+        high_ax.set_xlim(
+            len(ordered_df.iloc[:, -num_pts:].columns) - 0.5 - num_pts,
+            len(ordered_df.iloc[:, -num_pts:].columns),
+        )
+        low_ax.set_xticklabels(rotation=80, labels=ordered_df.iloc[:, :num_pts].columns)
+        high_ax.set_xticklabels(
+            rotation=80, labels=ordered_df.iloc[:, -num_pts:].columns
+        )
 
-#     Returns
-#     -------
-#         run_outcomes: A list of tuples containing the true labels and predicted values for each test run.
-#     """
-#     # TODO: allow spatial splitting, perhaps using **kwarg functionality to declare lat/lon limits
-#     # prediction_list = []
-#     run_outcomes = []
-#     for run in tqdm(
-#         range(runs_n),
-#         desc=f"Inference on {runs_n} train-test splits",
-#     ):
-#         # select test data
-#         _, X_test, _, y_test, _, _ = spatial_split_train_test(
-#             xa_dss=xa_dss,
-#             data_type=data_type,
-#             test_fraction=test_fraction,
-#             split_type=split_type,
-#             train_test_lat_divide=train_test_lat_divide,
-#             train_direction=train_direction,
-#             bath_mask=bath_mask,
-#         )
+        # hide the lines and ticks on low_ax and high_ax
+        low_ax.spines["right"].set_visible(False)
+        high_ax.spines["left"].set_visible(False)
+        high_ax.tick_params(left=False)
+        low_ax.tick_params(labeltop=False)  # don't put tick labels at the top
+        high_ax.tick_params(labeltop=False)
+        high_ax.xaxis.tick_bottom()
 
-#         pred = model.predict(X_test)
-#         run_outcomes.append((y_test, pred))
+        d = 0.015  # how big to make the diagonal lines in axes coordinates
+        # arguments to pass to plot, just so we don't keep repeating them
+        kwargs = dict(transform=low_ax.transAxes, color="k", clip_on=False)
+        low_ax.plot((1 - d, 1 + d), (-d, +d), **kwargs)  # top-right diagonal
+        low_ax.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)  # top-right diagonal
 
-#     return run_outcomes
+        kwargs.update(transform=high_ax.transAxes)  # switch to the bottom axes
+        high_ax.plot((-d, +d), (-d, +d), **kwargs)  # bottom-left diagonal
+        high_ax.plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-right diagonal
+        for a in [low_ax, high_ax]:
+            a.hlines(0, -0.5, n_samples, ls="--", color="grey")
+        low_ax.set_ylabel("Permutation importance")
 
+    else:
+        low_cmap = sns.light_palette(
+            spatial_plots.ColourMapGenerator().lim_blue_hexes[0],
+            input="hex",
+            n_colors=n_samples,
+        )[::-1]
+        f, ax = plt.subplots(figsize=figsize)
+        sns.boxplot(ordered_df.iloc[:, :n_samples], ax=ax, palette=low_cmap)
+        # formatting
+        ax.set_xticklabels(rotation=80, labels=ordered_df.columns[:n_samples])
+        ax.set_ylabel("Permutation importance")
+        ax.hlines(0, -0.5, n_samples, ls="--", color="grey")
 
-# def rocs_n_runs(
-#     run_outcomes: tuple[list[float]], binarize_threshold: float = 0, figsize=[7, 7]
-# ):
-#     """
-#     Plot ROC curves for multiple random test runs.
-
-#     Parameters
-#     ----------
-#         run_outcomes: A list of tuples containing the true labels and predicted values for each test run.
-#         binarize_threshold (optional): The threshold value for binarizing the labels. Defaults to 0.
-
-#     Returns
-#     -------
-#         None
-#     """
-#     # colour formatting
-#     color_map = spatial_plots.get_cbar("seq")
-#     num_colors = len(run_outcomes)
-#     colors = [color_map(i / num_colors) for i in range(num_colors)]
-
-#     f, ax = plt.subplots(figsize=figsize)
-#     roc_aucs = []
-#     for c, outcome in enumerate(run_outcomes):
-#         # cast regression to binary classification for plotting
-#         binary_y_labels, binary_predictions = threshold_label(
-#             outcome[0], outcome[1], binarize_threshold
-#         )
-
-#         fpr, tpr, _ = sklmetrics.roc_curve(
-#             binary_y_labels, binary_predictions, drop_intermediate=False
-#         )
-#         roc_auc = sklmetrics.auc(fpr, tpr)
-#         roc_aucs.append(roc_auc)
-
-#         label = f"{roc_auc:.05f}"
-#         ax.plot(fpr, tpr, label=label, color=colors[c])
-
-#     # determine minimum and maximumm auc
-#     min_auc, max_auc = np.min(roc_aucs), np.max(roc_aucs)
-#     # return mean roc
-#     mean_auc = np.mean(roc_aucs)
-
-#     # Set legend labels for min and max AUC lines only
-#     handles, legend_labels = ax.get_legend_handles_labels()
-#     filtered_handles = []
-#     filtered_labels = []
-#     for handle, label in zip(handles, legend_labels):
-#         if label in [f"{min_auc:.05f}", f"{max_auc:.05f}"]:
-#             filtered_handles.append(handle)
-#             filtered_labels.append(label)
-
-#     if len(filtered_handles) > 1:
-#         filtered_handles, filtered_labels = [filtered_handles[0]], [filtered_labels[0]]
-#     ax.legend(
-#         filtered_handles,
-#         filtered_labels,
-#         title="Maximum and minimum AUC scores",
-#         loc="lower right",
-#     )
-
-#     n_runs = len(run_outcomes)
-#     # format
-#     model_results.format_roc(
-#         ax=ax,
-#         title=f"""Receiver Operating Characteristic (ROC) Curve\n for {n_runs} randomly initialised test datasets.
-#         \nMean AUC {mean_auc:.05f}""",
-#     )
-
-
-# def investigate_label_thresholds(
-#     thresholds: list[float],
-#     y_test: np.ndarray | pd.Series,
-#     y_predictions: np.ndarray | pd.Series,
-#     figsize=[7, 7],
-# ):
-#     """Plot ROC curves with multiple lines for different label thresholds.
-
-#     Parameters
-#     ----------
-#         thresholds (list[float]): List of label thresholds.
-#         y_test (np.ndarray or pd.Series): True labels.
-#         y_predictions (np.ndarray or pd.Series): Predicted labels.
-#         figsize (list, optional): Figure size for the plot. Default is [7, 7].
-
-#     Returns
-#     -------
-#         None
-#     """
-#     f, ax = plt.subplots(figsize=figsize)
-#     # prepare colour assignment
-#     color_map = spatial_plots.get_cbar("seq")
-#     num_colors = len(thresholds)
-#     colors = [color_map(i / num_colors) for i in range(num_colors)]
-
-#     # plot ROC curves
-#     for c, thresh in enumerate(thresholds):
-#         binary_y_labels, binary_predictions = threshold_label(
-#             y_test, y_predictions, thresh
-#         )
-#         fpr, tpr, _ = sklmetrics.roc_curve(
-#             binary_y_labels, binary_predictions, drop_intermediate=False
-#         )
-#         roc_auc = sklmetrics.auc(fpr, tpr)
-
-#         label = f"{thresh:.01f} | {roc_auc:.02f}"
-#         ax.plot(fpr, tpr, label=label, color=colors[c])
-
-#     # format
-#     model_results.format_roc(
-#         ax=ax,
-#         title="Receiver Operating Characteristic (ROC) Curve\nfor several coral presence/absence thresholds",
-#     )
-#     ax.legend(title="threshold value | auc")
-
-
-# def n_random_runs_preds_across_models(
-#     model_types: list[str],
-#     models: list,
-#     xa_dss: list[xa.Dataset],
-#     runs_n: int = 10,
-#     test_fraction: float = 0.25,
-#     split_type: str = "pixel",
-#     train_test_lat_divide: int = float,
-#     train_direction: str = "N",
-#     bath_mask: bool = True,
-# ):
-#     model_class = ModelInitializer()
-#     outcomes_dict = {}
-#     for i, model_type in enumerate(model_types):
-#         model = models[i]
-#         data_type = model_class.get_data_type(model_type)
-#         outcomes = n_random_runs_preds(
-#             model=model,
-#             xa_dss=xa_dss,
-#             runs_n=runs_n,
-#             data_type=data_type,
-#             test_fraction=test_fraction,
-#             split_type=split_type,
-#             train_test_lat_divide=train_test_lat_divide,
-#             train_direction=train_direction,
-#             bath_mask=bath_mask,
-#         )
-#         outcomes_dict[model_type] = outcomes
-
-#     return outcomes_dict
-
-
-# def models_rocs_n_runs(
-#     model_outcomes: dict[list[float]], binarize_threshold: float = 0, figsize=[7, 7]
-# ):
-#     """
-#     Plot ROC curves for multiple models' outcomes.
-
-#     Parameters
-#     ----------
-#         model_outcomes: A dictionary where keys are model names and values are lists of outcomes containing the true
-#             labels and predicted values for each test run.
-#         binarize_threshold (optional): The threshold value for binarizing the labels. Defaults to 0.
-
-#     Returns
-#     -------
-#         None
-#     """
-#     # Colour formatting
-#     color_map = spatial_plots.get_cbar("seq")
-#     num_models = len(model_outcomes)
-#     colors = [color_map(i / num_models) for i in range(num_models)]
-
-#     f, ax = plt.subplots(figsize=figsize)
-#     roc_aucs = []
-#     legend_labels = []
-
-#     for c, (model_name, outcomes) in tqdm(
-#         enumerate(model_outcomes.items()),
-#         total=len(model_outcomes),
-#         desc="Iterating over models",
-#     ):
-#         roc_aucs = []
-
-#         for i, outcome in enumerate(outcomes):
-#             # Cast regression to binary classification for plotting
-#             binary_y_labels, binary_predictions = threshold_label(
-#                 outcome[0], outcome[1], binarize_threshold
-#             )
-#             fpr, tpr, _ = sklmetrics.roc_curve(
-#                 binary_y_labels, binary_predictions, drop_intermediate=False
-#             )
-#             roc_auc = sklmetrics.auc(fpr, tpr)
-#             roc_aucs.append(roc_auc)
-
-#             # plot final label
-#             if i == (len(outcomes) - 2):
-#                 # Calculate mean AUC
-#                 mean_auc = np.mean(roc_aucs)
-#                 # Show label only for the last outcome of each model
-#                 label = f"{model_name} | {mean_auc:.03f}"
-#                 ax.plot(fpr, tpr, label=label, color=colors[c])
-#                 legend_labels.append(label)
-#             else:
-#                 # Hide label for other outcomes
-#                 ax.plot(fpr, tpr, color=colors[c])
-
-#     ax.legend(title="Mean model AUC scores", loc="lower right")
-#     # Format the plot
-#     n_runs = len(outcomes)
-#     format_roc(
-#         ax=ax,
-#         title=f"Receiver Operating Characteristic (ROC) Curve\n for {n_runs} randomly initialized test datasets.",
-#     )
+    return f
 
 
 ############
