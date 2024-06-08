@@ -1230,7 +1230,7 @@ def create_train_metadata(
 
 
 # # have expanded this hugely in functions_creche.py
-# class ModelInitializer:
+# class ModelInitialiser:
 #     def __init__(self, random_state: int = 42):
 #         self.random_state = random_state
 
@@ -1295,7 +1295,7 @@ def create_train_metadata(
 
 # # weirdly specific outputs, not useful
 # def initialise_model(model_type: str, random_state: int = 42):
-#     model_instance = ModelInitializer(random_state=random_state)
+#     model_instance = ModelInitialiser(random_state=random_state)
 
 #     return (
 #         model_instance.get_model(model_type),
@@ -1309,7 +1309,7 @@ def create_train_metadata(
 # ):
 #     param_grid = generate_parameter_grid(best_params_dict)
 #     # generate_gridsearch_grid(best_params_dict)
-#     model_class = ModelInitializer()
+#     model_class = ModelInitialiser()
 #     model = model_class.get_model(model_type)
 
 #     return (
@@ -1343,7 +1343,7 @@ def create_train_metadata(
 #         y_train = threshold_array(y_train)
 
 #     if search_type == "random":
-#         search_grid = ModelInitializer().get_search_grid(model_type)
+#         search_grid = ModelInitialiser().get_search_grid(model_type)
 #         model_search = RandomizedSearchCV(
 #             estimator=model,
 #             param_distributions=search_grid,
