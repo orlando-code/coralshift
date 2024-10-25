@@ -163,21 +163,17 @@ class Config:
         self.source_id = conf['source_id']
         self.member_id = conf['member_id']
         
-        
-###############################################################################
-# Missing months
-###############################################################################
 
-###############################################################################
-# Weights and biases config (https://docs.wandb.ai/guides/track/advanced/environment-variables)
-###############################################################################
+# ###############################################################################
+# # Weights and biases config (https://docs.wandb.ai/guides/track/advanced/environment-variables)
+# ###############################################################################
 
-# TODO: set up wandb config
-# Get API key from https://wandb.ai/authorize
-WANDB_API_KEY = "b31d9bc1dad7625997b86c2a5db38f8369babbe7"
-# Absolute path to store wandb generated files (dir must exist)
-#   Note: user must have write access
-WANDB_DIR = "/maps/rt582/coralshift/wandb"
-# Absolute path to wandb config dir (
-WANDB_CONFIG_DIR = "/path/to/wandb/config/dir"
-WANDB_CACHE_DIR = "/path/to/wandb/cache/dir"
+# # TODO: set up wandb config
+# # Get API key from https://wandb.ai/authorize
+# WANDB_API_KEY = "b31d9bc1dad7625997b86c2a5db38f8369babbe7"
+# # Absolute path to store wandb generated files (dir must exist)
+# #   Note: user must have write access
+# WANDB_DIR = "/maps/rt582/coralshift/wandb"
+# # Absolute path to wandb config dir (
+# WANDB_CONFIG_DIR = "/path/to/wandb/config/dir"
+# WANDB_CACHE_DIR = "/path/to/wandb/cache/dir"
