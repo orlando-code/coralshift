@@ -36,3 +36,6 @@ __pycache__/
 
 # ignore any installation-specific directories egg
 **/*egg*/
+
+# ignore graveyard scripts
+**/graveyard/*
