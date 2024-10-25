@@ -1,17 +1,93 @@
-from __future__ import annotations
-
-import xarray as xa
-import rioxarray as rio
+# general
 import numpy as np
-import rasterio
 import pandas as pd
-import haversine
 
-from rasterio import features
+# spatial
+import xarray as xa
+import rasterio
+import haversine
+from rasterio import features as rfeatures
+
+# from scipy.ndimage import binary_dilation, generic_filter
+
+# file ops
 from tqdm import tqdm
-from scipy.ndimage import binary_dilation, generic_filter
 from pathlib import Path
+
+# custom
 from coralshift.utils import file_ops, utils
+
+
+def spatial_predictions_from_data(y: pd.Series, predictions: np.ndarray) -> pd.Series:
+    predictions = pd.Series(predictions, index=y.index)
+
+    # join dataframes on index
+    merged = pd.concat(
+        [pd.Series(y, name="label"), pd.Series(predictions, name="predictions")],
+        axis=1,
+    )
+
+    return spatially_reform_data(merged)
+
+
+def spatially_reform_data(df, resolution: float = None):
+    """
+    Reformats the input dataframe by adding missing rows for latitude and longitude values based on the specified
+    resolution.
+
+    Args:
+        df (pd.DataFrame or pd.Series): The input dataframe to be reformatted.
+        resolution (float, optional): The resolution for latitude and longitude values
+
+    Returns:
+        pd.DataFrame or pd.Series: The reformatted dataframe with added rows for missing latitude and longitude values.
+    """
+    if not resolution:
+        lat_res_calc = abs(np.diff(df.sort_index().index.get_level_values("latitude")))
+        lon_res_calc = abs(np.diff(df.sort_index().index.get_level_values("longitude")))
+        resolution = np.min([np.min(lat_res_calc[lat_res_calc != 0]), np.min(lon_res_calc[lon_res_calc != 0])]).round(5)
+
+    lat_spacing, lon_spacing = resolution, resolution
+
+    # Create arrays of latitude and longitude values using inferred spacing
+    latitudes = np.arange(
+        df.index.get_level_values("latitude").min(),
+        df.index.get_level_values("latitude").max() + lat_spacing,
+        lat_spacing,
+    )
+    longitudes = np.arange(
+        df.index.get_level_values("longitude").min(),
+        df.index.get_level_values("longitude").max() + lon_spacing,
+        lon_spacing,
+    )
+    # prepare index from (unrounded) index of 
+    index = pd.MultiIndex.from_product(
+        [latitudes, longitudes], names=["approx_latitude", "approx_longitude"]
+    )
+    if isinstance(df, pd.Series):
+        new_df = df.reindex(index, fill_value=np.nan).to_frame()
+    else:
+        new_df = df.reindex(index, fill_value=np.nan)
+
+    new_df["latitude"] = new_df.index.get_level_values("approx_latitude").round(5)
+    new_df["longitude"] = new_df.index.get_level_values("approx_longitude").round(5)
+
+    df = df.reset_index(inplace=False)
+    df["latitude"] = df["latitude"].round(5)
+    df["longitude"] = df["longitude"].round(5)
+    # return df
+    new_df = new_df.reset_index(inplace=False)
+    new_df.set_index(["latitude", "longitude"], inplace=True)
+    new_df.drop(columns=["approx_latitude", "approx_longitude"], inplace=True)
+    # return df
+    df.set_index(["latitude", "longitude"], inplace=True)
+
+    return df.combine_first(new_df).to_xarray().sortby(["latitude", "longitude"])
+
+# def spatially_reform_data(df, resolution: float = None):
+#     """TODO: docstring"""
+
+#     return df.to_xarray().sortby(["latitude", "longitude"])
 
 
 def resample_xarray_to_target(
@@ -404,155 +480,156 @@ def min_max_of_all_spatial_coords(
     return (np.min(lats), np.max(lats)), (np.min(lons), np.max(lons))
 
 
-def return_pixels_closest_to_value(
-    array: np.ndarray,
-    central_value: float,
-    tolerance: float = 0.5,
-    buffer_pixels: int = 10,
-    bathymetry_only: bool = True,
-) -> np.ndarray:
-    """Returns a 1D array of all the pixels in the input array that are closest to a specified central value within a
-    given tolerance and within a pixel buffer zone.
+# def return_pixels_closest_to_value(
+#     array: np.ndarray,
+#     central_value: float,
+#     tolerance: float = 0.5,
+#     buffer_pixels: int = 10,
+#     bathymetry_only: bool = True,
+# ) -> np.ndarray:
+#     """Returns a 1D array of all the pixels in the input array that are closest to a specified central value within a
+#     given tolerance and within a pixel buffer zone.
 
-    Parameters
-    ----------
-        array (np.ndarray): The input array of pixel values.
-        central_value (float): The central value to which the pixels should be compared.
-        tolerance (float, optional): The tolerance within which the pixels are considered to be "close" to the central
-            value. Defaults to 0.5.
-        buffer_pixels (int, optional): The size of the buffer zone around the pixels. Defaults to 10.
-        bathymetry_only (bool, optional): Whether to only consider bathymetric data, i.e., values less than zero.
-            Defaults to True.
+#     Parameters
+#     ----------
+#         array (np.ndarray): The input array of pixel values.
+#         central_value (float): The central value to which the pixels should be compared.
+#         tolerance (float, optional): The tolerance within which the pixels are considered to be "close" to the central
+#             value. Defaults to 0.5.
+#         buffer_pixels (int, optional): The size of the buffer zone around the pixels. Defaults to 10.
+#         bathymetry_only (bool, optional): Whether to only consider bathymetric data, i.e., values less than zero.
+#             Defaults to True.
 
-    Returns
-    -------
-        np.ndarray: A 1D array of all the pixels in the input array that are closest to the specified central value
-        within the given tolerance and within the pixel buffer zone.
-    """
-    binary = np.isclose(array, central_value, atol=0.5)
-    # morphological dilation operation
-    dilated = binary_dilation(binary, iterations=buffer_pixels)
+#     Returns
+#     -------
+#         np.ndarray: A 1D array of all the pixels in the input array that are closest to the specified central value
+#         within the given tolerance and within the pixel buffer zone.
+#     """
+#     binary = np.isclose(array, central_value, atol=0.5)
+#     # morphological dilation operation
+#     dilated = binary_dilation(binary, iterations=buffer_pixels)
 
-    array_vals = array[dilated]
-    # if specifying only bathymetric data
-    if bathymetry_only:
-        array_vals = array_vals[array_vals < 0]
+#     array_vals = array[dilated]
+#     # if specifying only bathymetric data
+#     if bathymetry_only:
+#         array_vals = array_vals[array_vals < 0]
 
-    # return only non-zero values as 1d array
-    return array_vals[np.nonzero(array_vals)]
-
-
-def tif_to_xarray(tif_path: Path | str, renamed: str = None) -> xa.DataArray:
-    """
-    Convert a TIFF file to an xarray.DataArray object.
-
-    Parameters
-    ----------
-        tif_path (Path or str): Path to the TIFF file.
-        renamed (str, optional): Name to assign to the DataArray. If not provided, the original name will be used.
-
-    Returns
-    -------∂aArray: The converted DataArray object.
-    """
-    xa_da = rio.open_rasterio(rasterio.open(tif_path))
-    if renamed:
-        return process_xa_d(xa_da.rename(renamed))
-    else:
-        return process_xa_d(xa_da)
+#     # return only non-zero values as 1d array
+#     return array_vals[np.nonzero(array_vals)]
 
 
-def return_distance_closest_to_value(
-    array: np.ndarray,
-    central_value: float,
-    tolerance: float = 0.5,
-    buffer_distance: float = 300,
-    distance_per_pixel: float = 30,
-    bathymetry_only: bool = True,
-) -> np.ndarray:
-    """Wrapper for return_pixels_closest_to_value() allowing specification by distance from thresholded values rather
-    than number of pixels
+# def tif_to_xarray(tif_path: Path | str, renamed: str = None) -> xa.DataArray:
+#     """
+#     Convert a TIFF file to an xarray.DataArray object.
 
-    Returns a 1D array of all the pixels in the input array that are closest to a specified central value within a
-    given tolerance and within a distance buffer zone.
+#     Parameters
+#     ----------
+#         tif_path (Path or str): Path to the TIFF file.
+#         renamed (str, optional): Name to assign to the DataArray. If not provided, the original name will be used.
 
-    Parameters
-    ----------
-        array (np.ndarray): The input array of pixel values.
-        central_value (float): The central value to which the pixels should be compared.
-        tolerance (float, optional): The tolerance within which the pixels are considered to be "close" to the central
-            value. Defaults to 0.5.
-        buffer_distance (float, optional): The size of the buffer zone around the pixels. Defaults to 300.
-        bathymetry_only (bool, optional): Whether to only consider bathymetric data, i.e., values less than zero.
-            Defaults to True.
-
-    Returns
-    -------
-        np.ndarray: A 1D array of all the pixels in the input array that are closest to the specified central value
-        within the given tolerance and within the distance buffer zone.
-    """
-    buffer_pixels = buffer_distance / distance_per_pixel
-    return return_pixels_closest_to_value(
-        array, central_value, tolerance, buffer_pixels, bathymetry_only
-    )
+#     Returns
+#     -------∂aArray: The converted DataArray object.
+#     """
+#     xa_da = rio.open_rasterio(rasterio.open(tif_path))
+#     if renamed:
+#         return process_xa_d(xa_da.rename(renamed))
+#     else:
+#         return process_xa_d(xa_da)
 
 
-def upsample_xa_array(
-    xa_array: xa.DataArray, resolution: float = 1 / 12, shape: tuple = None
-) -> xa.DataArray:
-    """Upsamples the resolution of a DataArray using rioxarray's 'reproject' functionality: reprojecting it onto a lower
-    resolution and/or differently-sized grid
+# def return_distance_closest_to_value(
+#     array: np.ndarray,
+#     central_value: float,
+#     tolerance: float = 0.5,
+#     buffer_distance: float = 300,
+#     distance_per_pixel: float = 30,
+#     bathymetry_only: bool = True,
+# ) -> np.ndarray:
+#     """Wrapper for return_pixels_closest_to_value() allowing specification by distance from thresholded values rather
+#     than number of pixels
 
-    Parameters
-    ----------
-    xa_array (xa.DataArray): Input DataArray to upsample.
-    resolution (float, optional): Output resolution of the upsampled DataArray, in the same units as the input.
-        Defaults to 1/12.
-    shape (tuple, optional): Shape of the output DataArray as (height, width). If specified, overrides the resolution
-        parameter.
+#     Returns a 1D array of all the pixels in the input array that are closest to a specified central value within a
+#     given tolerance and within a distance buffer zone.
 
-    Returns
-    -------
-    xa.DataArray: The upsampled DataArray
-    """
+#     Parameters
+#     ----------
+#         array (np.ndarray): The input array of pixel values.
+#         central_value (float): The central value to which the pixels should be compared.
+#         tolerance (float, optional): The tolerance within which the pixels are considered to be "close" to the central
+#             value. Defaults to 0.5.
+#         buffer_distance (float, optional): The size of the buffer zone around the pixels. Defaults to 300.
+#         bathymetry_only (bool, optional): Whether to only consider bathymetric data, i.e., values less than zero.
+#             Defaults to True.
 
-    if not shape:
-        upsampled_array = xa_array.rio.reproject(
-            xa_array.rio.crs, resolution=resolution
-        )
-    else:
-        upsampled_array = xa_array.rio.reproject(xa_array.rio.crs, shape=shape)
+#     Returns
+#     -------
+#         np.ndarray: A 1D array of all the pixels in the input array that are closest to the specified central value
+#         within the given tolerance and within the distance buffer zone.
+#     """
+#     buffer_pixels = buffer_distance / distance_per_pixel
+#     return return_pixels_closest_to_value(
+#         array, central_value, tolerance, buffer_pixels, bathymetry_only
+#     )
 
-    return upsampled_array
+
+# def upsample_xa_array(
+#     xa_array: xa.DataArray, resolution: float = 1 / 12, shape: tuple = None
+# ) -> xa.DataArray:
+#     """Upsamples the resolution of a DataArray using rioxarray's 'reproject' functionality: reprojecting it onto a
+# lower
+#     resolution and/or differently-sized grid
+
+#     Parameters
+#     ----------
+#     xa_array (xa.DataArray): Input DataArray to upsample.
+#     resolution (float, optional): Output resolution of the upsampled DataArray, in the same units as the input.
+#         Defaults to 1/12.
+#     shape (tuple, optional): Shape of the output DataArray as (height, width). If specified, overrides the resolution
+#         parameter.
+
+#     Returns
+#     -------
+#     xa.DataArray: The upsampled DataArray
+#     """
+
+#     if not shape:
+#         upsampled_array = xa_array.rio.reproject(
+#             xa_array.rio.crs, resolution=resolution
+#         )
+#     else:
+#         upsampled_array = xa_array.rio.reproject(xa_array.rio.crs, shape=shape)
+
+#     return upsampled_array
 
 
-def upsample_dict_of_xa_arrays(
-    xa_dict: dict, resolution: float = 1 / 12, shape: tuple[int, int] = None
-) -> dict:
-    """Upsamples the resolution of each DataArray in a dictionary and returns the upsampled dictionary.
+# def upsample_dict_of_xa_arrays(
+#     xa_dict: dict, resolution: float = 1 / 12, shape: tuple[int, int] = None
+# ) -> dict:
+#     """Upsamples the resolution of each DataArray in a dictionary and returns the upsampled dictionary.
 
-    Parameters
-    ----------
-    xa_dict (dict): Dictionary containing the input DataArrays.
-    resolution (float, optional): Output resolution of the upsampled DataArrays, in the same units as the input.
-        Defaults to 1/12.
-    shape (tuple, optional): Shape of the output DataArrays as (height, width). If specified, overrides the resolution
-        parameter.
+#     Parameters
+#     ----------
+#     xa_dict (dict): Dictionary containing the input DataArrays.
+#     resolution (float, optional): Output resolution of the upsampled DataArrays, in the same units as the input.
+#         Defaults to 1/12.
+#     shape (tuple, optional): Shape of the output DataArrays as (height, width). If specified, overrides the resolution
+#         parameter.
 
-    Returns
-    -------
-    dict: Dictionary containing the upsampled DataArrays with corresponding keys as array_name_upsampled names.
-    TODO: add in check to ensure that upsampling rather than downsampling?
-    """
-    upsampled_dict = {}
-    print(f"Upsampling {xa_dict.keys()} from dictionary to {resolution}{shape}.")
-    for name, array in tqdm(xa_dict.items(), desc="processing xarray dict: "):
-        upsampled_name = "_".join(
-            (file_ops.remove_suffix(name), "upsampled", "{0:.3g}".format(resolution))
-        )
-        upsampled_array = upsample_xa_array(array, resolution, shape)
-        upsampled_dict[upsampled_name] = upsampled_array
+#     Returns
+#     -------
+#     dict: Dictionary containing the upsampled DataArrays with corresponding keys as array_name_upsampled names.
+#     TODO: add in check to ensure that upsampling rather than downsampling?
+#     """
+#     upsampled_dict = {}
+#     print(f"Upsampling {xa_dict.keys()} from dictionary to {resolution}{shape}.")
+#     for name, array in tqdm(xa_dict.items(), desc="processing xarray dict: "):
+#         upsampled_name = "_".join(
+#             (file_ops.remove_suffix(name), "upsampled", "{0:.3g}".format(resolution))
+#         )
+#         upsampled_array = upsample_xa_array(array, resolution, shape)
+#         upsampled_dict[upsampled_name] = upsampled_array
 
-    return upsampled_dict
+#     return upsampled_dict
 
 
 def xarray_coord_limits(xa_array: xa.Dataset, dim: str) -> tuple[float]:
@@ -627,12 +704,12 @@ def rasterize_shapely_df(
         shapes = [
             (row[shapes_col], 1)
         ]  # the second value (1) represents the value to assign to the raster cell
-        rasterized = features.rasterize(
+        rasterized = rfeatures.rasterize(
             shapes=shapes,
             out_shape=(height, width),
             transform=transform,
             fill=0,
-            all_touched=True,
+            all_touched=False,
             merge_alg=rasterio.enums.MergeAlg.replace,
         )
         raster[rasterized == 1] = int(class_value)
@@ -795,7 +872,7 @@ def check_nc_exists_generate_raster_xa(
         return xa.open_dataset(filepath)
 
 
-def choose_resolution(resolution: float, unit: str = "m") -> float:
+def process_resolution_input(resolution: float, unit: str = "m") -> float:
     """
     Convert the input resolution from the specified unit to degrees or return the resolution as is.
 
@@ -811,11 +888,16 @@ def choose_resolution(resolution: float, unit: str = "m") -> float:
         float: The converted resolution in degrees or the original resolution if the unit is 'd' or 'degrees'.
 
     """
-    if unit.lower() in ["m", "metres", "metre"]:
-        _, _, av_degrees = distance_to_degrees(resolution)
-        return resolution, av_degrees
+    if unit.lower() in ["km", "kilometers"]:
+        _, _, degree_resolution = distance_to_degrees(resolution * 1000)
+    elif unit.lower() in ["m", "metres", "metre"]:
+        _, _, degree_resolution = distance_to_degrees(resolution)
     elif unit.lower() in ["d", "degrees", "degree"]:
-        return degrees_to_distances(resolution)[2], resolution
+        degree_resolution = resolution
+    else:
+        raise ValueError(f"Unit string {unit} not recognised.")
+
+    return degree_resolution
 
 
 def degrees_to_distances(
@@ -839,7 +921,7 @@ def degrees_to_distances(
     Returns
     -------
         tuple[float]: A tuple containing the converted distances in meters
-        (latitude distance, longitude distance).
+        (latitude distance, longitude distance, mean distance).
 
     Notes
     -----
@@ -1076,47 +1158,96 @@ def get_variable_values(xa_ds: xa.Dataset, var_name: str) -> list[np.ndarray]:
     return values_list
 
 
-def buffer_nans(array: np.ndarray, size: float = 1) -> np.ndarray:
-    """Buffer nan values in a 2D array by taking the mean of valid neighbors.
+# def buffer_nans(array: np.ndarray, num_pixels: float = 1) -> np.ndarray:
+#     """Buffer nan values in a 2D array by taking the mean of valid neighbors.
 
-    Parameters
-    ----------
+#     Parameters
+#     ----------
+#         array (ndarray): Input 2D array with NaN values representing land.
+#         num_pixels (int, optional): Buffer num_pixels in pixels. Defaults to 1.
+
+#     Returns
+#     -------
+#         np.ndarray: Buffered array with NaN values replaced by the mean of valid neighbors.
+#     """
+
+#     def nan_sweeper(values: np.ndarray):
+#         """Custom function to sweep NaN values and calculate the mean of valid neighbors.
+
+#         Parameters
+#         ----------
+#             values (np.ndarray): 1D array representing the neighborhood of an element.
+
+#         Returns
+#         -------
+#             float: Mean value of valid neighbors or the central element if not NaN.
+#         """
+#         central_value = values[len(values) // 2]
+#         # check if central element of kernel is nan
+#         if np.isnan(central_value):
+#             if np.isnan(values).all():
+#                 return central_value
+#             # extract valid (non-nan values)
+#             valid_values = values[~(np.isnan(values))]
+#             # and return the mean of these values, to be assigned to rest of the buffer kernel
+#             return np.mean(valid_values)
+#         else:
+#             return central_value
+
+#     actual_num_pixels = num_pixels + 1
+#     # call nan_sweeper on each element of "array"
+#     # "constant" – array extended by filling all values beyond edge with same constant value, defined by cval
+#     buffered_array = generic_filter(
+#         array, nan_sweeper, size=actual_num_pixels, mode="constant", cval=np.nan
+#     )
+#     return buffered_array
+
+
+# def buffer_nans(array: np.ndarray, num_pixels: int = 1) -> np.ndarray:
+#     """Buffer NaN values in a 2D array by taking the mean of valid neighbors.
+
+#     Parameters:
+#         array (ndarray): Input 2D array with NaN values representing land.
+#         num_pixels (int, optional): Number of pixels to buffer by. Defaults to 1.
+
+#     Returns:
+#         np.ndarray: Buffered array with NaN values replaced by the mean of valid neighbors.
+#     """
+
+#     def nan_sweeper(values):
+#         # Check if the central element of the kernel is NaN
+#         if np.isnan(values[len(values) // 2]):
+#             # Extract valid (non-NaN) values
+#             valid_values = values[~np.isnan(values)]
+#             if len(valid_values) == 0:
+#                 return np.nan  # All neighbors are NaN
+#             else:
+#                 return np.mean(valid_values)
+#         else:
+#             return values[len(values) // 2]
+
+#     # kernel_size = 2 * num_pixels + 1  # Kernel size considering neighbors
+#     kernel_size = num_pixels + 1
+#     buffered_array = generic_filter(
+#         array, nan_sweeper, size=kernel_size, mode="constant", cval=np.nan
+#     )
+#     return buffered_array
+
+
+def buffer_nans(array: np.ndarray, num_pixels: int = 1) -> np.ndarray:
+    """Buffer NaN values in a 2D array by taking the mean of valid neighbors.
+
+    Parameters:
         array (ndarray): Input 2D array with NaN values representing land.
-        size (int, optional): Buffer size in pixels. Defaults to 1.
+        num_pixels (int, optional): Number of pixels to buffer by. Defaults to 1.
 
-    Returns
-    -------
+    Returns:
         np.ndarray: Buffered array with NaN values replaced by the mean of valid neighbors.
     """
+    from skimage.restoration import inpaint
 
-    def nan_sweeper(values: np.ndarray):
-        """Custom function to sweep NaN values and calculate the mean of valid neighbors.
-
-        Parameters
-        ----------
-            values (np.ndarray): 1D array representing the neighborhood of an element.
-
-        Returns
-        -------
-            float: Mean value of valid neighbors or the central element if not NaN.
-        """
-        central_value = values[len(values) // 2]
-        # check if central element of kernel is nan
-        if np.isnan(central_value):
-            if np.isnan(values).all():
-                return central_value
-            # extract valid (non-nan values)
-            valid_values = values[~(np.isnan(values))]
-            # and return the mean of these values, to be assigned to rest of the buffer kernel
-            return np.mean(valid_values)
-        else:
-            return central_value
-
-    # call nan_sweeper on each element of "array"
-    # "constant" – array extended by filling all values beyond edge with same constant value, defined by cval
-    buffered_array = generic_filter(
-        array, nan_sweeper, size=size, mode="constant", cval=np.nan
-    )
+    mask = np.isnan(array).astype(int)
+    buffered_array = inpaint.inpaint_biharmonic(array, mask)
     return buffered_array
 
     # # Use Dask array instead of NumPy array for parallel computation
@@ -1215,14 +1346,18 @@ def chunk_as_necessary(
 
 def process_xa_d(
     xa_d: xa.Dataset | xa.DataArray,
+    rename_lat_lon_grids: bool = False,
     rename_mapping: dict = {
         "lat": "latitude",
         "lon": "longitude",
-        "x": "longitude",
         "y": "latitude",
+        "x": "longitude",
+        "i": "longitude",
+        "j": "latitude",
+        "lev": "depth",
     },
     squeeze_coords: str | list[str] = None,
-    chunk_dict: dict = {"latitude": 100, "longitude": 100, "time": 100},
+    # chunk_dict: dict = {"latitude": 100, "longitude": 100, "time": 100},
     crs: str = "EPSG:4326",
 ):
     """
@@ -1248,6 +1383,11 @@ def process_xa_d(
     """
     temp_xa_d = xa_d.copy()
 
+    if rename_lat_lon_grids:
+        temp_xa_d = temp_xa_d.rename(
+            {"latitude": "latitude_grid", "longitude": "longitude_grid"}
+        )
+
     for coord, new_coord in rename_mapping.items():
         if new_coord not in temp_xa_d.coords and coord in temp_xa_d.coords:
             temp_xa_d = temp_xa_d.rename({coord: new_coord})
@@ -1264,13 +1404,29 @@ def process_xa_d(
     else:
         temp_xa_d = temp_xa_d.transpose("latitude", "longitude")
 
-    if "grid_mapping" in xa_d.attrs:
-        del xa_d.attrs["grid_mapping"]
+    if "grid_mapping" in temp_xa_d.attrs:
+        del temp_xa_d.attrs["grid_mapping"]
+
+    # drop variables which will never be variables
+    # TODO: add as argument with default
+    drop_vars = ["time_bnds", "lat_bnds", "lon_bnds"]
+
+    if isinstance(temp_xa_d, xa.Dataset):
+        temp_xa_d = temp_xa_d.drop_vars(
+            [var for var in drop_vars if var in temp_xa_d.variables]
+        )
+
+    temp_xa_d = utils.mask_above_threshold(temp_xa_d, threshold=1e10)
+
+    # sort coordinate dimensions in order time (if time present), latitude, longitude
+    temp_xa_d = temp_xa_d.sortby(list(temp_xa_d.dims))
+
     # add crs
-    temp_xa_d.rio.write_crs(crs, inplace=True)
-    chunked_xa_d = chunk_as_necessary(temp_xa_d, chunk_dict)
+    # temp_xa_d.rio.write_crs(crs, inplace=True)    # was messing with fill_loess
+    # if chunk_dict is not None:
+    #     temp_xa_d = chunk_as_necessary(temp_xa_d, chunk_dict)
     # sort coords by ascending values
-    return chunked_xa_d.sortby(list(temp_xa_d.dims))
+    return temp_xa_d.sortby(list(temp_xa_d.dims))
 
 
 def xa_region_from_coord_bounds(xa_d, coord_bounds_dict):
@@ -1770,7 +1926,7 @@ def spatially_buffer_timeseries(
             xa_ds[data_var],
             input_core_dims=[[]],
             output_core_dims=[[]],
-            kwargs={"size": buffer_size},
+            kwargs={"num_pixels": buffer_size},
             dask="parallelized",
         )
         buffered_ds[data_var] = buffered
@@ -2021,9 +2177,9 @@ def get_vars_from_ds_or_da(xa_d: xa.DataArray | xa.Dataset) -> str | list[str]:
     -------
     str | list[str]: Variable name(s).
     """
-    if type(xa_d) == xa.core.dataarray.DataArray:
+    if xa_d.isinstance(xa.core.dataarray.DataArray):
         vars = xa_d.name
-    elif type(xa_d) == xa.core.dataarray.Dataset:
+    elif xa_d.isinstance(xa.core.dataarray.Dataset):
         vars = list(xa_d.data_vars)
     else:
         raise TypeError("Format was neither an xarray Dataset nor a DataArray")
@@ -2050,6 +2206,23 @@ def index_pair_to_lats_lons_pair(
     return lats, lons
 
 
+def calculate_coord_resolution(
+    xa_d: xa.Dataset | xa.DataArray, coord: str
+) -> tuple[float]:
+    """Calculate the spatial resolution of latitude and longitude in an xarray Dataset or DataArray.
+
+    Parameters
+    ----------
+    xa_d (xa.Dataset | xa.DataArray): Input xarray Dataset or DataArray.
+    coord (str): Coordinate to calculate the resolution of.
+
+    Returns
+    -------
+    tuple[float]: Spatial resolution of latitude and longitude.
+    """
+    return np.mean(np.diff(xa_d[coord].values))
+
+
 def calculate_spatial_resolution(xa_d: xa.Dataset | xa.DataArray) -> tuple[float]:
     """Calculate the spatial resolution of latitude and longitude in an xarray Dataset or DataArray.
 
@@ -2061,13 +2234,10 @@ def calculate_spatial_resolution(xa_d: xa.Dataset | xa.DataArray) -> tuple[float
     -------
     tuple[float]: Spatial resolution of latitude and longitude.
     """
-    # calculate number of latitude and longitude data points
-    num_lats, num_lons = len(xa_d.latitude.values), len(xa_d.longitude.values)
-    # calculate extreme values of latitude and longitude
-    lat_lims = xarray_coord_limits(xa_d, "latitude")
-    lon_lims = xarray_coord_limits(xa_d, "longitude")
-    lat_resolution = np.divide(np.diff(lat_lims), num_lats).item()
-    lon_resolution = np.divide(np.diff(lon_lims), num_lons).item()
+    # average latitudinal resolution
+    lat_resolution = calculate_coord_resolution(xa_d, "latitude")
+    # average longitudinal resolution
+    lon_resolution = calculate_coord_resolution(xa_d, "longitude")
 
     return lat_resolution, lon_resolution
 
@@ -2232,58 +2402,59 @@ def drop_xa_variables(
 
 def generate_var_mask(
     xa_d: xa.Dataset | xa.DataArray,
-    # var_name: str = "bathymetry_A",
+    mask_var: str = "elevation",
     limits: tuple[float] = [-2000, 0],
-    # sub_val: float = np.nan,
+    comp_mask_var: str = "unep_coral_presence",
 ) -> xa.DataArray:
     if isinstance(xa_d, xa.DataArray):
         return (xa_d <= max(limits)) & (xa_d >= min(limits))
+
     elif isinstance(xa_d, xa.Dataset):
-        matching_vars = [var for var in xa_d.variables if var.startswith("bath")]
-        if len(matching_vars) == 0:
-            raise ValueError("No variable starting with 'bath' found in the dataset.")
-        var_name = matching_vars[0]
-        return (xa_d[var_name] <= max(limits)) & (xa_d[var_name] >= min(limits))
+        if mask_var not in xa_d.variables:
+            raise ValueError(f"Variable {mask_var} not found in dataset.")
+        else:
+            return (xa_d[mask_var] <= max(limits)) & (xa_d[mask_var] >= min(limits))
+
     else:
         raise TypeError(
             f"xa_d was neither an xarray Dataset nor a DataArray. Instead type: {type(xa_d)}."
         )
 
 
-def resample_list_xa_ds_into_dict(
-    xa_das: list[xa.DataArray],
-    target_resolution: float,
-    unit: str = "m",
-    lat_lims: tuple[float] = (-10, -17),
-    lon_lims: tuple[float] = (142, 147),
-) -> dict:
-    """
-    Resample a list of xarray DataArrays to the target resolution and merge them.
+# def resample_list_xa_ds_into_dict(
+#     xa_das: list[xa.DataArray],
+#     target_resolution: float,
+#     unit: str = "m",
+#     lat_lims: tuple[float] = (-10, -17),
+#     lon_lims: tuple[float] = (142, 147),
+# ) -> dict:
+#     """
+#     Resample a list of xarray DataArrays to the target resolution and merge them.
 
-    Parameters
-    ----------
-        xa_das (list[xa.DataArray]): A list of xarray DataArrays to be resampled and merged.
-        target_resolution (float): The target resolution for resampling.
-        unit (str, defaults to "m"): The unit of the target resolution.
-        interp_method: (str, defaults to "linear") The interpolation method for resampling.
+#     Parameters
+#     ----------
+#         xa_das (list[xa.DataArray]): A list of xarray DataArrays to be resampled and merged.
+#         target_resolution (float): The target resolution for resampling.
+#         unit (str, defaults to "m"): The unit of the target resolution.
+#         interp_method: (str, defaults to "linear") The interpolation method for resampling.
 
-    Returns
-    -------
-        A dictionary containing the resampled xarray DataArrays merged by their names.
-    """
-    # TODO: will probably need to save to individual files/folders and combine at test/train time
-    # may need to go to target array here
-    target_resolution_d = choose_resolution(target_resolution, unit)[1]
+#     Returns
+#     -------
+#         A dictionary containing the resampled xarray DataArrays merged by their names.
+#     """
+#     # TODO: will probably need to save to individual files/folders and combine at test/train time
+#     # may need to go to target array here
+#     target_resolution_d = choose_resolution(target_resolution, unit)[1]
 
-    # dummy_xa = generate_dummy_xa(target_resolution_d, lat_lims, lon_lims)
+#     # dummy_xa = generate_dummy_xa(target_resolution_d, lat_lims, lon_lims)
 
-    resampled_xa_das_dict = {}
-    for xa_da in tqdm(xa_das, desc="Resampling xarray DataArrays"):
-        # xa_resampled = resample_xa_d_to_other(xa_da, dummy_xa, name=xa_da.name)
-        xa_resampled = resample_xarray_to_target(xa_da, target_resolution_d)
-        resampled_xa_das_dict[xa_da.name] = xa_resampled
+#     resampled_xa_das_dict = {}
+#     for xa_da in tqdm(xa_das, desc="Resampling xarray DataArrays"):
+#         # xa_resampled = resample_xa_d_to_other(xa_da, dummy_xa, name=xa_da.name)
+#         xa_resampled = resample_xarray_to_target(xa_da, target_resolution_d)
+#         resampled_xa_das_dict[xa_da.name] = xa_resampled
 
-    return resampled_xa_das_dict
+#     return resampled_xa_das_dict
 
 
 def combine_ds_tiles(

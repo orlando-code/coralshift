@@ -1,82 +1,386 @@
-from __future__ import annotations
+# general
+import pandas as pd
+import numpy as np
 
+# spatial
+import xarray as xa
+import geopandas as gpd
+
+# file ops
 from pathlib import Path
 from tqdm import tqdm
 import urllib
 import json
-import xarray as xa
-import pandas as pd
-import geopandas as gpd
-import rasterio
-import rioxarray as rio
-import numpy as np
+import yaml
+import os
+import pickle
+import csv
 
+# custom
 from coralshift.processing import spatial_data
-from coralshift.utils import utils, directories, config
+from coralshift.utils import utils, config
 
 
-def check_file_exists(
-    filepath: Path | str = None,
-    dir_path: Path | str = None,
-    filename: str = None,
-    suffix: str = None,
-) -> bool:
-    """Check if a file with the specified filename and optional suffix exists in the given directory.
-    # TODO: potentially more checking required
-    Parameters
-    ----------
-    dir_path (Path | str): Path to the directory where the file should be located.
-    filename (str): Name of the file to check for.
-    suffix (str, optional) Optional suffix for the filename, by default None.
+class FileName:
+    def __init__(
+        self,
+        variable_id: str | list,
+        grid_type: str,
+        fname_type: str,
+        date_range: str = None,
+        lats: list[float, float] = None,
+        lons: list[float, float] = None,
+        levs: list[int, int] = None,
+        plevels: list[float, float] = None,
+    ):
+        """
+        Args:
+            source_id (str): name of climate model
+            member_id (str): model run
+            variable_id (str): variable name
+            grid_type (str): type of grid (tripolar or latlon)
+            fname_type (str): type of file (individual, time-concatted, var_concatted) TODO
+            lats (list[float, float], optional): latitude range. Defaults to None.
+            lons (list[float, float], optional): longitude range. Defaults to None.
+            plevels (list[float, float], optional): pressure level range. Defaults to None.
+            fname (str, optional): filename. Defaults to None to allow construction.
+        """
+        self.variable_id = variable_id
+        self.grid_type = grid_type
+        self.fname_type = fname_type
+        self.date_range = date_range
+        self.lats = lats
+        self.lons = lons
+        self.levs = levs
+        self.plevels = plevels
+
+    def get_spatial(self):
+        if self.lats and self.lons:  # if spatial range specified (i.e. cropping)
+            # cast self.lats and self.lons lists to integers. A little crude, but avoids decimals in filenames
+            lats = [int(lat) for lat in self.lats]
+            lons = [int(lon) for lon in self.lons]
+            return utils.lat_lon_string_from_tuples(lats, lons).upper()
+        else:
+            return "uncropped"
+
+    def get_plevels(self):
+        if self.plevels == [-1] or self.plevels == -1:  # seafloor
+            return f"sfl-{max(self.levs)}"
+        elif not self.plevels:
+            return "sfc"
+            if self.plevels[0] is None:
+                return "sfc"
+        elif isinstance(self.plevels, float):  # specified pressure level
+            return "{:.0f}".format(self.plevels / 100)
+        elif isinstance(self.plevels, list):  # pressure level range
+            if self.plevels[0] is None:  # if plevels is list of None, surface
+                return "sfc"
+            return f"levs_{min(self.plevels)}-{max(self.plevels)}"
+        else:
+            raise ValueError(
+                f"plevel must be one of [-1, float, list]. Instead received '{self.plevels}'"
+            )
+
+    def get_var_str(self):
+        if isinstance(self.variable_id, list):
+            return "_".join(self.variable_id)
+        else:
+            return self.variable_id
+
+    def get_grid_type(self):
+        if self.grid_type == "tripolar":
+            return "tp"
+        elif self.grid_type == "latlon":
+            return "ll"
+        else:
+            raise ValueError(
+                f"grid_type must be 'tripolar' or 'latlon'. Instead received '{self.grid_type}'"
+            )
+
+    def get_date_range(self):
+        if not self.date_range:
+            return None
+        if self.fname_type == "time_concatted" or self.fname_type == "var_concatted":
+            # Can't figure out how it's being done currently
+            return str("-".join((str(self.date_range[0]), str(self.date_range[1]))))
+        else:
+            return self.date_range
+
+    def join_as_necessary(self):
+        var_str = self.get_var_str()
+        spatial = self.get_spatial()
+        plevels = self.get_plevels()
+        grid_type = self.get_grid_type()
+        date_range = self.get_date_range()
+
+        # join these variables separated by '_', so long as the variable is not None
+        return "_".join(
+            [i for i in [var_str, spatial, plevels, grid_type, date_range] if i]
+        )
+
+    def construct_fname(self):
+
+        if self.fname_type == "var_concatted":
+            if not isinstance(self.variable_id, list):
+                raise TypeError(
+                    f"Concatted variable requires multiple variable_ids. Instead received '{self.variable_id}'"
+                )
+
+        self.fname = self.join_as_necessary()
+
+        return f"{self.fname}.nc"
+
+
+def combine_dataframes(df1, df2):
+    # Get shared columns
+    # shared_cols = set(df1.columns) & set(df2.columns)
+
+    # Add new columns from df2 to df1
+    new_cols_df2 = set(df2.columns) - set(df1.columns)
+    for col in new_cols_df2:
+        df1[col] = np.nan  # Add new column with NaN values
+
+    # Concatenate data frames along rows
+    combined_df = pd.concat([df1, df2], ignore_index=True, sort=False)
+
+    # Reorder columns based on original header (df1)
+    combined_df = combined_df.reindex(columns=df1.columns)
+
+    return combined_df
+
+
+def write_dict_to_csv(dict_info, csv_fp):
+    csv_fp = Path(csv_fp)
+    # read new data
+    flattened_data = utils.flatten_dict(dict_info)
+    df_new = pd.DataFrame([flattened_data])
+    if csv_fp.exists():
+        df = pd.read_csv(csv_fp)
+    else:
+        df_new.to_csv(csv_fp, index=False)
+        return
+
+    combined_df = combine_dataframes(df, df_new)
+    combined_df.to_csv(csv_fp, index=False)
+
+
+# def write_dict_to_csv(yaml_dict: dict, csv_fp: str | Path):
+#     """
+#     Writes data from a YAML file to a CSV file.
+
+#     Args:
+#         yaml_fp (str or Path): The file path of the YAML configuration file.
+
+#     Raises:
+#         FileNotFoundError: If the YAML file specified by `yaml_fp` does not exist.
+
+#     """
+#     flattened_data = utils.flatten_dict(yaml_dict)
+
+#     # Create DataFrame from flattened dictionary
+#     df = pd.DataFrame([flattened_data])
+
+#     # Check if CSV file exists
+#     file_exists = Path(csv_fp).exists()
+
+#     # Read existing header from CSV file if it exists
+#     existing_header = []
+#     if file_exists:
+#         existing_df = pd.read_csv(csv_fp)
+#         existing_header = existing_df.columns.tolist()
+
+#     # Add new columns to the DataFrame and update header
+#     for col in df.columns:
+#         if col not in existing_header:
+#             existing_header.append(col)
+#             if file_exists:
+#                 existing_df[col] = pd.NA  # Add new column with NaN values
+
+#     # Concatenate existing DataFrame and new DataFrame
+#     if file_exists:
+#         # df = pd.concat([existing_df, df], ignore_index=True, sort=False)
+#         df = existing_df.merge(df, sort=False)
+
+#     # Write DataFrame to CSV
+#     # df.to_csv(csv_fp, mode='a', index=False, header=not file_exists)
+#     df.to_csv(csv_fp, mode='a', index=False, header=existing_header)
+
+# # Flatten nested dictionaries
+# flattened_data = utils.flatten_dict(yaml_dict)
+
+# # Extract keys and values
+# keys = list(flattened_data.keys())
+# values = list(flattened_data.values())
+
+# # Check if CSV file exists
+# csv_file = Path(csv_fp)
+# file_exists = csv_file.exists()
+
+# # Open CSV file in append mode
+# # with open(csv_fp, "a", newline="") as csv_f:
+# #     csv_writer = csv.writer(csv_f)
+
+# #     # Write header if CSV file is newly created
+# #     if not file_exists:
+# #         csv_writer.writerow(keys)
+
+# #     header = read_csv_header(csv_fp)
+# #     # if keys contains values not in header, append these values to the original header (overwrite original)
+# #     for key in keys:
+# #         if key not in header:
+# #             header.append(key)
+# #     ### This line should overwrite csv header with updated header
+
+# #     # Write values to CSV
+# #     csv_writer.writerow(values)
+# # Open CSV file in read mode to read the existing content
+# existing_content = []
+# if file_exists:
+#     with open(csv_fp, "r", newline="") as csv_f:
+#         reader = csv.reader(csv_f)
+#         # Read existing content line by line
+#         existing_content = list(reader)
+
+# # Open CSV file in write mode to write the updated content
+# with open(csv_fp, "w", newline="") as csv_f:
+#     csv_writer = csv.writer(csv_f)
+
+#     # Write the updated header
+#     if not file_exists:
+#         csv_writer.writerow(keys)
+#     else:
+#         # Update the header with new keys not present in the original header
+#         header = existing_content[0]
+#         for key in keys:
+#             if key not in header:
+#                 header.append(key)
+#         csv_writer.writerow(header)
+
+#         # Write the original data
+#         for row in existing_content[1:]:
+#             csv_writer.writerow(row)
+
+#     # Write values to CSV
+#     csv_writer.writerow(values)
+#####
+
+# # Create CSV file if it doesn't exist
+# if not Path(csv_fp).exists():
+#     with open(csv_fp, "w", newline="") as csv_f:
+#         csv_writer = csv.DictWriter(csv_f, fieldnames=flattened_data.keys())
+#         csv_writer.writeheader()
+
+# # Open CSV file in append mode
+# with open(csv_fp, "a", newline="") as csv_f:
+#     csv_writer = csv.DictWriter(csv_f, fieldnames=flattened_data.keys())
+#     csv_writer.writerow(flattened_data)
+#     # make a list of values in the order of columns and write them
+#     csv_writer.writerow(
+#         [flattened_data.get(col, None) for col in flattened_data.keys()]
+#     )
+
+
+def read_csv_header(csv_fp: str | Path) -> list[str]:
+    """
+    Reads the header (first line) of a CSV file.
+
+    Args:
+        csv_fp (str or Path): The file path of the CSV file.
+
+    Returns:
+        list: List containing the header fields.
+    """
+    # Open CSV file in read mode
+    with open(csv_fp, "r", newline="") as csv_f:
+        csv_reader = csv.reader(csv_f)
+        # Read the first row (header)
+        header = next(csv_reader)
+
+    return header
+
+
+class FileHandler:
+    def __init__(self, config_info, model_code, base_dir: str | Path = None):
+        self.config_info = config_info
+        self.model_code = model_code
+        self.base_dir = base_dir
+
+    def construct_fp_dir(self):
+        res_str = utils.replace_dot_with_dash(str(self.config_info["resolution"]))
+        return (
+            Path(Path(self.base_dir) if self.base_dir else config.runs_dir)
+            / f"{res_str}d"
+            / self.model_code
+        )
+
+    def construct_fp_stem(self):
+        return "_".join(self.config_info["datasets"])
+
+    def unique_num(self, fp_dir):
+        """Returns the highest ID number of the same fp_stem (function of datasets) in the IDXXX naming convention"""
+        counter = 0
+        fp_stem = self.construct_fp_stem()
+        new_filename = f"ID000_{fp_stem}"
+        while list(Path(fp_dir).glob(f"{new_filename}*")):
+            counter += 1
+            new_filename = f"ID{utils.pad_number_with_zeros(counter, resulting_len=3)}_{Path(fp_stem).stem}"
+        return counter
+
+    def get_highest_unique_fname(self, fp_dir=None):
+        fp_stem = self.construct_fp_stem()
+        if not fp_dir:
+            fp_dir = self.construct_fp_dir()
+        highest_num = self.unique_num(fp_dir) - 1
+        return (
+            f"ID{utils.pad_number_with_zeros(highest_num, resulting_len=3)}_{fp_stem}"
+        )
+
+    def get_next_unique_fname(self, fp_dir=None):
+        fp_stem = self.construct_fp_stem()
+        if not fp_dir:
+            fp_dir = self.construct_fp_dir()
+        return f"ID{utils.pad_number_with_zeros(self.unique_num(fp_dir), resulting_len=3)}_{fp_stem}"
+
+    def get_next_unique_fp_root(self, fp_dir=None):
+        if not fp_dir:
+            fp_dir = self.construct_fp_dir()
+        return fp_dir / self.get_next_unique_fname(fp_dir)
+
+    def get_highest_unique_fp_root(self, fp_dir=None):
+        if not fp_dir:
+            fp_dir = self.construct_fp_dir()
+        return fp_dir / self.get_highest_unique_fname(fp_dir)
+
+
+def guarantee_existence(path: Path | str) -> Path:
+    """Checks if string is an existing directory path, else creates it
+
+    Parameter
+    ---------
+    path (str)
 
     Returns
     -------
-    bool: True if the file exists, False otherwise.
+    Path
+        pathlib.Path object of path
     """
-    # if filepath argument not provided, try to create from directory path and filename
-    if not filepath:
-        filepath = Path(dir_path) / filename
-    # if suffix argument provided (likely in conjunction with a "filename", append)
-    if suffix:
-        filepath = Path(filepath).with_suffix(pad_suffix(suffix))
-    return filepath.is_file()
+    path_obj = Path(path)
+    if not path_obj.exists():
+        path_obj.mkdir(parents=True, exist_ok=True)
+    return path_obj.resolve()
 
 
-def save_nc(
-    save_dir: Path | str,
-    filename: str,
-    xa_d: xa.DataArray | xa.Dataset,
-    return_array: bool = False,
-) -> xa.DataArray | xa.Dataset:
-    """
-    Save the given xarray DataArray or Dataset to a NetCDF file iff no file with the same
-    name already exists in the directory.
-    # TODO: issues when suffix provided
-    Parameters
-    ----------
-        save_dir (Path or str): The directory path to save the NetCDF file.
-        filename (str): The name of the NetCDF file.
-        xa_d (xarray.DataArray or xarray.Dataset): The xarray DataArray or Dataset to be saved.
-
-    Returns
-    -------
-        xarray.DataArray or xarray.Dataset: The input xarray object.
-    """
-    filename = remove_suffix(utils.replace_dot_with_dash(filename))
-    save_path = (Path(save_dir) / filename).with_suffix(".nc")
-    if not save_path.is_file():
-        if "grid_mapping" in xa_d.attrs:
-            del xa_d.attrs["grid_mapping"]
-        print(f"Writing {filename} to file at {save_path}")
-        spatial_data.process_xa_d(xa_d).to_netcdf(save_path)
-        print("Writing complete.")
+def check_exists_save(
+    xa_d: xa.Dataset | xa.DataArray,
+    save_fp: str | Path,
+    save_message: str,
+    skip_message: str,
+):
+    if not os.path.exists(save_fp):
+        print(save_message, flush=True)
     else:
-        print(f"{filename} already exists in {save_dir}")
-
-    if return_array:
-        return save_path, xa.open_dataset(save_path, decode_coords="all")
-    else:
-        return save_path
+        print(skip_message, flush=True)
+    return not os.path.exists(save_fp)
 
 
 def prune_file_list_on_existence(file_list: list[Path | str]) -> list:
@@ -195,35 +499,6 @@ def check_path_suffix(path: Path | str, comparison: str) -> bool:
         return False
 
 
-# def load_merge_nc_files(
-#     nc_dir: Path | str, incl_subdirs: bool = True, concat_dim: str = "time"
-# ):
-#     """Load and merge all netCDF files in a directory.
-
-#     Parameters
-#     ----------
-#         nc_dir (Path | str): directory containing the netCDF files to be merged.
-
-#     Returns
-#     -------
-#         xr.Dataset: merged xarray Dataset object containing the data from all netCDF files.
-#     """
-#     # specify whether searching subdirectories as well
-#     files = return_list_filepaths(nc_dir, ".nc", incl_subdirs)
-#     # if only a single file present (no need to merge)
-#     if len(files) == 1:
-#         return xa.open_dataset(files[0])
-#     # combine nc files by time
-#     ds = xa.open_mfdataset(
-#         files,
-#         decode_cf=False,
-#         concat_dim=concat_dim,
-#         combine="nested",
-#         coords="minimal",
-#     )
-#     return xa.decode_cf(ds).sortby("time", ascending=True)
-
-
 def merge_nc_files_in_dir(
     nc_dir: Path | str,
     filename: str = None,
@@ -285,16 +560,6 @@ def merge_nc_files_in_dir(
         print(f"{merged_save_path} already exists.")
     return merged_save_path
 
-    # # combine nc files by time
-    # ds = xa.open_mfdataset(
-    #     filepaths,
-    #     decode_cf=False,
-    #     concat_dim=concat_dim,
-    #     combine="nested",
-    #     coords="minimal",
-    # )
-    # return xa.decode_cf(ds).sortby("time", ascending=True)
-
 
 def merge_nc_files_in_dirs(
     parent_dir: Path | str, filename: str = "placeholder", concat_dim: str = "time"
@@ -317,23 +582,6 @@ def merge_nc_files_in_dirs(
         return merge_nc_files_in_dir(
             nc_dir, filename, include_subdirs=True, concat_dim=concat_dim
         )
-        # merged_name = f"{str(dir.stem)}_time_merged.nc"
-        # merged_path = dir / merged_name
-        # print(f"Merging .nc files into {merged_path}")
-
-        # # if merged doesn't already exist
-        # if not merged_path.is_file():
-        #     files = return_list_filepaths(dir, ".nc", incl_subdirs=False)
-        #     if len(files) == 1:
-        #         ds = xa.open_dataset(files[0])
-        #     else:
-        #         # combine nc files by time
-        #         ds = xa.open_mfdataset(
-        #             files, decode_cf=False, concat_dim=concat_dim, combine="nested"
-        #         ).sortby("time", ascending=True)
-        #     ds.to_netcdf(merged_path)
-        # else:
-        #     print(f"{merged_path} already exists.")
 
 
 def merge_from_dirs(parent_dir: Path | str, concat_files_common: str):
@@ -349,47 +597,6 @@ def merge_from_dirs(parent_dir: Path | str, concat_files_common: str):
             merged_data = xa.merge([merged_data, dataset])
 
     return merged_data
-
-    # # specify whether searching subdirectories as well
-    # files = return_list_filepaths(nc_dir, ".nc", incl_subdirs)
-    # # if only a single file present (no need to merge)
-    # if len(files) == 1:
-    #     return xa.open_dataset(files[0])
-    # # combine nc files by time
-    # ds = xa.open_mfdataset(
-    #     files, decode_cf=False, concat_dim=concat_dim, combine="nested"
-    # )
-    # return xa.decode_cf(ds).sortby("time", ascending=True)
-
-    # for each subdir in turn, get list of files
-    # merge files in list with distinct name
-    # concatenate merged files
-
-
-# def merge_save_nc_files(download_dir: Path | str, filename: str):
-#     # read relevant .nc files and merge to return master xarray
-#     xa_ds = load_merge_nc_files(Path(download_dir))
-#     save_path = Path(Path(download_dir), filename).with_suffix(".nc")
-#     xa_ds.to_netcdf(save_path)
-#     print(f"Combined nc file written to {save_path}.")
-#     return xa_ds
-
-
-# hopefully isn't necessary, since loading all datasets into memory is very intensive and not scalable
-# def naive_nc_merge(dir: Path | str):
-#     file_paths = return_list_filepaths(dir, ".nc")
-#     # get names of files
-#     filenames = [file_path.stem for file_path in file_paths]
-#     # load in files to memory as xarray
-#     das = [xa.load_dataset(file_path) for file_path in file_paths]
-
-#     combined = xa.merge([da for da in das], compat="override")
-
-#     # save combined file
-#     save_name = filenames[0] + "&" + filenames[-1] + "_merged.nc"
-#     save_path = Path(dir) / save_name
-#     combined.to_netcdf(path=save_path)
-#     print(f"{save_name} saved successfully")
 
 
 def pad_suffix(suffix: str) -> str:
@@ -461,38 +668,39 @@ def read_nc_path(nc_file_path: Path | str, engine: str = "h5netcdf") -> xa.DataA
     return xa.open_dataset(nc_file_path, engine=engine)
 
 
-def dict_of_ncs_from_dir(
-    dir_path: Path | str, crs: str = "epsg:4326", engine: str = "h5netcdf"
-) -> dict:
-    """Reads multiple netcdf files in a directory and returns a dictionary of DataArrays.
+# def dict_of_ncs_from_dir(
+#     dir_path: Path | str, crs: str = "epsg:4326", engine: str = "h5netcdf"
+# ) -> dict:
+#     """Reads multiple netcdf files in a directory and returns a dictionary of DataArrays.
 
-    Parameters
-    ----------
-    dir_path (Path | str): Path to directory containing netCDF files.
-    engine (str, optional): Engine to use to read netCDF files. Defaults to "h5netcdf".
+#     Parameters
+#     ----------
+#     dir_path (Path | str): Path to directory containing netCDF files.
+#     engine (str, optional): Engine to use to read netCDF files. Defaults to "h5netcdf".
 
-    Returns
-    -------
-    dict
-        Dictionary containing the DataArrays, keyed by the file names without the .nc extension.
+#     Returns
+#     -------
+#     dict
+#         Dictionary containing the DataArrays, keyed by the file names without the .nc extension.
 
-    TODO: Could also make into a more generic function which reads in different file types in correct way. Haven't done
-    this for now since will all be read in different ways
-    """
-    # generate list of all ".nc" format files in directory
-    nc_files_list = return_list_filepaths(dir_path, ".nc")
+#     TODO: Could also make into a more generic function which reads in different file types in correct way. Haven't
+# done
+#     this for now since will all be read in different ways
+#     """
+#     # generate list of all ".nc" format files in directory
+#     nc_files_list = return_list_filepaths(dir_path, ".nc")
 
-    nc_arrays_dict = {}
-    for nc_path in tqdm(nc_files_list):
-        # fetch "name.extension" of file from path
-        path_end = get_n_last_subparts_path(nc_path, 1)
-        # fetch name of file
-        nc_filename = remove_suffix(str(path_end))
-        # read file and assign crs
-        nc_array = read_nc_path(nc_path, engine).rio.write_crs(crs, inplace=True)
-        nc_arrays_dict[nc_filename] = nc_array
+#     nc_arrays_dict = {}
+#     for nc_path in tqdm(nc_files_list):
+#         # fetch "name.extension" of file from path
+#         path_end = get_n_last_subparts_path(nc_path, 1)
+#         # fetch name of file
+#         nc_filename = remove_suffix(str(path_end))
+#         # read file and assign crs
+#         nc_array = read_nc_path(nc_path, engine).rio.write_crs(crs, inplace=True)
+#         nc_arrays_dict[nc_filename] = nc_array
 
-    return nc_arrays_dict
+#     return nc_arrays_dict
 
 
 def load_gpkg(filepath):
@@ -624,22 +832,6 @@ def add_suffix_if_necessary(filepath: Path | str, suffix_to_add: str) -> Path:
         )
 
 
-def generate_filepath(
-    dir_path: str | Path, filename: str = None, suffix: str = None
-) -> Path:
-    """Generates directory path if non-existant; if filename provided, generates filepath, adding suffix if
-    necessary."""
-    # if generating/ensuring directory path
-    if not filename:
-        return config.guarantee_existence(dir_path)
-    # if filename provided, seemingly with suffix included
-    elif not suffix:
-        return Path(dir_path) / filename
-    # if filename and suffix provided
-    else:
-        return (Path(dir_path) / filename).with_suffix(pad_suffix(suffix))
-
-
 class NpEncoder(json.JSONEncoder):
     """
     Custom JSON encoder to handle NumPy types.
@@ -688,21 +880,6 @@ def save_json(
         print(f"Dictionary saved as json file at {filepath}")
 
 
-def tif_to_xa_array(tif_path) -> xa.DataArray:
-    return spatial_data.process_xa_d(rio.open_rasterio(rasterio.open(tif_path)))
-
-
-def save_dict_xa_ds_to_nc(
-    xa_d_dict: dict, save_dir: Path | str, target_resolution: float = None
-) -> None:
-    for filename, array in tqdm(xa_d_dict.items(), desc="Writing tifs to nc files"):
-        if target_resolution:
-            spatial_data.upsample_xarray_to_target(
-                xa_array=array, target_resolution=target_resolution
-            )
-        save_nc(save_dir, filename, array)
-
-
 def resample_list_xa_ds_into_dict(
     xa_das: list[xa.DataArray],
     target_resolution: float,
@@ -741,142 +918,6 @@ def resample_list_xa_ds_into_dict(
     return resampled_xa_das_dict
 
 
-def resample_dir_ncs(ncs_dir, target_resolution_d=1 / 27):
-    nc_files = return_list_filepaths(ncs_dir, ".nc", incl_subdirs=False)
-    res_string = utils.generate_resolution_str(target_resolution_d)
-
-    save_dir = config.guarantee_existence(ncs_dir / f"{res_string}_arrays")
-    for nc in nc_files:
-        nc_xa = open_xa_file(nc).astype("float32")
-        new_name = f"{str(nc.stem)}_{res_string}"
-        # resample to res
-        resampled = spatial_data.resample_xarray_to_target(
-            xa_d=nc_xa, target_resolution_d=target_resolution_d, name=new_name
-        )
-        # save
-        save_nc(save_dir, new_name, resampled)
-
-
-def tifs_to_resampled_ncs(
-    tifs_dir: Path | str = None,
-    target_resolution_d: float = 1 / 27,
-):
-    if not tifs_dir:
-        tifs_dir = (directories.get_reef_baseline_dir(),)
-    tif_files = return_list_filepaths(tifs_dir, ".tif")
-
-    res_string = utils.generate_resolution_str(target_resolution_d)
-
-    save_dir = config.guarantee_existence(tifs_dir / f"{res_string}_arrays")
-    for tif in tif_files:
-        c_xa = open_xa_file(tif)
-        new_name = f"{str(c_xa.stem)}_{res_string}"
-        # resample to res
-        resampled = spatial_data.resample_xarray_to_target(
-            xa_d=c_xa, target_resolution_d=target_resolution_d, name=new_name
-        )
-        # save
-        save_nc(save_dir, new_name, resampled)
-
-
-def resample_list_xa_ds_to_target_res_and_save(
-    xa_das: list[xa.DataArray],
-    target_resolution_d: float,
-    unit: str = "m",
-    lat_lims: tuple[float] = (-10, -17),
-    lon_lims: tuple[float] = (142, 147),
-) -> None:
-    """
-    Resamples a list of xarray DataArrays to a target resolution, and saves the resampled DataArrays to NetCDF files.
-
-    Parameters
-    ----------
-        xa_das (list[xa.DataArray]): A list of xarray DataArrays to be resampled.
-        target_resolution_d (float): The target resolution in degrees or meters, depending on the unit specified.
-        unit (str, optional): The unit of the target resolution. Defaults to "m".
-        lat_lims (tuple[float], optional): Latitude limits for the dummy DataArray used for resampling.
-            Defaults to (-10, -17).
-        lon_lims (tuple[float], optional): Longitude limits for the dummy DataArray used for resampling.
-            Defaults to (142, 147).
-
-    Returns
-    -------
-        None
-    """
-
-    dummy_xa = spatial_data.generate_dummy_xa(target_resolution_d, lat_lims, lon_lims)
-
-    save_dir = generate_filepath(
-        (
-            directories.get_comparison_dir()
-            / utils.replace_dot_with_dash(f"{target_resolution_d:.05f}d_arrays")
-        )
-    )
-
-    for xa_da in tqdm(
-        xa_das,
-        desc=f"Resampling xarray DataArrays to {target_resolution_d:.05f}d",
-        position=1,
-        leave=True,
-    ):
-        filename = utils.replace_dot_with_dash(
-            f"{xa_da.name}_{target_resolution_d:.05f}d"
-        )
-        save_path = (save_dir / filename).with_suffix(".nc")
-
-        if not save_path.is_file():
-            xa_resampled = spatial_data.process_xa_d(
-                spatial_data.upsample_xa_d_to_other(
-                    spatial_data.process_xa_d(xa_da), dummy_xa, name=xa_da.name
-                )
-            )
-            # causes problems with saving
-            if "grid_mapping" in xa_resampled.attrs:
-                del xa_resampled.attrs["grid_mapping"]
-
-            xa_resampled.to_netcdf(save_path)
-        else:
-            print(f"{filename} already exists in {save_dir}")
-
-
-# def resample_list_xa_ds_to_target_resolution_and_merge(
-#     xa_das: list[xa.DataArray],
-#     target_resolution: float,
-#     unit: str = "m",
-#     lat_lims: tuple[float] = (-10, -17),
-#     lon_lims: tuple[float] = (142, 147),
-# ) -> dict:
-#     """
-#     Resample a list of xarray DataArrays to the target resolution and merge them.
-
-#     Parameters
-#     ----------
-#         xa_das (list[xa.DataArray]): A list of xarray DataArrays to be resampled and merged.
-#         target_resolution (float): The target resolution for resampling.
-#         unit (str, defaults to "m"): The unit of the target resolution.
-#         interp_method: (str, defaults to "linear") The interpolation method for resampling.
-
-#     Returns
-#     -------
-#         A dictionary containing the resampled xarray DataArrays merged by their names.
-#     """
-#     # TODO: will probably need to save to individual files/folders and combine at test/train time
-#     # may need to go to target array here
-#     target_resolution_d = spatial_data.choose_resolution(target_resolution, unit)[1]
-
-#     dummy_xa = spatial_data.generate_dummy_xa(target_resolution_d, lat_lims, lon_lims)
-
-#     resampled_xa_das_dict = {}
-#     for xa_da in tqdm(xa_das, desc="Resampling xarray DataArrays"):
-#         xa_resampled = spatial_data.resample_xa_d_to_other(
-#             xa_da, dummy_xa, name=xa_da.name
-#         )
-#         # xa_resampled = spatial_data.upsample_xarray_to_target(xa_da, target_resolution_d)
-#         resampled_xa_das_dict[xa_da.name] = xa_resampled
-
-#     return resampled_xa_das_dict, unit
-
-
 def extract_variable(xa_d: xa.Dataset | xa.DataArray, name=None):
     """
     Extract the first data variable from an xarray dataset that isn't "spatial_ref".
@@ -907,13 +948,160 @@ def extract_variable(xa_d: xa.Dataset | xa.DataArray, name=None):
         return xa_d
 
 
-def open_xa_file(xa_path: Path | str) -> xa.Dataset | xa.DataArray:
-    try:
-        return spatial_data.process_xa_d(
-            xa.open_dataarray(xa_path, decode_coords="all")
-        )
-    except ValueError:
-        return spatial_data.process_xa_d(xa.open_dataset(xa_path, decode_coords="all"))
+####
+# Michaelmas
+
+
+def create_coord_subdir_name(og_dir_p, lats, lons, depths):
+    """
+    Creates a subdirectory of the original directory with the coordinates of the data appended to the name.
+
+    Args:
+        og_dir_p (str): The original directory.
+        lats (list): The latitude values of the data.
+        lons (list): The longitude values of the data.
+        depths (list): The depth values of the data.
+
+    Returns:
+        None
+
+    TODO: make less specific i.e. can specify a subset of info to append to new dir. Could split into
+    naming and creation
+    """
+    og_dir_name = Path(og_dir_p).name
+    # Concatenate lat and lon values to create a subdirectory name
+    sub_dir_name = utils.replace_dot_with_dash(
+        f"{og_dir_name}_lat{min(lats)}_{max(lats)}_lon{min(lons)}_{max(lons)}_dep{min(depths)}_{max(depths)}"
+    )
+
+    return sub_dir_name
+
+
+def create_subdirectory(og_dir_p, subdir_name):
+    """
+    Creates a subdirectory of the original directory with the coordinates of the data appended to the name.
+
+    Args:
+        og_dir_p (str): The original directory.
+        new_dir_name (str): The name of the new subdirectory.
+
+    Returns:
+        None
+    """
+    # Create a Path object for the subdirectory
+    subdir_p = og_dir_p / subdir_name
+
+    # Check if the subdirectory already exists
+    if not subdir_p.exists():
+        # Create the subdirectory
+        subdir_p.mkdir(parents=True, exist_ok=True)
+        print(f"Subdirectory '{subdir_name}' created successfully.")
+    else:
+        print(f"Subdirectory '{subdir_name}' already exists.")
+
+
+def read_yaml(yaml_path: str | Path):
+    with open(yaml_path, "r") as file:
+        yaml_info = yaml.safe_load(file)
+    return yaml_info
+
+
+def edit_yaml(yaml_path: str | Path, info: dict):
+    yaml_info = read_yaml(yaml_path)
+    yaml_info.update(info)
+
+    save_yaml(yaml_path, yaml_info)
+
+
+def save_yaml(yaml_path: str | Path, info: dict):
+    with open(yaml_path, "w") as file:
+        yaml.dump(info, file)
+
+
+def uniquify_file_numerically(dir_path: str | Path, filename: str):
+    """If a file already exists in the directory, make a new file with a number appended to the end"""
+    counter = 1
+    new_filename = f"{filename}_000"
+    while (dir_path / new_filename).exists():
+        new_filename = f"{Path(filename).stem}_{utils.pad_number_with_zeros(counter, resulting_len=3)}{Path(filename).suffix}"  # noqa
+        counter += 1
+    return new_filename
+
+
+def uniquify_file_wordily(dir_path: str | Path, filename: str):
+    """If a file already exists in the directory, make a new file with a letter appended to the end"""
+    counter = 97  # ASCII code for 'a'
+    new_filename = f"{filename}_a"
+    while (dir_path / new_filename).exists():
+        new_filename = f"{Path(filename).stem}_{chr(counter)}_{Path(filename).suffix}"
+        counter += 1
+    return new_filename
+
+
+def read_pickle(pkl_path: str | Path):
+    with open(pkl_path, "rb") as file:
+        pkl_info = pickle.load(file)
+    return pkl_info
+
+
+def write_pickle(pkl_path: str | Path, info):
+    with open(pkl_path, "wb") as file:
+        pickle.dump(info, file)
+
+
+def rename_nc_with_coords(
+    nc_fp: Path | str, lat_coord_name: str = None, lon_coord_name: str = None, delete_og: bool = True
+) -> None:
+    """
+    Renames a NetCDF file with latitude and longitude coordinates.
+
+    Args:
+        nc_fp (Path | str): The file path of the NetCDF file to be renamed.
+        lat_coord_name (str, optional): The name of the latitude coordinate variable. If not provided,
+            common latitude coordinate names will be used.
+        lon_coord_name (str, optional): The name of the longitude coordinate variable. If not provided,
+            common longitude coordinate names will be used.
+        delete_og (bool, optional): Whether to delete the original file after renaming. Defaults to False.
+
+    Raises:
+        ValueError: If the latitude or longitude coordinate is not found in the dataset.
+        FileExistsError: If the new file path already exists.
+
+    Returns:
+        None
+    """
+    nc_fp = Path(nc_fp)
+    nc_xa = xa.open_dataset(nc_fp)
+
+    lat_coord_possibilities = ["lat", "latitude", "y"] if not lat_coord_name else [lat_coord_name]
+    lon_coord_possibilities = ["lon", "longitude", "x"] if not lon_coord_name else [lon_coord_name]
+
+    lat_coord = next((coord for coord in lat_coord_possibilities if coord in nc_xa.coords), None)
+    lon_coord = next((coord for coord in lon_coord_possibilities if coord in nc_xa.coords), None)
+
+    if not lat_coord:
+        raise ValueError("Latitude coordinate not found in the dataset.")
+    if not lon_coord:
+        raise ValueError("Longitude coordinate not found in the dataset.")
+
+    min_lat, max_lat = nc_xa[lat_coord].values.min(), nc_xa[lat_coord].values.max()
+    min_lon, max_lon = nc_xa[lon_coord].values.min(), nc_xa[lon_coord].values.max()
+
+    lats_strs = [f"s{utils.replace_dot_with_dash(str(abs(round(lat, 1))))}" if lat < 0 else f"n{utils.replace_dot_with_dash(str(abs(round(lat, 1))))}" for lat in [min_lat, max_lat]]   # noqa
+    lons_strs = [f"w{utils.replace_dot_with_dash(str(abs(round(lon, 1))))}" if lon < 0 else f"e{utils.replace_dot_with_dash(str(abs(round(lon, 1))))}" for lon in [min_lon, max_lon]]   # noqa
+
+    new_fp = nc_fp.parent / f"{nc_fp.stem}_{lats_strs[1]}_{lats_strs[0]}_{lons_strs[0]}_{lons_strs[1]}.nc"
+
+    if new_fp.exists():
+        raise FileExistsError(f"File {new_fp} already exists.")
+
+    print("Writing file...")
+    nc_xa.to_netcdf(new_fp)
+    print(f"Written {nc_fp} to {new_fp}")
+
+    if delete_og:
+        nc_fp.unlink()
+        print(f"Deleted {nc_fp}")
 
 
 ############

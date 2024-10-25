@@ -1,8 +1,8 @@
 import json
 import pandas as pd
 import geopandas as gpd
-import numpy as np
-import rasterio
+# import numpy as np
+# import rasterio
 import xarray as xa
 from tqdm import tqdm
 
@@ -118,52 +118,52 @@ def process_benthic_pd(
     return gpd.GeoDataFrame(filtered_df, geometry=geometry_col)
 
 
-def rasterize_gdf(gdf: gpd.GeoDataFrame, chunk_size: int = 100):
-    """Rasterizes a GeoDataFrame into a raster array.
-    N.B. prohibitively computationally-expensive to run locally
+# def rasterize_gdf(gdf: gpd.GeoDataFrame, chunk_size: int = 100):
+#     """Rasterizes a GeoDataFrame into a raster array.
+#     N.B. prohibitively computationally-expensive to run locally
 
-    Parameters
-    ----------
-        gdf (gpd.GeoDataFrame): The GeoDataFrame containing the geometries to rasterize.
-        chunk_size (int, optional): The size of the chunks to process the GeoDataFrame. Defaults to 100.
+#     Parameters
+#     ----------
+#         gdf (gpd.GeoDataFrame): The GeoDataFrame containing the geometries to rasterize.
+#         chunk_size (int, optional): The size of the chunks to process the GeoDataFrame. Defaults to 100.
 
-    Returns
-    -------
-        np.ndarray: The rasterized array representing the GeoDataFrame.
-    """
+#     Returns
+#     -------
+#         np.ndarray: The rasterized array representing the GeoDataFrame.
+#     """
 
-    # Prepare raster parameters
-    lon_min, lat_min, lon_max, lat_max = gdf.total_bounds
-    (lat_distance, lon_distance) = spatial_data.degrees_to_distances(
-        lat_max - lat_min,
-        lon_max - lon_min,
-        np.mean((lat_min, lat_max)),
-        np.mean((lon_max, lon_min)),
-    )
-    width = int(lon_distance)
-    height = int(lat_distance)
-    pixel_size = 5
-    transform = rasterio.transform.from_origin(
-        lon_min, lat_max, xsize=pixel_size, ysize=pixel_size
-    )
+#     # Prepare raster parameters
+#     lon_min, lat_min, lon_max, lat_max = gdf.total_bounds
+#     (lat_distance, lon_distance) = spatial_data.degrees_to_distances(
+#         lat_max - lat_min,
+#         lon_max - lon_min,
+#         np.mean((lat_min, lat_max)),
+#         np.mean((lon_max, lon_min)),
+#     )
+#     width = int(lon_distance)
+#     height = int(lat_distance)
+#     pixel_size = 5
+#     transform = rasterio.transform.from_origin(
+#         lon_min, lat_max, xsize=pixel_size, ysize=pixel_size
+#     )
 
-    # Create an empty raster array
-    raster_array = np.zeros((height, width), dtype=np.uint8)  # Use the desired dtype
+#     # Create an empty raster array
+#     raster_array = np.zeros((height, width), dtype=np.uint8)  # Use the desired dtype
 
-    # Process the geodataframe in chunks
-    for i in tqdm(range(0, len(gdf), chunk_size), desc="Rasterizing chunks"):
-        # Get the chunk of data
-        chunk = gdf.iloc[i : i + chunk_size]  # noqa
+#     # Process the geodataframe in chunks
+#     for i in tqdm(range(0, len(gdf), chunk_size), desc="Rasterizing chunks"):
+#         # Get the chunk of data
+#         chunk = gdf.iloc[i : i + chunk_size]  # noqa
 
-        # Get the shapes and values for the chunk
-        shapes = (
-            (geom, value) for geom, value in zip(chunk.geometry, chunk["class_val"])
-        )
+#         # Get the shapes and values for the chunk
+#         shapes = (
+#             (geom, value) for geom, value in zip(chunk.geometry, chunk["class_val"])
+#         )
 
-        # Rasterize the shapes in the chunk
-        out = rasterio.rasterize(shapes=shapes, out=raster_array, transform=transform)
+#         # Rasterize the shapes in the chunk
+#         out = rasterio.rasterize(shapes=shapes, out=raster_array, transform=transform)
 
-    return out
+#     return out
 
 
 def process_coral_gt_tifs(tif_dir_name=None, target_resolution_d: float = None):
@@ -218,57 +218,3 @@ def process_reef_extent_tifs(target_resolution_d: float = None):
         resampled_gt_nc_dict[new_name] = xa_d
     # save dictionary of tifs to nc, if files not already existing
     file_ops.save_dict_xa_ds_to_nc(gt_nc_dict, directories.get_gt_files_dir())
-
-
-############
-# DEPRECATED
-############
-
-# def process_nc_dir_coral_gt_tifs(tif_dir_name=None, target_resolution_d:float=None):
-#     if not tif_dir_name:
-#         tif_dir = directories.get_reef_baseline_dir()
-#     else:
-#         tif_dir = directories.get_reef_baseline_dir() / tif_dir_name
-
-#     nc_dir = file_ops.guarantee_existence(tif_dir / "gt_nc_dir")
-#     # save tifs to ncs in new dir
-#     tif_paths = tifs_to_ncs(nc_dir, target_resolution_d)
-#     # get list of nc paths in dir
-#     xa_arrays_list = [tif_to_xa_array(tif_path) for tif_path in tif_paths]
-#     # merge ncs into one mega nc file
-#     if len(xa_arrays_list) > 1:
-#         concatted = xa.concat(xa_arrays_list, dim=["latitude","longitude"])
-#     else:
-#         concatted = xa_arrays_list[0]
-#     file_ops.save_nc(nc_dir, f"concatenated_{target_resolution_d:.05f}_degree", concatted)
-
-
-# def tifs_to_ncs(nc_dir: Path | list[str], target_resolution_d: float=None) -> None:
-
-#     tif_dir = nc_dir.parent
-#     tif_paths = file_ops.return_list_filepaths(tif_dir, ".tif")
-#     xa_array_dict = {}
-#     for tif_path in tqdm(tif_paths, total=len(tif_paths), desc="Writing tifs to nc files"):
-#         # filename = str(file_ops.get_n_last_subparts_path(tif, 1))
-#         filename = tif_path.stem
-#         tif_array = tif_to_xa_array(tif_path)
-#         # xa_array_dict[filename] = tif_array.rename(filename)
-#         if target_resolution_d:
-#             tif_array = spatial_data.upsample_xarray_to_target
-#   xa_array=tif_array, target_resolution=target_resolution_d)
-#         # save array to nc file
-#         file_ops.save_nc(tif_dir, filename, tif_array)
-
-#     return tif_paths
-#     print(f"All tifs converted to xarrays and stored as .nc files in {nc_dir}.")
-
-
-# def process_reef_extent_tifs():
-#     # fetch list of ground truth tifs
-#     gt_tif_files = file_ops.return_list_filepaths(
-#         directories.get_gt_files_dir(), ".tif"
-#     )
-#     # generate dictionary of file names and arrays: {filename: xarray.DataArray, ...}
-#     gt_tif_dict = spatial_data.tifs_to_xa_array_dict(gt_tif_files)
-#     # save dictionary of tifs to nc, if files not already existing
-#     file_ops.save_dict_xa_ds_to_nc(gt_tif_dict, directories.get_gt_files_dir())

@@ -1,0 +1,73 @@
+# depth_mask_lims:
+# - -1000
+# - 0
+data_source: asdf
+regressor_classification_threshold: 0.01
+depth_mask: [-1000, 10]
+ds_type: static
+predictand: UNEP_GDCR
+datasets: 
+- cmip6
+- unep
+# - gebco
+# - slope
+env_vars:
+- tos
+# - mlotst
+# - rsdo
+# - so
+# - thetao
+# - uo
+# - vo
+# - hfds
+# - wfo
+# - aragos
+# - umo
+# - vmo
+# o2def
+random_state: 42
+resolution: 0.01
+resolution_unit: d
+# pos_neg_ratio: 0.25
+year_range_to_include: [1950, 2015] # TODO: revise for future
+upsample_method: linear
+downsample_method: mean
+spatial_buffer: 10
+save_figs: True
+do_train: True
+do_save_model: True
+do_plot: True
+processing:
+  do_crop: False
+# spatial extent
+lats:
+- -30
+- -2
+# - -5
+# - 0
+lons:
+# - 140
+# - 145
+- 140
+- 166
+levs:
+- 0
+- 20
+split_type: spatial
+test_geom: [-16, -10, 140, 160]
+train_test_val_frac: [0.8, 0.2, 0]
+X_scaler: standard
+y_scaler: minmax
+hyperparameter_search:
+  cv_folds: 5
+  n_samples: -1
+  n_iter: 100
+  search_type: random
+  do_search: False
+  n_trials: 5
+  search_types:
+  # - grid
+  - random
+  n_jobs: 8
+source_id: "EC-Earth3P-HR"
+member_id: "r1i1p2f1"

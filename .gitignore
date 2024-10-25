@@ -19,3 +19,23 @@ __pycache__/
 ### VisualStudioCode Patch ###
 # Ignore all local history of files
 **/.history
+
+# ignore data folder: too large for repository
+/data
+
+# ignore logging: specific to user
+/logs
+/testlogs
+/newtestlogs
+
+# machine learning runs
+/runs/*
+!/runs/config_files/
+!/runs/config_files/*
+/runs/config_files/multi_config/*    
+
+# ignore any installation-specific directories egg
+**/*egg*/
+
+# ignore graveyard scripts
+**/graveyard/*
