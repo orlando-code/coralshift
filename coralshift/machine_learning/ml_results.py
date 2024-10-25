@@ -26,21 +26,30 @@ class AnalyseResults:
         trains: tuple[pd.DataFrame, pd.DataFrame] = None,
         tests: tuple[pd.DataFrame, pd.DataFrame] = None,
         vals: tuple[pd.DataFrame, pd.DataFrame] = None,
-        do_plot: bool = True,
+        trains_preds: pd.DataFrame = None,
+        tests_preds: pd.DataFrame = None,
+        do_plot: bool = False,
         save_graphs: bool = True,
         config_info: dict = None,
         presentation_format: bool = False,
+        extent: list[float] = None,
     ):
         self.model = model
         self.model_code = model_code
         self.trains = trains
         self.tests = tests
         self.vals = vals
+        self.trains_preds = trains_preds
+        self.tests_preds = tests_preds
         self.do_plot = do_plot
         self.save_graphs = save_graphs
         self.config_info = config_info
+        self.extent = extent if extent else [*self.config_info["lons"], *self.config_info["lats"]]
         self.ds_type = None
         self.presentation_format = presentation_format
+
+        if config_info:
+            self.__dict__.update(config_info)
 
     def make_predictions(self, X):
         num_points = X.shape[0]
@@ -147,7 +156,7 @@ class AnalyseResults:
 
     def plot_spatial_inference_comparison(self, y, predictions):
         f, ax = visualise_results.plot_spatial_inference_comparison(
-            y, predictions, self.presentation_format
+            y, predictions, self.presentation_format, extent=self.extent
         )
         self.save_fig(fn="spatial_inference_comparison", dpi=f.dpi)
 
@@ -161,6 +170,7 @@ class AnalyseResults:
             predictions,
             self.config_info["regressor_classification_threshold"],
             presentation_format=self.presentation_format,
+            extent=self.extent,
         )
         self.save_fig(fn="spatial_confusion_matrix", dpi=f.dpi)
 
@@ -173,6 +183,7 @@ class AnalyseResults:
         f, ax = visualise_results.plot_spatial_residuals(
             y,
             predictions,
+            extent=self.extent
             # presentation_format=self.presentation_format
         )
         self.save_fig(fn="spatial_differences", dpi=f.dpi)
@@ -202,7 +213,10 @@ class AnalyseResults:
 
         for i, ds in enumerate([self.trains, self.tests, self.vals]):
             self.ds_type = ds_types[i]
-            predictions = self.make_predictions(ds[0][:n_samples])
+            if not self.trains_preds:
+                predictions = self.make_predictions(ds[0][:n_samples])
+            else:
+                predictions = self.trains_preds if self.ds_type == "trains" else self.tests_preds
 
             self.produce_plots(ds[1][:n_samples], predictions)
             self.produce_metrics(ds[1][:n_samples], predictions)

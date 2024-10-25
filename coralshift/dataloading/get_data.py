@@ -27,6 +27,7 @@ from pathlib import Path
 # custom
 from coralshift.dataloading import bathymetry
 from coralshift.utils import utils, config
+from coralshift.utils.config import Config
 from coralshift.processing import spatial_data, ml_processing
 
 import cmipper.file_ops as cmipper_file_ops
@@ -65,17 +66,14 @@ def generate_xa_ds_from_shapefile(
     correct_resolutions = find_files_for_resolution(potential_fps, res_str)
     xas = cmipper_file_ops.find_files_for_area(correct_resolutions, lats, lons)
 
-    if len(xas) >= 1:
+    if len(xas) >= 10000:   # TODO: temp
         print(f"Loading {shapefile_id} xarray at {degrees_resolution:.03f} degrees resolution.")
+        print(f"loading from {xas[0]}")
         return xa.open_dataset(xas[0]).sel(latitude=slice(*lats), longitude=slice(*lons))
     else:
-        print(f"Loading {shapefile_id} data...")
-        # unep_fp = (
-        #     Path(config.gt_data_dir)
-        #     / "unep_wcmc/01_Data/WCMC008_CoralReef2021_Py_v4_1.shp"
-        # )
+        print(f"Loading {shapefile_id} data from original shapefile: {shapefile_fp}")
+
         # load unep tabular data. Don't dask yet to allow filtering by region (if required)
-        # unep_gdf = gpd.read_file(unep_fp).cx[lats[0] : lats[1], lons[0] : lons[1]]
         gdf = daskgpd.read_file(shapefile_fp, npartitions=4)
         if shapefile_id in ["wri", "WRI_REEF_EXTENT"]:  # this gdf is weirdly bundled into one row
             gdf = gdf.explode()
@@ -104,6 +102,11 @@ def generate_xa_ds_from_shapefile(
             resolution=degrees_resolution,
             name=shapefile_id.upper(),
         ).chunk("auto")
+        xa_d.longitude.attrs["units"] = "degrees_east" 
+        xa_d.latitude.attrs["units"] = "degrees_north" 
+        
+        # reproject to bathymetry resolution for saving
+
 
         # generate filepath and save
         spatial_extent_info = cmipper_utils.lat_lon_string_from_tuples(lats, lons).upper()
@@ -258,9 +261,9 @@ class ReturnRaster:
     # - reef_check / reef_check_points
 
     """
-
     def __init__(
         self,
+        config_info: Config,
         # dataset: str = None,
         lats: list[float, float] = None,
         lons: list[float, float] = None,
@@ -276,43 +279,43 @@ class ReturnRaster:
         year_range_to_include: list[int, int] = None,
         # source: str = "EC-Earth3P-HR",    # TODO: be more specific with which source
         # member: str = "r1i1p1f1",
-        config_info: dict = None,
+        # config_info: dict = None,
     ):
-        if config_info:
-            self.__dict__.update(config_info)
+        # if config_info:
+        #     self.__dict__.update(config_info)
 
         # self.dataset = dataset if dataset else config_info["dataset"]
-        self.lats = lats if lats else config_info["lats"]
-        self.lons = lons if lons else config_info["lons"]
-        self.buffered_lats = utils.get_buffered_lims(self.lats, self.resolution)
-        self.buffered_lons = utils.get_buffered_lims(self.lons, self.resolution)
-        self.levs = levs if levs else config_info["levs"]
-        self.resolution = resolution if resolution else config_info["resolution"]
+        self.lats = lats if lats else config_info.lats
+        self.lons = lons if lons else config_info.lons
+        self.buffered_lats = utils.get_buffered_lims(self.lats)
+        self.buffered_lons = utils.get_buffered_lims(self.lons)
+        self.levs = levs if levs else config_info.levs
+        self.resolution = resolution if resolution else config_info.resolution
         self.resolution_unit = (
-            resolution_unit if resolution_unit else config_info["resolution_unit"]
+            resolution_unit if resolution_unit else config_info.resolution_unit
         )
         # self.pos_neg_ratio = pos_neg_ratio if pos_neg_ratio else config_info["pos_neg_ratio"]
         self.upsample_method = (
-            upsample_method if upsample_method else config_info["upsample_method"]
+            upsample_method if upsample_method else config_info.upsample_method
         )
         self.downsample_method = (
-            downsample_method if downsample_method else config_info["downsample_method"]
+            downsample_method if downsample_method else config_info.downsample_method
         )
         self.spatial_buffer = (
-            spatial_buffer if spatial_buffer else config_info["spatial_buffer"]
+            spatial_buffer if spatial_buffer else config_info.spatial_buffer
         )
-        self.ds_type = ds_type if ds_type else config_info["ds_type"]
+        self.ds_type = ds_type if ds_type else config_info.ds_type
         self.env_vars = (
-            env_vars if env_vars else config_info["env_vars"] if config_info else None
+            env_vars if env_vars else config_info.env_vars if config_info else None
         )
         self.year_range_to_include = (
             year_range_to_include
             if year_range_to_include
-            else config_info["year_range_to_include"]
+            else config_info.year_range_to_include
         )
-        self.config_info = config_info
+        self.cfg = config_info
 
-    def get_raw_raster(self, dataset):
+    def get_raw_raster(self, dataset, ds=None):
         if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence"]:
             # TODO: check that there isn't an intersecting one already
             return generate_xa_ds_from_shapefile(
@@ -357,24 +360,26 @@ class ReturnRaster:
                 return raster
             else:
                 raise ValueError("No intersecting CMIP6 files found.")
-
+        elif dataset == "new":
+            return ds
         else:
-            raise ValueError(f"Dataset {self.dataset} not recognised.")
+            raise ValueError(f"Dataset {dataset} not recognised.")
 
-    def get_resampled_raster(self, raster, dataset):
+    def get_resampled_raster(self, raster, dataset="cmip"):
         self.resolution = spatial_data.process_resolution_input(
             self.resolution, self.resolution_unit
         )
         print(f"\tresampling dataset to {self.resolution} degree(s) resolution...\n")
 
         if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence"]:
+            # count number of coral-containing cells in region
             resample_method = Resampling.sum
         else:
             resample_method = Resampling.bilinear
 
         # fetching more data than required necessary to avoid missing values at edge
 
-        # # print(buffered_lats, buffered_lons)
+        # print(self.buffered_lats, self.buffered_lons)
 
         # LATS = [-32, 0]
         # LONS = [130, 170]
@@ -389,34 +394,6 @@ class ReturnRaster:
             resample_method=resample_method,
             project_first=True,
         )
-
-    # def get_resampled_raster(self, raster):
-    #     self.resolution = spatial_data.process_resolution_input(
-    #         self.resolution, self.resolution_unit
-    #     )
-    #     print(f"\tresampling dataset to {self.resolution} degree(s) resolution...\n")
-
-    #     current_resolution = utils.get_resolution(raster)
-    #     if self.resolution < current_resolution:
-    #         resample_method = self.upsample_method
-    #     else:
-    #         resample_method = self.downsample_method
-
-    #     # doing this to get around "buffer size too small error"
-    #     rough_regrid = resample_xa_d(
-    #         raster,
-    #         lat_range=self.lats,
-    #         lon_range=self.lons,
-    #         resolution=self.resolution,
-    #         resample_method=resample_method,
-    #     )
-    #     return xesmf_regrid(
-    #         rough_regrid,
-    #         lat_range=self.lats,
-    #         lon_range=self.lons,
-    #         resolution=self.resolution,
-    #         # resample_method=resample_method,
-    #     )
 
     def get_spatially_buffered_raster(self, raster):
         print("\tapplying spatial buffering...")
@@ -440,19 +417,19 @@ class ReturnRaster:
         #     )
         # return static_ds
 
-    def return_raster(self, dataset=None):
+    def return_raster(self, dataset=None, ds=None):
         # order of operations decided to minimise unnecessarily intensive processing while
         # preserving information
         if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence"]:
             dtype = np.float32  # necessary for nan values when resampling
-        else:
-            dtype = np.float32
-        # self.buffered_lats = utils.get_buffered_lims(self.lats, self.resolution)
-        # self.buffered_lons = utils.get_buffered_lims(self.lons, self.resolution)
 
-        processed_raster = spatial_data.process_xa_d(
-            self.get_raw_raster(dataset=dataset)
-        ).astype(dtype)
+        if dataset == "new":
+            processed_raster = spatial_data.process_xa_d(
+                self.get_raw_raster(dataset, ds=ds)).astype(dtype)
+        else:
+            processed_raster = spatial_data.process_xa_d(
+                self.get_raw_raster(dataset).astype(dtype)
+            )
         # this shouldn't be necessary (process_xa_d included in cmip download, but made a change to remove time_bnds
         # since then)
 
@@ -469,12 +446,12 @@ class ReturnRaster:
             )
         resampled_raster = self.get_resampled_raster(buffered_raster, dataset=dataset)
 
-        if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence"]:
-            # normalise to coral cover
-            lat_res, lon_res = abs(resampled_raster.rio.resolution()[0]), abs(resampled_raster.rio.resolution()[1])
-            cell_area = lat_res * lon_res   # in degrees
-            cell_area = cell_area * 110e3 * 110e3   # in m2 # TODO: adjust area further from the equator
-            resampled_raster = 30**2 * resampled_raster / cell_area     # area of single observation of unep
+        # if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence"]:
+        #     # normalise to coral cover
+        #     lat_res, lon_res = abs(resampled_raster.rio.resolution()[0]), abs(resampled_raster.rio.resolution()[1])
+        #     cell_area = lat_res * lon_res   # in degrees
+        #     cell_area = cell_area * 110e3 * 110e3 * np.cos(np.mean(resampled_raster.latitude) * np.pi / 180)  # in m^2
+        #     resampled_raster = 30**2 * resampled_raster / cell_area     # area of single observation of unep
 
         return resampled_raster
 
@@ -595,7 +572,7 @@ def rasterize_geodf(
         fill=0,     # not nan since integer, and want to have negative target (0)
         all_touched=all_touched,    # argument to be made that this doesn't best reflect suitability
         dtype=rasterio.uint16,  # updated since was reaching upper limit of uint8
-        merge_alg=merge_alg,
+        merge_alg=merge_alg,    # ignore overlapping polygons
     )
 
 

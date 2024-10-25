@@ -5,6 +5,7 @@ from matplotlib.figure import Figure
 from matplotlib import animation, colors
 import matplotlib.gridspec as gridspec
 import matplotlib.colors as mcolors
+import matplotlib.patches as patches
 import seaborn as sns
 
 # general
@@ -29,7 +30,7 @@ from coralshift.utils import file_ops
 
 
 # TODO: not working universally
-def customize_plot_colors(fig, ax, background_color="#212121", text_color="white"):
+def customize_plot_colors(fig, ax, background_color="#212121", text_color="white", legend_text_color="black"):
     # Set figure background color
     fig.patch.set_facecolor(background_color)
 
@@ -50,10 +51,10 @@ def customize_plot_colors(fig, ax, background_color="#212121", text_color="white
     ax.yaxis.label.set_color(text_color)
 
     # Set legend text color
-    legend = ax.get_legend()
+    legend = ax.get_legend()  # often don't want legend colour to be white
     if legend:
         for text in legend.get_texts():
-            text.set_color(text_color)
+            text.set_color(legend_text_color)
     # # set cbar labels
     # cbar = ax.collections[0].colorbar
     # cbar.set_label(color=text_color)
@@ -240,6 +241,7 @@ def plot_spatial(
     figsize: tuple[float, float] = (10, 10),
     val_lims: tuple[float, float] = None,
     presentation_format: bool = False,
+    dpi: int = 300,
     labels: list[str] = ["l", "b"],
     cbar_dict: dict = None,
     cartopy_dict: dict = None,
@@ -274,10 +276,10 @@ def plot_spatial(
     # for some reason fig not including axis ticks. Universal for other plotting
     if not fax:
         if extent == "global":
-            fig, ax = generate_geo_axis(figsize=figsize, map_proj=ccrs.Robinson())
+            fig, ax = generate_geo_axis(figsize=figsize, map_proj=ccrs.Robinson(), dpi=dpi)
             ax.set_global()
         else:
-            fig, ax = generate_geo_axis(figsize=figsize, map_proj=map_proj)
+            fig, ax = generate_geo_axis(figsize=figsize, map_proj=map_proj, dpi=dpi)
 
     else:
         fig, ax = fax[0], fax[1]
@@ -417,9 +419,9 @@ def format_cartopy_display(ax, cartopy_dict: dict = None):
         "name": "land",
         "scale": "10m",
         "edgecolor": "black",
-        "facecolor": (0, 0, 0, 0),  # "none"
+        "facecolor": "#cfcfcf",  # "none"
         "linewidth": 0.5,
-        "alpha": 0.3,
+        "alpha": 1,
     }
 
     if cartopy_dict:
@@ -435,7 +437,7 @@ def format_cartopy_display(ax, cartopy_dict: dict = None):
             facecolor=default_cartopy_dict["facecolor"],
             linewidth=default_cartopy_dict["linewidth"],
             alpha=default_cartopy_dict["alpha"],
-        )
+        ), zorder=100
     )
 
     return ax
@@ -1313,3 +1315,33 @@ def grid_subplots(total, wrap=None, **kwargs):
         rows = 1
     fig, ax = plt.subplots(rows, cols, **kwargs)
     return fig, ax
+
+
+def plot_train_test_datasets(
+    train_da: xa.DataArray,
+    test_da: xa.DataArray,
+    text_pos: tuple[float, float] = (0.5, 0.5),
+    figsize: tuple[float, float] = (10, 10),
+    dpi=150,
+    fax=None
+):
+    # cast first to ones, second to 0s
+    train_ds = train_da.where(~train_da.notnull(), 1)
+    test_ds = test_da.where(~test_da.notnull(), 0)
+
+    if not fax:
+        f, ax = plt.subplots(subplot_kw={'projection': ccrs.PlateCarree()}, figsize=figsize, dpi=dpi)
+    else:
+        f, ax = fax
+    plot_spatial(train_ds, title="", fax=(f, ax), val_lims=[0, 1], cbar_dict={"cbar": False})
+    plot_spatial(test_ds, title="", fax=(f, ax), val_lims=[0, 1], cbar_dict={"cbar": False})
+
+    # # slightly rough-and-ready, not particularly elegant (also only works for case study area):
+    # # TODO: generalise
+    # train_rect = patches.Rectangle((141, -25), 2, 1, facecolor='#d83c04', zorder=100)
+    # ax.add_patch(train_rect)
+    # test_rect = patches.Rectangle((141, -27), 2, 1, facecolor='#3B9AB2', zorder=100)
+    # ax.add_patch(test_rect)
+    # ax.text(144, -25, 'train dataset', verticalalignment='bottom', color='#d83c04', zorder=100)
+    # ax.text(144, -27, 'test dataset', verticalalignment='bottom', color='#3B9AB2', zorder=100)
+    # # plt.show()

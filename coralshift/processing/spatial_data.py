@@ -30,57 +30,64 @@ def spatial_predictions_from_data(y: pd.Series, predictions: np.ndarray) -> pd.S
     return spatially_reform_data(merged)
 
 
-# def spatially_reform_data(df, resolution: float = None):
-#     """TODO: docstring
-#     Pretty hacky. Best to specify resolution where possible"""
-#     if not resolution:  # THIS IS THE PROBLEM
-#         lat_diff = abs(np.diff(df.sort_index().index.get_level_values("latitude")))
-#         lon_diff = abs(np.diff(df.sort_index().index.get_level_values("longitude")))
-
-#         # lat_spacing = np.min(lat_diff[np.nonzero(lat_diff)])
-#         # lon_spacing = np.min(lon_diff[np.nonzero(lon_diff)])
-#         lat_spacing = np.mean(lat_diff[np.nonzero(lat_diff)])
-#         lon_spacing = np.mean(lon_diff[np.nonzero(lon_diff)])
-#         lat_spacing, lon_spacing = min([lat_spacing, lon_spacing]), min([lat_spacing, lon_spacing])
-#     else:
-#         lat_spacing, lon_spacing = resolution, resolution
-
-#     # Create arrays of latitude and longitude values using inferred spacing
-#     latitudes = np.arange(
-#         df.index.get_level_values("latitude").min(),
-#         df.index.get_level_values("latitude").max() + lat_spacing,
-#         lat_spacing,
-#     )
-#     longitudes = np.arange(
-#         df.index.get_level_values("longitude").min(),
-#         df.index.get_level_values("longitude").max() + lon_spacing,
-#         lon_spacing,
-#     )
-
-#     # return latitudes, longitudes
-
-#     index = pd.MultiIndex.from_product(
-#         [latitudes, longitudes], names=["approx_latitude", "approx_longitude"]
-#     )
-
-#     if isinstance(df, pd.Series):
-#         new_df = df.reindex(index, fill_value=np.nan).to_frame()
-#     else:
-#         new_df = df.reindex(index, fill_value=np.nan)
-
-#     # new_df = pd.DataFrame()
-#     new_df["latitude"] = new_df.index.get_level_values("approx_latitude").round(5)
-#     new_df["longitude"] = new_df.index.get_level_values("approx_longitude").round(5)
-
-#     new_df = new_df.set_index(["latitude", "longitude"])
-#     new_df = df.reindex(new_df.index)
-
-#     return new_df.to_xarray().sortby(["latitude", "longitude"])
-
 def spatially_reform_data(df, resolution: float = None):
-    """TODO: docstring"""
+    """
+    Reformats the input dataframe by adding missing rows for latitude and longitude values based on the specified
+    resolution.
 
-    return df.to_xarray().sortby(["latitude", "longitude"])
+    Args:
+        df (pd.DataFrame or pd.Series): The input dataframe to be reformatted.
+        resolution (float, optional): The resolution for latitude and longitude values
+
+    Returns:
+        pd.DataFrame or pd.Series: The reformatted dataframe with added rows for missing latitude and longitude values.
+    """
+    if not resolution:
+        lat_res_calc = abs(np.diff(df.sort_index().index.get_level_values("latitude")))
+        lon_res_calc = abs(np.diff(df.sort_index().index.get_level_values("longitude")))
+        resolution = np.min([np.min(lat_res_calc[lat_res_calc != 0]), np.min(lon_res_calc[lon_res_calc != 0])]).round(5)
+
+    lat_spacing, lon_spacing = resolution, resolution
+
+    # Create arrays of latitude and longitude values using inferred spacing
+    latitudes = np.arange(
+        df.index.get_level_values("latitude").min(),
+        df.index.get_level_values("latitude").max() + lat_spacing,
+        lat_spacing,
+    )
+    longitudes = np.arange(
+        df.index.get_level_values("longitude").min(),
+        df.index.get_level_values("longitude").max() + lon_spacing,
+        lon_spacing,
+    )
+    # prepare index from (unrounded) index of 
+    index = pd.MultiIndex.from_product(
+        [latitudes, longitudes], names=["approx_latitude", "approx_longitude"]
+    )
+    if isinstance(df, pd.Series):
+        new_df = df.reindex(index, fill_value=np.nan).to_frame()
+    else:
+        new_df = df.reindex(index, fill_value=np.nan)
+
+    new_df["latitude"] = new_df.index.get_level_values("approx_latitude").round(5)
+    new_df["longitude"] = new_df.index.get_level_values("approx_longitude").round(5)
+
+    df = df.reset_index(inplace=False)
+    df["latitude"] = df["latitude"].round(5)
+    df["longitude"] = df["longitude"].round(5)
+    # return df
+    new_df = new_df.reset_index(inplace=False)
+    new_df.set_index(["latitude", "longitude"], inplace=True)
+    new_df.drop(columns=["approx_latitude", "approx_longitude"], inplace=True)
+    # return df
+    df.set_index(["latitude", "longitude"], inplace=True)
+
+    return df.combine_first(new_df).to_xarray().sortby(["latitude", "longitude"])
+
+# def spatially_reform_data(df, resolution: float = None):
+#     """TODO: docstring"""
+
+#     return df.to_xarray().sortby(["latitude", "longitude"])
 
 
 def resample_xarray_to_target(
@@ -1402,7 +1409,7 @@ def process_xa_d(
 
     # drop variables which will never be variables
     # TODO: add as argument with default
-    drop_vars = ["time_bnds"]
+    drop_vars = ["time_bnds", "lat_bnds", "lon_bnds"]
 
     if isinstance(temp_xa_d, xa.Dataset):
         temp_xa_d = temp_xa_d.drop_vars(

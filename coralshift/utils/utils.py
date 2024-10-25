@@ -194,7 +194,7 @@ def generate_date_pairs(
     ]
 
 
-def get_buffered_lims(coord_vals, buffer_size):
+def get_buffered_lims(coord_vals, buffer_size=1):   # for security
     return [min(coord_vals) - buffer_size, max(coord_vals) + buffer_size]
 
 
@@ -252,6 +252,7 @@ def mask_above_threshold(xa_d, threshold=10000):
     if isinstance(xa_d, xa.Dataset):
         # print(type(xa_d))
         # print(np.min(xa_d.lat.values))
+        # TODO: not all variable types will work with this
         return xa_d.map(lambda x: x.where(x <= threshold, np.nan))
     elif isinstance(xa_d, xa.DataArray):
         return xa_d.where(xa_d <= threshold, np.nan)

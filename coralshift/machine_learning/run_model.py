@@ -37,7 +37,8 @@ def run_model(
     config_info: dict,
     ds_info: dict = None,
     client=None,
-    cluster=None
+    cluster=None,
+    extent: tuple[float] = None
 ):
     tic = time.time()
     # TODO: comment
@@ -59,6 +60,7 @@ def run_model(
         tests=tests,
         vals=vals,
         config_info=file_ops.read_yaml(latest_config_fp),
+        extent=extent
     ).analyse_results()
 
     print(f"\nWriting run results to {str(config.runs_csv)}...\n")

@@ -162,9 +162,10 @@ class RunStaticML:
         if config_info:
             self.__dict__.update(config_info)
 
-    def initialise_model(self, params: dict = None):
+    def initialise_model(self, params: dict = None, n_jobs: int = 16):
         # get instance of any model type
-        return ModelInitialiser(model_type=self.model_code, params=params).get_model()
+        return ModelInitialiser(
+            model_type=self.model_code, params=params, n_jobs=n_jobs).get_model()
 
     def threshold_datasets(self, dss: list[tuple[pd.DataFrame, pd.Series]]):
         # return list of tuples of thresholded datasets
@@ -218,14 +219,13 @@ class RunStaticML:
             print("ASdfasd")  # TODO: wtf is this?
 
     def initialise_cluster(self, port: int = 8786):
-        memory_limit = utils.memory_string(utils.calc_worker_memory_lim(4, 16))
-        cluster = LocalCluster(n_workers=16, memory_limit=memory_limit, dashboard_address=f":{port}")
+        memory_limit = utils.memory_string(utils.calc_worker_memory_lim(n_workers=4, memory_limit=16))
+        # cluster = LocalCluster(n_workers=8, memory_limit=memory_limit, dashboard_address=f":{port}")
+        cluster = LocalCluster(
+            n_workers=self.hyperparameter_search["n_jobs"], memory_limit=memory_limit, dashboard_address=f":{port}")
         # look into flexible cluster for setting up adaptive cluster
         client = Client(cluster)
-        print("CLUSTER")
-        print(cluster)
-        print("CLIENT")
-        print(client)
+
         return cluster, client
 
     def shutdown_cluster(self):
@@ -246,7 +246,7 @@ class RunStaticML:
                 n_iter=self.hyperparameter_search["n_iter"],
                 verbose=100,
                 # TODO: replace jobs hardcoding AH .g. n_jobs: int = int(multiprocessing.cpu_count() * FRAC_COMPUTE)?
-                n_jobs=16,
+                n_jobs=1 if self.model_code == "xgb_reg" else 8,   # becuase better for XGBoost to parallelise model
             )
         elif search_type == "grid":
             search_grid = generate_gridsearch_parameter_grid(
@@ -257,22 +257,35 @@ class RunStaticML:
                 search_grid,
                 cv=self.hyperparameter_search["cv_folds"],
                 verbose=100,
-                n_jobs=16,
+                # n_jobs=1,
             )
         else:
             raise ValueError(
                 f"Parameter search type {self.config_info['hyperparameter_search']['type']} not recognised."
             )
 
+# n_jobs compound between model declaration and parameter search: when n_jobs=16 for searchgrid, n_jobs=8 for model,
+# 16 searchgrids are run together
+# meanwhile, joblib parallel seems to gain access to all 256 cpus: [Parallel(n_jobs=1)]:
+# Using backend DaskDistributedBackend with 256 concurrent workers.
+
     def do_parallel_search(self, search_object):
         print(f"\nRunning parameter search for {self.model_code}...")
-        with joblib.parallel_backend(backend="dask", verbose=100, n_jobs=4):
-            print("DF SHAPE IN PARAMETER SEARCH", self.trains[0][: self.hyperparameter_search["n_samples"]].shape)
-            print("NUM POINTS IN PARAMETER SEARCH", len(self.trains[1][: self.hyperparameter_search["n_samples"]]))
+        print("DF SHAPE IN PARAMETER SEARCH", self.trains[0][: self.hyperparameter_search["n_samples"]].shape)
+        print("NUM POINTS IN PARAMETER SEARCH", len(self.trains[1][: self.hyperparameter_search["n_samples"]]))
+        if self.model_code in ["xgb_reg", "xgb_cf"]:
+            # search_object.n_jobs = 1
             search_object.fit(
                 self.trains[0][: self.hyperparameter_search["n_samples"]],
                 self.trains[1][: self.hyperparameter_search["n_samples"]],
             )
+        else:
+            with joblib.parallel_backend(backend="dask", verbose=100, n_jobs=-192):
+                search_object.fit(
+                    self.trains[0][: self.hyperparameter_search["n_samples"]],
+                    self.trains[1][: self.hyperparameter_search["n_samples"]],
+                )
+
         return search_object.best_params_
 
     def fetch_best_params_from_config(self):
@@ -280,7 +293,7 @@ class RunStaticML:
         # Try to fetch best_grid_params first, then best_random_params
         try:
             params_fp = self.config_info["file_paths"]["best_grid_params"]
-            print(f"Loading best parameters from {params_fp}...")
+            print(f"Loading best parameters from {params_fp}...\n")
             best_params = file_ops.read_pickle(params_fp)
         except KeyError:
             try:
@@ -361,13 +374,16 @@ class RunStaticML:
         else:
             # returns best of best params (grid first, then random, else None)
             best_params = self.fetch_best_params_from_config()
+            if not best_params:     # if no best params yet, get default params
+                best_params = ModelInitialiser(model_type=self.model_code).get_model().get_params()
+
             self.save_param_search(fp_root, best_params, search_type="default")
 
         return best_params
 
     def train_model(self, fp_root: Path | str, hyperparams: dict = None):
         # initialise model with provided hyperparameters
-        model = self.initialise_model(params=hyperparams)
+        model = self.initialise_model(params=hyperparams, n_jobs=self.hyperparameter_search["n_jobs"])
         # train model
         if self.do_train:
             n_samples = self.hyperparameter_search["n_samples"]
@@ -400,12 +416,11 @@ class RunStaticML:
         return model
 
     def run_model(self):
-        # initialise dask cluster   # TODO: play around with number of workers
-        if not (self.cluster and self.client):
+        # initialise dask cluster if not using XGB, and if doesn't already exist
+        if not (self.cluster and self.client) and "xgb" not in self.model_code:
             self.cluster, self.client = self.initialise_cluster()
 
         print(self.client)
-
         # threshold labels if necessary
         self.trains, self.tests, self.vals = self.threshold_datasets(
             [self.trains, self.tests, self.vals]    # specify more than a port
@@ -452,13 +467,13 @@ class RunStaticML:
         file_ops.edit_yaml(config_fp, file_info)
 
         # shut down dask cluster
-        self.shutdown_cluster()
+        # self.shutdown_cluster()
 
         return model, config_fp
 
 
 class ModelInitialiser:
-    def __init__(self, model_type: str, random_state: int = 42, params: dict = None):
+    def __init__(self, model_type: str, random_state: int = 42, params: dict = None, n_jobs: int = 16):
         self.random_state = random_state
         self.model_info = [
             # discrete models
@@ -471,7 +486,7 @@ class ModelInitialiser:
                     # n_jobs=int(utils.num_cpus() / 16),
                     verbose=100,
                     random_state=self.random_state,
-                    n_jobs=8,
+                    n_jobs=n_jobs,
                 ),
                 "search_grid": log_reg_search_grid(),
             },
@@ -479,15 +494,15 @@ class ModelInitialiser:
                 "model_type": "lin_reg",
                 "model_type_full_name": "Linear Regression",
                 "data_type": "continuous",
-                "model": LinearRegression(n_jobs=int(utils.num_cpus() / 16)),
+                "model": LinearRegression(n_jobs=int(utils.num_cpus() / 200)),
             },
             {
                 "model_type": "max_ent",
                 "model_type_full_name": "Maximum Entropy",
                 "data_type": "discrete",
                 "model": elapid.MaxentModel(
-                    # n_cpus=int(utils.num_cpus() / 16),
-                    n_cpus=8
+                    # n_cpus=int(utils.num_cpus() / 200),
+                    n_cpus=n_jobs
                 ),
                 "search_grid": maxent_search_grid(),
             },
@@ -497,8 +512,8 @@ class ModelInitialiser:
                 "data_type": "discrete",
                 "model": RandomForestClassifier(
                     class_weight="balanced",
-                    # n_jobs=int(utils.num_cpus() / 16),
-                    n_jobs=8,
+                    # n_jobs=int(utils.num_cpus() / 200),
+                    n_jobs=n_jobs,
                     verbose=1,
                     random_state=self.random_state,
                 ),
@@ -520,8 +535,8 @@ class ModelInitialiser:
                 "data_type": "continuous",
                 "model": RandomForestRegressor(
                     verbose=1,
-                    # n_jobs=int(utils.num_cpus() / 16),
-                    n_jobs=8,
+                    # n_jobs=int(utils.num_cpus() / 200),
+                    n_jobs=n_jobs,
                     random_state=self.random_state,
                 ),
                 "search_grid": rf_search_grid(),
@@ -542,8 +557,8 @@ class ModelInitialiser:
                 "data_type": "discrete",
                 "model": xgb.XGBClassifier(
                     verbose=1,
-                    # n_jobs=int(utils.num_cpus() / 16),
-                    n_jobs=8,
+                    # n_jobs=int(utils.num_cpus() / 200),
+                    n_jobs=n_jobs,
                     random_state=self.random_state,
                 ),
                 "search_grid": xgb_search_grid(),
@@ -554,8 +569,8 @@ class ModelInitialiser:
                 "data_type": "continuous",
                 "model": xgb.XGBRegressor(
                     verbose=1,
-                    # n_jobs=int(utils.num_cpus() / 16),
-                    n_jobs=8,
+                    # n_jobs=int(utils.num_cpus() / 200),
+                    n_jobs=n_jobs,
                     random_state=self.random_state,
                 ),
                 "search_grid": xgb_search_grid(model_type="regressor"),
@@ -614,6 +629,8 @@ class ModelInitialiser:
 
 
 def make_vals_list(val_lims: tuple, num_vals: int, spacing: str = "linear") -> list:
+    if isinstance(val_lims, list) and len(val_lims) == 1:
+        return [val_lims[0]]
     if spacing == "linear":
         return equal_spacing(val_lims, num_vals)
     elif spacing == "log":
@@ -684,28 +701,24 @@ def rf_search_grid(
     estimator_lims: tuple[int] = (200, 2000),
     max_features: list[str] = ["auto", "sqrt"],
     max_depth_lims: tuple[int] = (10, 110),
-    min_samples_split: list[int] = [2, 5, 10],
-    min_samples_leaf: list[int] = [1, 2, 4],
-    bootstrap: list[bool] = [True, False],
+    min_samples_split_lims: list[int] = [2, 10],
+    min_samples_leaf_lims: list[int] = [1, 4],
+    # bootstrap: list[bool] = [True, False],
+    bootstrap: list[bool] = [True],
+    n_trials: int = 3
 ) -> dict:
+
     # Number of trees in random forest
-    n_estimators = [
-        int(x)
-        for x in np.linspace(
-            start=min(estimator_lims), stop=max(estimator_lims), num=10
-        )
-    ]
+    n_estimators = make_vals_list(estimator_lims, n_trials)
     # Number of features to consider at every split
     max_features = max_features
     # Maximum number of levels in tree
-    max_depth = [
-        int(x) for x in np.linspace(min(max_depth_lims), max(max_depth_lims), num=11)
-    ]
+    max_depth = make_vals_list(max_depth_lims, n_trials)
     max_depth.append(None)
     # Minimum number of samples required to split a node
-    min_samples_split = min_samples_split
+    min_samples_split = make_vals_list(min_samples_split_lims, n_trials)
     # Minimum number of samples required at each leaf node
-    min_samples_leaf = min_samples_leaf
+    min_samples_leaf = make_vals_list(min_samples_leaf_lims, n_trials)
     # Method of selecting samples for training each tree
     bootstrap = bootstrap
     # Create the random grid
@@ -722,13 +735,15 @@ def rf_search_grid(
 def mlp_search_grid(
     hidden_layer_sizes=[(500,), (100,), (50, 30, 20)],
     activation: list[str] = ["identity", "logistic", "tanh", "relu"],
-    solver: list[str] = ["adam", "sgd", "lbfgs"],
+    # solver: list[str] = ["adam", "sgd", "lbfgs"],
+    solver: list[str] = ["adam"],
     alpha_lims: tuple[float] = (0.000001, 0.001),
     batch_size=["auto"],
     learning_rate=["adaptive"],
     learning_rate_init_lims: tuple[float] = (0.0001, 0.01),
     max_iter_lims: tuple[int] = (50, 500),
-    shuffle: tuple[bool] = [True, False],
+    # shuffle: tuple[bool] = [True, False],
+    shuffle: tuple[bool] = [True],
     momentum_lims: tuple[float] = (0.8, 1),
     nesterovs_momentum: tuple[bool] = [True, False],
     # max_fun=15000,
@@ -738,7 +753,8 @@ def mlp_search_grid(
     alpha = make_vals_list(alpha_lims, n_trials, "log")
     learning_rate_init = make_vals_list(learning_rate_init_lims, n_trials)
     max_iter = make_vals_list(max_iter_lims, n_trials)
-    momentum = make_vals_list(momentum_lims, n_trials)
+    # momentum = make_vals_list(momentum_lims, n_trials)
+    momentum = momentum_lims
 
     return {
         "hidden_layer_sizes": hidden_layer_sizes,
@@ -757,7 +773,8 @@ def mlp_search_grid(
 
 
 def boosted_search_grid(
-    loss: list[str] = ["squared_error", "absolute_error", "huber", "quantile"],
+    # loss: list[str] = ["squared_error", "absolute_error", "huber", "quantile"],
+    loss: list[str] = ["squared_error"],
     learning_rate_lims: tuple[float] = (0.001, 1.0),
     n_estimators_lims: tuple[int] = (100, 2000),
     subsample_lims: tuple[float] = (0.1, 1.0),
@@ -789,7 +806,8 @@ def boosted_search_grid(
 
     # Loss function to optimize
     if model_type == "classifier":
-        loss = ["exponential", "log_loss"]
+        # loss = ["exponential", "log_loss"]
+        loss = ["log_loss"]
 
     # Create the random grid
     return {
@@ -809,63 +827,61 @@ def boosted_search_grid(
 
 
 def xgb_search_grid(
+    n_trials: int = 3,
+    objective: str = ["reg:squarederror"],
+    eval_metric: str = ["rmse"],
     n_estimators_lims: tuple[int] = (100, 2000),
-    learning_rate_lims: tuple[float] = (0.001, 1.0),
-    max_depth_lims: tuple[int] = (1, 10),
-    min_samples_split: list[int] = [2, 5, 10],
-    min_samples_leaf: list[int] = [1, 2, 4],
-    max_features: list[str] = ["auto", "sqrt"],
-    loss: list[str] = ["ls", "lad", "huber", "quantile"],
-    subsample_lims: tuple[float] = (0.1, 1.0),
-    criterion: list[str] = ["friedman_mse", "mse"],
-    model_type: str = "classifier",
+    max_depth_lims: tuple[int] = (1, 1000),
+    colsample_bytree_lims: tuple[float] = (0.1, 0.9),
+    # learning_rate_lims: tuple[float] = (0.001, 1.0),
+    # min_samples_split: list[int] = [2, 5, 10],
+    # min_samples_leaf: list[int] = [1, 2, 4],
+    # max_features: list[str] = ["auto", "sqrt"],
+    # loss: list[str] = ["ls", "lad", "huber", "quantile"],
+    # subsample_lims: tuple[float] = (0.1, 1.0),
+    # criterion: list[str] = ["rmse"],
+    model_type: str = "regressor",
 ) -> dict:
     # TODO: there are more parameters here, some of which may depend on the booster and so throw a load of errors
     # look in graveyard at xgb_random_search
     #
     # Number of trees in the ensemble
-    n_estimators = [
-        int(x)
-        for x in np.linspace(
-            start=min(n_estimators_lims), stop=max(n_estimators_lims), num=10
-        )
-    ]
+    n_estimators = make_vals_list(n_estimators_lims, n_trials, "log")
+    max_depth = make_vals_list(max_depth_lims, n_trials, "log")
+    colsample_bytree = make_vals_list(colsample_bytree_lims, n_trials, "log")
+
     # Learning rate (shrinkage)
-    learning_rate = np.logspace(*np.log10(learning_rate_lims), num=10).tolist()
+    # learning_rate = np.logspace(*np.log10(learning_rate_lims), num=n_trials).tolist()
     # Maximum depth of each tree
-    max_depth = [
-        int(x)
-        for x in np.linspace(
-            start=min(max_depth_lims), stop=max(max_depth_lims), num=10
-        )
-    ]
-    max_depth.append(None)  # what is this doing?
+    # max_depth.append(None)
     # Minimum number of samples required to split a node
-    min_samples_split = min_samples_split
+    # min_samples_split = min_samples_split
     # Minimum number of samples required at each leaf node
-    min_samples_leaf = min_samples_leaf
+    # min_samples_leaf = min_samples_leaf
     # Maximum number of features to consider at each split
-    max_features = max_features
+    # max_features = max_features
     # Loss function to optimize
-    if model_type == "classifier":
-        loss = ["exponential", "log_loss"]
-        criterion = ["friedman_mse", "squared_error"]
+    # if model_type == "classifier":
+    #     loss = ["exponential", "log_loss"]
+    #     criterion = ["friedman_mse", "squared_error"]
     # Fraction of samples to be used for training each tree
-    subsample = np.linspace(
-        start=subsample_lims[0], stop=subsample_lims[1], num=10
-    ).tolist()
+    # subsample = np.linspace(
+    #     start=subsample_lims[0], stop=subsample_lims[1], num=n_trials
+    # ).tolist()
 
     # Create the random grid
     random_grid = {
+        "objective": objective,
+        "eval_metric": eval_metric,
         "n_estimators": n_estimators,
-        "learning_rate": learning_rate,
         "max_depth": max_depth,
-        "min_samples_split": min_samples_split,
-        "min_samples_leaf": min_samples_leaf,
-        "max_features": max_features,
-        "loss": loss,
-        "subsample": subsample,
-        "criterion": criterion,
+        "colsample_bytree": colsample_bytree
+        # "learning_rate": learning_rate,
+        # "min_samples_split": min_samples_split,
+        # "min_samples_leaf": min_samples_leaf,
+        # "max_features": max_features,
+        # "subsample": subsample,
+        # "criterion": criterion,
     }
     return random_grid
 
