@@ -44,13 +44,18 @@ class ProcessMLData:
 
     def __init__(
         self,
-        config_info: dict = None,
+        # config_info: dict = None,
+        config_info,    # dataclass
     ):
-        # self.config_info = config_info
+        self.cfg = config_info
 
-        if config_info:
-            self.__dict__.update(config_info)
-        self.config_info = config_info
+        # if config_info:
+        #     self.__dict__.update(config_info.__dict__)
+            
+        # assign all values from a dataclass as class attributes
+        for key, value in config_info.__dict__.items():
+            setattr(self, key, value)
+        
 
     def get_merged_datasets(self):
         dss = []
@@ -72,7 +77,7 @@ class ProcessMLData:
                     env_vars=self.env_vars,
                     year_range_to_include=self.year_range_to_include,
                     resolution_unit=self.resolution_unit,
-                    config_info=self.config_info,
+                    config_info=self.cfg,
                 ).return_raster(dataset=dataset)
             )
 
@@ -88,7 +93,7 @@ class ProcessMLData:
         df_X, df_y = ds_to_ml_ready(
             xa_ds,
             predictand=self.return_predictand(),
-            depth_mask=self.config_info["depth_mask"]
+            depth_mask=self.depth_mask
         )
         # if elevation not requested, drop (needed to be included to generate the shallow water mask)
         if not ("gebco" in self.datasets or "bathymetry" in self.datasets):
@@ -259,12 +264,12 @@ class ProcessMLData:
 
         if self.config_info["data_source"] == "parquet":
             print("Loading preprocessed data from parquet files...")
-            res_str = utils.replace_dot_with_dash(str(round(self.config_info["resolution"], 3)))
+            res_str = utils.replace_dot_with_dash(str(round(self.resolution, 3)))
             spatial_extent_info = cmipper_utils.lat_lon_string_from_tuples(
-                self.config_info["lats"], self.config_info["lons"]).upper()
+                self.lats, self.lons).upper()
 
-            if self.config_info["depth_mask"]:
-                dm = self.config_info["depth_mask"]
+            if self.depth_mask:
+                dm = self.depth_mask
                 fp_root = Path(config.ml_ready_dir) / self.split_type / f"{str(min(dm))}_{str(max(dm))}"
             else:
                 fp_root = Path(config.ml_ready_dir)
@@ -278,7 +283,7 @@ class ProcessMLData:
             y_trains = pd.read_parquet(tr_y_fp)[0]  # casting back to series
             X_tests = pd.read_parquet(te_X_fp)
             y_tests = pd.read_parquet(te_y_fp)[0]  # casting back to series
-        elif self.config_info["data_source"] == "xarray":
+        elif self.data_source == "xarray":
             print("TODO")
 
             # # get merged datasets
@@ -294,7 +299,7 @@ class ProcessMLData:
 
     def generate_ml_ready_data(self, ds=None):
 
-        if self.config_info["data_source"] in ["parquet", "xarray"]:
+        if self.data_source in ["parquet", "xarray"]:
             trains, tests, vals, _ = self.generate_ml_ready_data_from_files()
         else:
             if not ds:

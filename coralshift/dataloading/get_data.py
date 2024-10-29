@@ -349,7 +349,7 @@ class ReturnRaster:
                 levs=self.levs,
                 cmip6_data_dir=Path(
                     config.cmip6_data_dir
-                    ) / self.config_info["source_id"] / self.config_info["member_id"] / "regridded",
+                    ) / self.cfg.source_id / self.cfg.member_id / "regridded",
             )
             if raster:
                 return raster
@@ -426,15 +426,18 @@ class ReturnRaster:
     def return_raster(self, dataset=None, ds=None):
         # order of operations decided to minimise unnecessarily intensive processing while
         # preserving information
-        if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence"]:
-            dtype = np.float32  # necessary for nan values when resampling (rather than int)
-        if dataset == "new":
-            processed_raster = spatial_data.process_xa_d(
-                self.get_raw_raster(dataset, ds=ds)).astype(dtype)
-        else:
-            processed_raster = spatial_data.process_xa_d(
-                self.get_raw_raster(dataset).astype(dtype)
-            )
+        
+        processed_raster = spatial_data.process_xa_d(
+            self.get_raw_raster(dataset, ds=ds).astype(np.float32)  # necessary for nan values when resampling (rather than int)
+        )
+        # if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence"]:
+        # if dataset == "new":
+        #     processed_raster = spatial_data.process_xa_d(
+        #         self.get_raw_raster(dataset, ds=ds)).astype(dtype)
+        # else:
+        #     processed_raster = spatial_data.process_xa_d(
+        #         self.get_raw_raster(dataset).astype(dtype)
+        #     )
         # this shouldn't be necessary (process_xa_d included in cmip download, but made a change to remove time_bnds
         # since then)
 
