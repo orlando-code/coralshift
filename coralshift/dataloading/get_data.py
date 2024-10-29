@@ -411,13 +411,23 @@ class ReturnRaster:
         #         f"Dataset {self.dataset} not recognised as appropriate timeseries."
         #     )
         # return static_ds
-
+        
+    def calculate_reef_density(self, resampled_raster):
+        """TODO: currently a little messy (hardcoded minimum resolution) since still dealing with rasterising at gebco"""
+        # normalise to coral cover
+        lat_res, lon_res = abs(resampled_raster.rio.resolution()[0]), abs(resampled_raster.rio.resolution()[1])
+        # original resolution
+        # og_lat_res, og_lon_res = abs(original_ds.rio.resolution()[0]), abs(original_ds.rio.resolution()[1])
+        max_density = (lat_res * lon_res) / (15/3600)**2
+        resampled_raster = resampled_raster / max_density
+        # return resampled_raster.clip(min=0, max=1)  # TODO: currently ropey. Inaccuracy introduced by resampling
+        return resampled_raster
+    
     def return_raster(self, dataset=None, ds=None):
         # order of operations decided to minimise unnecessarily intensive processing while
         # preserving information
         if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence"]:
-            dtype = np.float32  # necessary for nan values when resampling
-
+            dtype = np.float32  # necessary for nan values when resampling (rather than int)
         if dataset == "new":
             processed_raster = spatial_data.process_xa_d(
                 self.get_raw_raster(dataset, ds=ds)).astype(dtype)
@@ -441,13 +451,9 @@ class ReturnRaster:
             )
         resampled_raster = self.get_resampled_raster(buffered_raster, dataset=dataset)
 
-        # if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence"]:
-        #     # normalise to coral cover
-        #     lat_res, lon_res = abs(resampled_raster.rio.resolution()[0]), abs(resampled_raster.rio.resolution()[1])
-        #     cell_area = lat_res * lon_res   # in degrees
-        #     cell_area = cell_area * 110e3 * 110e3 * np.cos(np.mean(resampled_raster.latitude) * np.pi / 180)  # in m^2
-        #     resampled_raster = 30**2 * resampled_raster / cell_area     # area of single observation of unep
-
+        if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence"]:
+            resampled_raster = self.calculate_reef_density(resampled_raster)
+            
         return resampled_raster
 
 
