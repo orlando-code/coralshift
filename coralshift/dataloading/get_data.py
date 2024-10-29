@@ -55,37 +55,35 @@ def generate_xa_ds_from_shapefile(
     lons: list[float, float] = [-180, 180],
     degrees_resolution: float = 15 / 3600,  # 15 arcseconds (gebco resolution)
 ):
-    # check if unep xarray already exists
+    # TODO: this is a bit of a mess conceptually
+    # check if relevant xarray already exists
     res_str = utils.replace_dot_with_dash(str(round(degrees_resolution, 3)))
-
     xa_dir = Path(config.gt_data_dir) / f"{shapefile_id.upper()}/rasters"
     xa_dir.mkdir(parents=True, exist_ok=True)
     potential_fps = list(xa_dir.glob("*.nc"))
-
-    # correct resolution
+    # check for correct resolution
     correct_resolutions = find_files_for_resolution(potential_fps, res_str)
     xas = cmipper_file_ops.find_files_for_area(correct_resolutions, lats, lons)
 
-    if len(xas) >= 10000:   # TODO: temp
+    if len(xas) >= 1:   # if any correct files are found, load the first
         print(f"Loading {shapefile_id} xarray at {degrees_resolution:.03f} degrees resolution.")
         print(f"loading from {xas[0]}")
         return xa.open_dataset(xas[0]).sel(latitude=slice(*lats), longitude=slice(*lons))
     else:
         print(f"Loading {shapefile_id} data from original shapefile: {shapefile_fp}")
 
-        # load unep tabular data. Don't dask yet to allow filtering by region (if required)
+        # load tabular data into geodf. Don't dask yet to allow filtering by region (if required)
         gdf = daskgpd.read_file(shapefile_fp, npartitions=4)
         if shapefile_id in ["wri", "WRI_REEF_EXTENT"]:  # this gdf is weirdly bundled into one row
             gdf = gdf.explode()
 
         geometry_filter = sgeometry.box(min(lons), min(lats), max(lons), max(lats))
-        filtered_gdf = gdf[gdf.geometry.intersects(geometry_filter)]  # coarse filter (allowing multipolys)
-        filtered_gdf = filtered_gdf.compute().explode(index_parts=True)
-        geometry_filter = sgeometry.box(min(lons), min(lats), max(lons), max(lats))
+        # two-filter step (rather than computing entire geodf to start) speeds up and helps with memory
+        filtered_gdf = gdf[gdf.geometry.intersects(geometry_filter)].compute().explode(index_parts=True)  # coarse filter (allowing multipolys)
         filtered_gdf = filtered_gdf[filtered_gdf.geometry.intersects(geometry_filter)]  # fine filter (all polys)
 
         print(
-            f"generating UNEP raster at {degrees_resolution:.03f} degrees resolution..."
+            f"generating {shapefile_id} raster at {degrees_resolution:.03f} degrees resolution..."
         )
         # generate gt raster
         # Purist: defined here as the mean (lat/lon) value maximum resolution (30m) the UNEP data at the equator
@@ -105,9 +103,6 @@ def generate_xa_ds_from_shapefile(
         xa_d.longitude.attrs["units"] = "degrees_east" 
         xa_d.latitude.attrs["units"] = "degrees_north" 
         
-        # reproject to bathymetry resolution for saving
-
-
         # generate filepath and save
         spatial_extent_info = cmipper_utils.lat_lon_string_from_tuples(lats, lons).upper()
         xa_d_fp = xa_dir / f"unep_{res_str}_{spatial_extent_info}.nc"
@@ -319,7 +314,7 @@ class ReturnRaster:
         if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence"]:
             # TODO: check that there isn't an intersecting one already
             return generate_xa_ds_from_shapefile(
-                shapefile_id="UNEP_GDCR", shapefile_fp=config.gdcr_dir / "01_Data/WCMC008_CoralReef2021_Py_v4_1.shp",
+                shapefile_id="UNEP_GDCR", shapefile_fp=config.gdcr_dir / "01_Data/WCMC008_CoralReef2021_Py_v4_1.shp",   # TODO: this not most recent
                 lats=self.buffered_lats, lons=self.buffered_lons, degrees_resolution=15/3600)   # 15" (gebco resolution)
         if dataset in ["wri"]:
             return generate_xa_ds_from_shapefile(
