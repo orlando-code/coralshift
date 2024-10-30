@@ -518,28 +518,6 @@ def format_spatial_plot(
 
     return fig, ax
 
-def plot_spatial_residuals(
-    xa_d_pred: xa.DataArray,
-    xa_d_gt: xa.DataArray,
-    figsize: tuple=(16, 9)):
-    """
-    Plot the spatial differences between predicted and ground truth data.
-
-    Parameters
-    ----------
-        xa_d_pred (xa.DataArray): Predicted data.
-        xa_d_gt (xa.DataArray): Ground truth data.
-        figsize (tuple[float, float], optional): Figure size. Default is (16, 9).
-
-    Returns
-    -------
-        None
-    """
-    # calculate difference
-    xa_diff = (xa_d_gt - xa_d_pred).rename("predicted/gt_residuals")
-    plot_spatial(xa_diff, figsize=figsize, cbar_dict={"cmap_type": "div"})
-
-
 
 def plot_array_hist(
     array: tuple[xa.DataArray, np.ndarray],
