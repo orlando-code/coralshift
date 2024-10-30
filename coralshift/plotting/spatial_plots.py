@@ -518,12 +518,10 @@ def format_spatial_plot(
 
     return fig, ax
 
-
-def plot_spatial_diffs(
+def plot_spatial_residuals(
     xa_d_pred: xa.DataArray,
     xa_d_gt: xa.DataArray,
-    figsize: tuple[float, float] = (16, 9),
-) -> None:
+    figsize: tuple=(16, 9)):
     """
     Plot the spatial differences between predicted and ground truth data.
 
@@ -537,20 +535,10 @@ def plot_spatial_diffs(
     -------
         None
     """
+    # calculate difference
     xa_diff = (xa_d_gt - xa_d_pred).rename("predicted/gt_residuals")
+    plot_spatial(xa_diff, figsize=figsize, cbar_dict={"cmap_type": "div"})
 
-    fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(2, 2)
-
-    # left plot
-    ax_r = fig.add_subplot(gs[:, 0], projection=ccrs.PlateCarree())
-    plot_spatial(fax=(fig, ax_r), xa_da=xa_diff, cmap_type="div", symmetric=True)
-
-    # right plots
-    ax_l_t = fig.add_subplot(gs[0, 1], projection=ccrs.PlateCarree())
-    plot_spatial(xa_d_gt, fax=(fig, ax_l_t), title="ground truth")
-    ax_l_b = fig.add_subplot(gs[1, 1], projection=ccrs.PlateCarree())
-    plot_spatial(xa_d_pred, fax=(fig, ax_l_b), title="inferred label")
 
 
 def plot_array_hist(
