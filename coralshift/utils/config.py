@@ -51,6 +51,7 @@ bathymetry_dir = data_dir / "bathymetry"
 env_data_dir = data_dir / "env_vars"
 gt_data_dir = data_dir / "ground_truth"
 ml_ready_dir = data_dir / "ml_ready"
+population_dir = data_dir / "population"
 # DATA SUBDIRECTORIES
 wri_dir = gt_data_dir / "WRI_REEF_EXTENT"
 gdcr_dir = gt_data_dir / "UNEP_GDCR"
