@@ -113,7 +113,7 @@ def plot_regression_histograms(
     ax[1].set_yscale("log")
 
     # format
-    plt.suptitle("Predicted vs ground truth")
+    plt.suptitle("Prediction vs ground truth")
     ax[0].set_ylabel("Predicted reef density")
     ax[0].set_xlabel("True reef density")
     ax[1].set_xlabel("True reef density")
