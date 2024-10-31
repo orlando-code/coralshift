@@ -1,6 +1,3 @@
-# depth_mask_lims:
-# - -1000
-# - 0
 data_source: asdf
 regressor_classification_threshold: 0.01
 depth_mask: [-1000, 10]
@@ -9,18 +6,18 @@ predictand: UNEP_GDCR
 datasets: 
 - cmip6
 - unep
-# - gebco
-# - slope
+- gebco
+- slope
 env_vars:
 - tos
-# - mlotst
-# - rsdo
-# - so
-# - thetao
-# - uo
-# - vo
-# - hfds
-# - wfo
+- mlotst
+- rsdo
+- so
+- thetao
+- uo
+- vo
+- hfds
+- wfo
 # - aragos
 # - umo
 # - vmo
