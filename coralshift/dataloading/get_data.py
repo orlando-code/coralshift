@@ -311,7 +311,7 @@ class ReturnRaster:
         self.cfg = config_info
 
     def get_raw_raster(self, dataset, ds=None):
-        if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence"]:
+        if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence", "unep_gdcr"]:
             # TODO: check that there isn't an intersecting one already
             return generate_xa_ds_from_shapefile(
                 shapefile_id="UNEP_GDCR", shapefile_fp=config.gdcr_dir / "01_Data/WCMC008_CoralReef2021_Py_v4_1.shp",   # TODO: this not most recent
