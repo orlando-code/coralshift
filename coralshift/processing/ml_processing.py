@@ -163,6 +163,8 @@ class ProcessMLData:
             trains = (X_trains, y_trains)
             tests = (X_tests, y_tests)
             vals = tests
+        else:
+            raise ValueError(f"split_type '{self.split_type}' not recognised")
 
         return trains, tests, vals
 
