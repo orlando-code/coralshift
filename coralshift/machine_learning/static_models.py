@@ -165,7 +165,8 @@ class RunStaticML:
     def initialise_model(self, params: dict = None, n_jobs: int = 16):
         # get instance of any model type
         return ModelInitialiser(
-            model_type=self.model_code, params=params, n_jobs=n_jobs).get_model()
+            model_type=self.model_code, params=params, n_jobs=n_jobs
+        ).get_model()
 
     def threshold_datasets(self, dss: list[tuple[pd.DataFrame, pd.Series]]):
         # return list of tuples of thresholded datasets
@@ -219,10 +220,15 @@ class RunStaticML:
             print("ASdfasd")  # TODO: wtf is this?
 
     def initialise_cluster(self, port: int = 8786):
-        memory_limit = utils.memory_string(utils.calc_worker_memory_lim(n_workers=4, memory_limit=16))
+        memory_limit = utils.memory_string(
+            utils.calc_worker_memory_lim(n_workers=4, memory_limit=16)
+        )
         # cluster = LocalCluster(n_workers=8, memory_limit=memory_limit, dashboard_address=f":{port}")
         cluster = LocalCluster(
-            n_workers=self.hyperparameter_search["n_jobs"], memory_limit=memory_limit, dashboard_address=f":{port}")
+            n_workers=self.hyperparameter_search["n_jobs"],
+            memory_limit=memory_limit,
+            dashboard_address=f":{port}",
+        )
         # look into flexible cluster for setting up adaptive cluster
         client = Client(cluster)
 
@@ -246,7 +252,9 @@ class RunStaticML:
                 n_iter=self.hyperparameter_search["n_iter"],
                 verbose=100,
                 # TODO: replace jobs hardcoding AH .g. n_jobs: int = int(multiprocessing.cpu_count() * FRAC_COMPUTE)?
-                n_jobs=1 if self.model_code == "xgb_reg" else 8,   # becuase better for XGBoost to parallelise model
+                n_jobs=(
+                    1 if self.model_code == "xgb_reg" else 8
+                ),  # becuase better for XGBoost to parallelise model
             )
         elif search_type == "grid":
             search_grid = generate_gridsearch_parameter_grid(
@@ -264,15 +272,21 @@ class RunStaticML:
                 f"Parameter search type {self.config_info['hyperparameter_search']['type']} not recognised."
             )
 
-# n_jobs compound between model declaration and parameter search: when n_jobs=16 for searchgrid, n_jobs=8 for model,
-# 16 searchgrids are run together
-# meanwhile, joblib parallel seems to gain access to all 256 cpus: [Parallel(n_jobs=1)]:
-# Using backend DaskDistributedBackend with 256 concurrent workers.
+    # n_jobs compound between model declaration and parameter search: when n_jobs=16 for searchgrid, n_jobs=8 for model,
+    # 16 searchgrids are run together
+    # meanwhile, joblib parallel seems to gain access to all 256 cpus: [Parallel(n_jobs=1)]:
+    # Using backend DaskDistributedBackend with 256 concurrent workers.
 
     def do_parallel_search(self, search_object):
         print(f"\nRunning parameter search for {self.model_code}...")
-        print("DF SHAPE IN PARAMETER SEARCH", self.trains[0][: self.hyperparameter_search["n_samples"]].shape)
-        print("NUM POINTS IN PARAMETER SEARCH", len(self.trains[1][: self.hyperparameter_search["n_samples"]]))
+        print(
+            "DF SHAPE IN PARAMETER SEARCH",
+            self.trains[0][: self.hyperparameter_search["n_samples"]].shape,
+        )
+        print(
+            "NUM POINTS IN PARAMETER SEARCH",
+            len(self.trains[1][: self.hyperparameter_search["n_samples"]]),
+        )
         if self.model_code in ["xgb_reg", "xgb_cf"]:
             # search_object.n_jobs = 1
             search_object.fit(
@@ -374,8 +388,12 @@ class RunStaticML:
         else:
             # returns best of best params (grid first, then random, else None)
             best_params = self.fetch_best_params_from_config()
-            if not best_params:     # if no best params yet, get default params
-                best_params = ModelInitialiser(model_type=self.model_code).get_model().get_params()
+            if not best_params:  # if no best params yet, get default params
+                best_params = (
+                    ModelInitialiser(model_type=self.model_code)
+                    .get_model()
+                    .get_params()
+                )
 
             self.save_param_search(fp_root, best_params, search_type="default")
 
@@ -383,7 +401,9 @@ class RunStaticML:
 
     def train_model(self, fp_root: Path | str, hyperparams: dict = None):
         # initialise model with provided hyperparameters
-        model = self.initialise_model(params=hyperparams, n_jobs=self.hyperparameter_search["n_jobs"])
+        model = self.initialise_model(
+            params=hyperparams, n_jobs=self.hyperparameter_search["n_jobs"]
+        )
         # train model
         if self.do_train:
             n_samples = self.hyperparameter_search["n_samples"]
@@ -423,7 +443,7 @@ class RunStaticML:
         print(self.client)
         # threshold labels if necessary
         self.trains, self.tests, self.vals = self.threshold_datasets(
-            [self.trains, self.tests, self.vals]    # specify more than a port
+            [self.trains, self.tests, self.vals]  # specify more than a port
         )
         # return self.trains, self.tests, self.vals
 
@@ -473,7 +493,13 @@ class RunStaticML:
 
 
 class ModelInitialiser:
-    def __init__(self, model_type: str, random_state: int = 42, params: dict = None, n_jobs: int = 16):
+    def __init__(
+        self,
+        model_type: str,
+        random_state: int = 42,
+        params: dict = None,
+        n_jobs: int = 16,
+    ):
         self.random_state = random_state
         self.model_info = [
             # discrete models
@@ -547,7 +573,6 @@ class ModelInitialiser:
                 "data_type": "continuous",
                 "model": GradientBoostingRegressor(
                     verbose=1, random_state=self.random_state
-
                 ),
                 "search_grid": boosted_search_grid(model_type="regressor"),
             },
@@ -705,7 +730,7 @@ def rf_search_grid(
     min_samples_leaf_lims: list[int] = [1, 4],
     # bootstrap: list[bool] = [True, False],
     bootstrap: list[bool] = [True],
-    n_trials: int = 3
+    n_trials: int = 3,
 ) -> dict:
 
     # Number of trees in random forest
@@ -827,12 +852,16 @@ def boosted_search_grid(
 
 
 def xgb_search_grid(
+    booster: str = "dart",  # attempt to reduce overfitting
     n_trials: int = 3,
-    objective: str = ["reg:squarederror"],
+    objective: str = ["reg:squarederror", "reg:squaredlogerror"],
     eval_metric: str = ["rmse"],
-    n_estimators_lims: tuple[int] = (100, 2000),
-    max_depth_lims: tuple[int] = (1, 1000),
+    n_estimators_lims: tuple[int] = (10, 2000),
+    max_depth_lims: tuple[int] = (1, 20),
+    min_child_weight_lims: tuple[float] = (0.1, 10),
+    subsample_lims: tuple[float] = (0.1, 1.0),
     colsample_bytree_lims: tuple[float] = (0.1, 0.9),
+    learning_rate_lims: tuple[float] = (0.01, 0.4),
     # learning_rate_lims: tuple[float] = (0.001, 1.0),
     # min_samples_split: list[int] = [2, 5, 10],
     # min_samples_leaf: list[int] = [1, 2, 4],
@@ -840,34 +869,24 @@ def xgb_search_grid(
     # loss: list[str] = ["ls", "lad", "huber", "quantile"],
     # subsample_lims: tuple[float] = (0.1, 1.0),
     # criterion: list[str] = ["rmse"],
-    model_type: str = "regressor",
+    # model_type: str = "regressor",
 ) -> dict:
     # TODO: there are more parameters here, some of which may depend on the booster and so throw a load of errors
     # look in graveyard at xgb_random_search
     #
     # Number of trees in the ensemble
     n_estimators = make_vals_list(n_estimators_lims, n_trials, "log")
-    max_depth = make_vals_list(max_depth_lims, n_trials, "log")
+    max_depth = make_vals_list(
+        max_depth_lims, n_trials, "linear"
+    )  # Maximum depth of each tree
+    min_child_weight = make_vals_list(min_child_weight_lims, n_trials, "log")
+    subsample = make_vals_list(
+        subsample_lims, n_trials, "linear"
+    )  # Fraction of samples to be used for training each tree
     colsample_bytree = make_vals_list(colsample_bytree_lims, n_trials, "log")
-
-    # Learning rate (shrinkage)
-    # learning_rate = np.logspace(*np.log10(learning_rate_lims), num=n_trials).tolist()
-    # Maximum depth of each tree
-    # max_depth.append(None)
-    # Minimum number of samples required to split a node
-    # min_samples_split = min_samples_split
-    # Minimum number of samples required at each leaf node
-    # min_samples_leaf = min_samples_leaf
-    # Maximum number of features to consider at each split
-    # max_features = max_features
-    # Loss function to optimize
-    # if model_type == "classifier":
-    #     loss = ["exponential", "log_loss"]
-    #     criterion = ["friedman_mse", "squared_error"]
-    # Fraction of samples to be used for training each tree
-    # subsample = np.linspace(
-    #     start=subsample_lims[0], stop=subsample_lims[1], num=n_trials
-    # ).tolist()
+    learning_rate = make_vals_list(
+        learning_rate_lims, n_trials, "log"
+    )  # Learning rate (shrinkage)
 
     # Create the random grid
     random_grid = {
@@ -875,13 +894,10 @@ def xgb_search_grid(
         "eval_metric": eval_metric,
         "n_estimators": n_estimators,
         "max_depth": max_depth,
-        "colsample_bytree": colsample_bytree
-        # "learning_rate": learning_rate,
-        # "min_samples_split": min_samples_split,
-        # "min_samples_leaf": min_samples_leaf,
-        # "max_features": max_features,
-        # "subsample": subsample,
-        # "criterion": criterion,
+        "colsample_bytree": colsample_bytree,
+        "min_child_weight": min_child_weight,
+        "subsample": subsample,
+        "learning_rate": learning_rate,
     }
     return random_grid
 
