@@ -862,18 +862,8 @@ def xgb_search_grid(
     subsample_lims: tuple[float] = (0.1, 1.0),
     colsample_bytree_lims: tuple[float] = (0.1, 0.9),
     learning_rate_lims: tuple[float] = (0.01, 0.4),
-    # learning_rate_lims: tuple[float] = (0.001, 1.0),
-    # min_samples_split: list[int] = [2, 5, 10],
-    # min_samples_leaf: list[int] = [1, 2, 4],
-    # max_features: list[str] = ["auto", "sqrt"],
-    # loss: list[str] = ["ls", "lad", "huber", "quantile"],
-    # subsample_lims: tuple[float] = (0.1, 1.0),
-    # criterion: list[str] = ["rmse"],
-    # model_type: str = "regressor",
 ) -> dict:
-    # TODO: there are more parameters here, some of which may depend on the booster and so throw a load of errors
-    # look in graveyard at xgb_random_search
-    #
+
     # Number of trees in the ensemble
     n_estimators = make_vals_list(n_estimators_lims, n_trials, "log")
     max_depth = make_vals_list(
