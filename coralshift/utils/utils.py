@@ -194,7 +194,7 @@ def generate_date_pairs(
     ]
 
 
-def get_buffered_lims(coord_vals, buffer_size=1):   # for security
+def get_buffered_lims(coord_vals, buffer_size=1):
     return [min(coord_vals) - buffer_size, max(coord_vals) + buffer_size]
 
 
@@ -427,6 +427,7 @@ def calc_non_zero_ratio(data, predictand=None):
 #         f"n{max(round_lats)}_s{min(round_lats)}_w{min(round_lons)}_e{max(round_lons)}"
 #     )
 
+
 def lat_lon_string_from_tuples(
     lats: tuple[float, float], lons: tuple[float, float], dp: int = 0
 ):
@@ -436,8 +437,22 @@ def lat_lon_string_from_tuples(
     lats = [round_to_1_sf_after_decimal(min_lat), round_to_1_sf_after_decimal(max_lat)]
     lons = [round_to_1_sf_after_decimal(min_lon), round_to_1_sf_after_decimal(max_lon)]
 
-    lats_strs = [f"s{replace_dot_with_dash(str(abs(round(lat, 1))))}" if lat < 0 else f"n{replace_dot_with_dash(str(abs(round(lat, 1))))}" for lat in lats]   # noqa
-    lons_strs = [f"w{replace_dot_with_dash(str(abs(round(lon, 1))))}" if lon < 0 else f"e{replace_dot_with_dash(str(abs(round(lon, 1))))}" for lon in lons]   # noqa
+    lats_strs = [
+        (
+            f"s{replace_dot_with_dash(str(abs(round(lat, 1))))}"
+            if lat < 0
+            else f"n{replace_dot_with_dash(str(abs(round(lat, 1))))}"
+        )
+        for lat in lats
+    ]  # noqa
+    lons_strs = [
+        (
+            f"w{replace_dot_with_dash(str(abs(round(lon, 1))))}"
+            if lon < 0
+            else f"e{replace_dot_with_dash(str(abs(round(lon, 1))))}"
+        )
+        for lon in lons
+    ]  # noqa
 
     return "_".join(lats_strs + lons_strs)
 
@@ -460,7 +475,7 @@ def round_to_1_sf_after_decimal(num):
         >>> round_to_1_sf_after_decimal(0.005)
         0.0
     """
-    parts = str(num).split('.')
+    parts = str(num).split(".")
     # if there is a decimal part
     if len(parts) == 2:
         dec_part = parts[1]
@@ -468,11 +483,13 @@ def round_to_1_sf_after_decimal(num):
         # determine number of zeros before first non-zero digit
         num_zeros = 0
         for i in range(len(dec_part)):
-            if dec_part[i] == '0':
+            if dec_part[i] == "0":
                 num_zeros += 1
             else:
                 break
-        return float(parts[0] + '.' + num_zeros*'0' + f"{float(f"{float(dec_part):.1g}"):g}"[0])    # noqa
+        return float(
+            parts[0] + "." + num_zeros * "0" + f"{float(f"{float(dec_part):.1g}"):g}"[0]
+        )  # noqa
     else:
         return float(parts[0])
 
@@ -554,7 +571,7 @@ def num_cpus():
 
 def calc_worker_memory_lim(n_workers, memory_limit):
     return memory_limit / n_workers
-    
+
 
 def memory_string(memory_limit):
     return str(memory_limit) + "GB"
