@@ -856,16 +856,17 @@ def xgb_search_grid(
     n_trials: int = 3,
     objective: str = ["reg:squarederror", "reg:squaredlogerror"],
     eval_metric: str = ["rmse"],
-    n_estimators_lims: tuple[int] = (10, 2000),
+    # n_estimators_lims: tuple[int] = (10, 2000),
     max_depth_lims: tuple[int] = (1, 20),
     min_child_weight_lims: tuple[float] = (0.1, 10),
     subsample_lims: tuple[float] = (0.1, 1.0),
     colsample_bytree_lims: tuple[float] = (0.1, 0.9),
     learning_rate_lims: tuple[float] = (0.01, 0.4),
+    n_jobs: int = 160,
 ) -> dict:
 
     # Number of trees in the ensemble
-    n_estimators = make_vals_list(n_estimators_lims, n_trials, "log")
+    # n_estimators = make_vals_list(n_estimators_lims, n_trials, "log")
     max_depth = make_vals_list(
         max_depth_lims, n_trials, "linear"
     )  # Maximum depth of each tree
@@ -882,12 +883,13 @@ def xgb_search_grid(
     random_grid = {
         "objective": objective,
         "eval_metric": eval_metric,
-        "n_estimators": n_estimators,
+        # "n_estimators": n_estimators,
         "max_depth": max_depth,
         "colsample_bytree": colsample_bytree,
         "min_child_weight": min_child_weight,
         "subsample": subsample,
         "learning_rate": learning_rate,
+        "n_jobs": n_jobs,
     }
     return random_grid
 
