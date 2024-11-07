@@ -1,23 +1,7 @@
-# import importlib
-# import inspect
+# general
 from pathlib import Path
 import subprocess
 from dataclasses import dataclass
-
-
-# def get_coralshift_dir():
-#     coralshift_module = importlib.import_module("coralshift")
-#     coralshift_dir = Path(inspect.getabsfile(coralshift_module)).parent
-#     return (coralshift_dir / "..").resolve()
-# setup(name="coralshift", version="0.1.0", packages=find_packages())
-
-
-# def get_coralshift_module_dir():
-#     return Path(__file__).resolve().parent.parent
-
-
-# def get_repo_dir():
-#     return get_coralshift_module_dir().parent
 
 
 def get_repo_root():
@@ -59,22 +43,24 @@ cmip6_data_dir = env_data_dir / "cmip6"
 static_cmip6_data_dir = cmip6_data_dir / "EC-Earth3P-HR/r1i1p2f1_latlon"
 
 # RUNS DIRECTORIES
-runs_csv = runs_dir / "runs.csv"    # run metadata file
-models_dir = runs_dir / "models"    # trained model directory
+runs_csv = runs_dir / "runs.csv"  # run metadata file
+models_dir = runs_dir / "models"  # trained model directory
 config_dir = runs_dir / "config_files"
-run_logs_dir = logs_dir / "runs"    # logging directory
+run_logs_dir = logs_dir / "runs"  # logging directory
 
 
 ###############################################################################
 # Config classes
 ###############################################################################
 
+
 @dataclass
 class ProcessingConfig:
     do_crop: bool
 
     def __init__(self, conf: dict):
-        self.do_crop = conf['do_crop']
+        self.do_crop = conf["do_crop"]
+
 
 @dataclass
 class HyperparameterSearchConfig:
@@ -88,14 +74,15 @@ class HyperparameterSearchConfig:
     n_jobs: int
 
     def __init__(self, conf: dict):
-        self.cv_folds = conf['cv_folds']
-        self.n_samples = conf['n_samples']
-        self.n_iter = conf['n_iter']
-        self.search_type = conf['search_type']
-        self.do_search = conf['do_search']
-        self.n_trials = conf['n_trials']
-        self.search_types = conf['search_types']
-        self.n_jobs = conf['n_jobs']
+        self.cv_folds = conf["cv_folds"]
+        self.n_samples = conf["n_samples"]
+        self.n_iter = conf["n_iter"]
+        self.search_type = conf["search_type"]
+        self.do_search = conf["do_search"]
+        self.n_trials = conf["n_trials"]
+        self.search_types = conf["search_types"]
+        self.n_jobs = conf["n_jobs"]
+
 
 @dataclass
 class Config:
@@ -133,37 +120,41 @@ class Config:
     member_id: str
 
     def __init__(self, conf: dict):
-        self.data_source = conf['data_source']
-        self.regressor_classification_threshold = conf['regressor_classification_threshold']
-        self.depth_mask = conf['depth_mask']
-        self.ds_type = conf['ds_type']
-        self.predictand = conf['predictand']
-        self.datasets = conf['datasets']
-        self.env_vars = conf['env_vars']
-        self.random_state = conf['random_state']
-        self.resolution = conf['resolution']
-        self.resolution_unit = conf['resolution_unit']
-        self.year_range_to_include = conf['year_range_to_include']
-        self.upsample_method = conf['upsample_method']
-        self.downsample_method = conf['downsample_method']
-        self.spatial_buffer = conf['spatial_buffer']
-        self.save_figs = conf['save_figs']
-        self.do_train = conf['do_train']
-        self.do_save_model = conf['do_save_model']
-        self.do_plot = conf['do_plot']
-        self.processing = ProcessingConfig(conf['processing'])
-        self.lats = conf['lats']
-        self.lons = conf['lons']
-        self.levs = conf['levs']
-        self.split_type = conf['split_type']
-        self.test_geom = conf['test_geom']
-        self.train_test_val_frac = conf['train_test_val_frac']
-        self.X_scaler = conf['X_scaler']
-        self.y_scaler = conf['y_scaler']
-        self.hyperparameter_search = HyperparameterSearchConfig(conf['hyperparameter_search'])
-        self.source_id = conf['source_id']
-        self.member_id = conf['member_id']
-        
+        self.data_source = conf["data_source"]
+        self.regressor_classification_threshold = conf[
+            "regressor_classification_threshold"
+        ]
+        self.depth_mask = conf["depth_mask"]
+        self.ds_type = conf["ds_type"]
+        self.predictand = conf["predictand"]
+        self.datasets = conf["datasets"]
+        self.env_vars = conf["env_vars"]
+        self.random_state = conf["random_state"]
+        self.resolution = conf["resolution"]
+        self.resolution_unit = conf["resolution_unit"]
+        self.year_range_to_include = conf["year_range_to_include"]
+        self.upsample_method = conf["upsample_method"]
+        self.downsample_method = conf["downsample_method"]
+        self.spatial_buffer = conf["spatial_buffer"]
+        self.save_figs = conf["save_figs"]
+        self.do_train = conf["do_train"]
+        self.do_save_model = conf["do_save_model"]
+        self.do_plot = conf["do_plot"]
+        self.processing = ProcessingConfig(conf["processing"])
+        self.lats = conf["lats"]
+        self.lons = conf["lons"]
+        self.levs = conf["levs"]
+        self.split_type = conf["split_type"]
+        self.test_geom = conf["test_geom"]
+        self.train_test_val_frac = conf["train_test_val_frac"]
+        self.X_scaler = conf["X_scaler"]
+        self.y_scaler = conf["y_scaler"]
+        self.hyperparameter_search = HyperparameterSearchConfig(
+            conf["hyperparameter_search"]
+        )
+        self.source_id = conf["source_id"]
+        self.member_id = conf["member_id"]
+
 
 # ###############################################################################
 # # Weights and biases config (https://docs.wandb.ai/guides/track/advanced/environment-variables)
@@ -178,3 +169,21 @@ class Config:
 # # Absolute path to wandb config dir (
 # WANDB_CONFIG_DIR = "/path/to/wandb/config/dir"
 # WANDB_CACHE_DIR = "/path/to/wandb/cache/dir"
+
+
+# import importlib
+# import inspect
+
+# def get_coralshift_dir():
+#     coralshift_module = importlib.import_module("coralshift")
+#     coralshift_dir = Path(inspect.getabsfile(coralshift_module)).parent
+#     return (coralshift_dir / "..").resolve()
+# setup(name="coralshift", version="0.1.0", packages=find_packages())
+
+
+# def get_coralshift_module_dir():
+#     return Path(__file__).resolve().parent.parent
+
+
+# def get_repo_dir():
+#     return get_coralshift_module_dir().parent
