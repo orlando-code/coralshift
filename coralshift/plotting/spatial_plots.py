@@ -3,9 +3,11 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib import animation, colors
-import matplotlib.gridspec as gridspec
+
+# import matplotlib.gridspec as gridspec
 import matplotlib.colors as mcolors
-import matplotlib.patches as patches
+
+# import matplotlib.patches as patches
 import seaborn as sns
 
 # general
@@ -30,7 +32,9 @@ from coralshift.utils import file_ops
 
 
 # TODO: not working universally
-def customize_plot_colors(fig, ax, background_color="#212121", text_color="white", legend_text_color="black"):
+def customize_plot_colors(
+    fig, ax, background_color="#212121", text_color="white", legend_text_color="black"
+):
     # Set figure background color
     fig.patch.set_facecolor(background_color)
 
@@ -276,7 +280,9 @@ def plot_spatial(
     # for some reason fig not including axis ticks. Universal for other plotting
     if not fax:
         if extent == "global":
-            fig, ax = generate_geo_axis(figsize=figsize, map_proj=ccrs.Robinson(), dpi=dpi)
+            fig, ax = generate_geo_axis(
+                figsize=figsize, map_proj=ccrs.Robinson(), dpi=dpi
+            )
             ax.set_global()
         else:
             fig, ax = generate_geo_axis(figsize=figsize, map_proj=map_proj, dpi=dpi)
@@ -421,7 +427,7 @@ def format_cartopy_display(ax, cartopy_dict: dict = None):
         "edgecolor": "black",
         "facecolor": "#cfcfcf",  # "none"
         "linewidth": 0.5,
-        "alpha": 1,
+        "alpha": 0.5,
     }
 
     if cartopy_dict:
@@ -437,7 +443,8 @@ def format_cartopy_display(ax, cartopy_dict: dict = None):
             facecolor=default_cartopy_dict["facecolor"],
             linewidth=default_cartopy_dict["linewidth"],
             alpha=default_cartopy_dict["alpha"],
-        ), zorder=100
+        ),
+        zorder=100,
     )
 
     return ax
@@ -1153,10 +1160,15 @@ def plot_comparative_histograms_visuals(
     val_lims: tuple[float, float] = [-100, 100],
     figsize: tuple[float, float] = None,
     cbar_dict=None,
-    hist_dict={"bins": 100, "density": False, "alpha": 0.5, "yscale": "log", "range": None},
+    hist_dict={
+        "bins": 100,
+        "density": False,
+        "alpha": 0.5,
+        "yscale": "log",
+        "range": None,
+    },
     n_hist_bins: int = 100,
     map_extents: list[float] = [140, 145, -15, -10],
-
     # combined: bool = False,   # TODO: allow plotting on single figure
 ):
     for a_i, array in tqdm(enumerate(arrays), total=len(arrays)):
@@ -1206,7 +1218,13 @@ def plot_two_methods_comparative_histograms_visuals(
     arrays1_label=None,
     arrays2_label=None,
     cbar_dict: dict = None,
-    hist_dict={"bins": 100, "density": False, "alpha": 0.5, "yscale": "log", "range": None},
+    hist_dict={
+        "bins": 100,
+        "density": False,
+        "alpha": 0.5,
+        "yscale": "log",
+        "range": None,
+    },
     val_lims: tuple[float, float] = [-100, 100],
     map_extents: list[float] = [140, 145, -15, -10],
 ):
@@ -1252,7 +1270,7 @@ def plot_two_methods_comparative_histograms_visuals(
         ax_hist.hist(
             arrays2[a_i].values.flatten(),
             bins=hist_dict["bins"],
-            alpha=hist_dict["alpha"]/2,
+            alpha=hist_dict["alpha"] / 2,
             label="second_method" if not arrays2_label else arrays2_label,
             density=hist_dict["density"],
             color="#3B9AB2",
@@ -1289,18 +1307,24 @@ def plot_train_test_datasets(
     text_pos: tuple[float, float] = (0.5, 0.5),
     figsize: tuple[float, float] = (10, 10),
     dpi=150,
-    fax=None
+    fax=None,
 ):
     # cast first to ones, second to 0s
     train_ds = train_da.where(~train_da.notnull(), 1)
     test_ds = test_da.where(~test_da.notnull(), 0)
 
     if not fax:
-        f, ax = plt.subplots(subplot_kw={'projection': ccrs.PlateCarree()}, figsize=figsize, dpi=dpi)
+        f, ax = plt.subplots(
+            subplot_kw={"projection": ccrs.PlateCarree()}, figsize=figsize, dpi=dpi
+        )
     else:
         f, ax = fax
-    plot_spatial(train_ds, title="", fax=(f, ax), val_lims=[0, 1], cbar_dict={"cbar": False})
-    plot_spatial(test_ds, title="", fax=(f, ax), val_lims=[0, 1], cbar_dict={"cbar": False})
+    plot_spatial(
+        train_ds, title="", fax=(f, ax), val_lims=[0, 1], cbar_dict={"cbar": False}
+    )
+    plot_spatial(
+        test_ds, title="", fax=(f, ax), val_lims=[0, 1], cbar_dict={"cbar": False}
+    )
 
     # # slightly rough-and-ready, not particularly elegant (also only works for case study area):
     # # TODO: generalise
