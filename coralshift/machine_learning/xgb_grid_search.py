@@ -165,6 +165,12 @@ if __name__ == "__main__":
         description="Perform grid search for XGBoost parameters."
     )
     parser.add_argument(
+        "--data_fp",
+        type=str,
+        required=True,
+        help="File path to the dataset (parquet required).",
+    )
+    parser.add_argument(
         "--num_boost_round", type=int, default=1000, help="Number of boosting rounds."
     )
     parser.add_argument(
