@@ -83,6 +83,8 @@ def main(data_fp, label_str, num_boost_round, num_search_vals, cv, seed):
     all_df = pd.read_parquet(data_fp)
     all_X = all_df.drop(columns=[label_str])
     all_y = all_df[label_str]
+    print("\nNumber of features", len(all_X.columns), flush=True)
+    print("Number of samples", len(all_y), flush=True)
     dtrain = xgb.DMatrix(data=all_X, label=all_y)
 
     # Generate search grid
@@ -167,6 +169,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--data_fp",
+        default="/maps/rt582/coralshift/coralshift/machine_learning/xgb_grid_search.py",
         type=str,
         required=True,
         help="File path to the dataset (parquet required).",
@@ -200,6 +203,8 @@ if __name__ == "__main__":
     os.environ["OMP_NUM_THREADS"] = str(args.num_cores)
 
     main(
+        data_fp=args.data_fp,
+        label_str=args.label_str,
         num_boost_round=args.num_boost_round,
         num_search_vals=args.num_search_vals,
         cv=args.cv,
