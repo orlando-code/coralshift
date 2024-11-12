@@ -11,6 +11,7 @@ import pandas as pd
 
 # machine learning
 import xgboost as xgb
+import os
 
 # custom
 from coralshift.machine_learning import static_models
@@ -191,7 +192,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--seed", type=int, default=42, help="Random seed for reproducibility."
     )
+    parser.add_argument(
+        "--num_cores", type=int, default=160, help="Number of cores to use."
+    )
     args = parser.parse_args()
+
+    os.environ["OMP_NUM_THREADS"] = str(args.num_cores)
 
     main(
         num_boost_round=args.num_boost_round,
