@@ -4,10 +4,10 @@ depth_mask: [-1000, 10]
 ds_type: static
 predictand: UNEP_GDCR
 datasets: 
-- cmip6
+# - cmip6
 - unep
 - gebco
-- slope
+# - slope
 env_vars:
 - tos
 - mlotst
@@ -46,7 +46,7 @@ lons:
 # - 140
 # - 145
 - 140
-- 166
+- 170
 levs:
 - 0
 - 20
@@ -57,11 +57,11 @@ X_scaler: standard
 y_scaler: minmax
 hyperparameter_search:
   cv_folds: 5
-  n_samples: -1
+  n_samples: 1
   n_iter: 100
   search_type: random
   do_search: False
-  n_trials: 5
+  n_trials: 7
   search_types:
   # - grid
   - random
