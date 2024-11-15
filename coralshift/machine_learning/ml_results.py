@@ -44,7 +44,9 @@ class AnalyseResults:
         self.do_plot = do_plot
         self.save_graphs = save_graphs
         self.config_info = config_info
-        self.extent = extent if extent else [*self.config_info["lons"], *self.config_info["lats"]]
+        self.extent = (
+            extent if extent else [*self.config_info["lons"], *self.config_info["lats"]]
+        )
         self.ds_type = None
         self.presentation_format = presentation_format
 
@@ -183,7 +185,7 @@ class AnalyseResults:
         f, ax = visualise_results.plot_spatial_residuals(
             y,
             predictions,
-            extent=self.extent
+            extent=self.extent,
             # presentation_format=self.presentation_format
         )
         self.save_fig(fn="spatial_differences", dpi=f.dpi)
@@ -216,7 +218,9 @@ class AnalyseResults:
             if not self.trains_preds:
                 predictions = self.make_predictions(ds[0][:n_samples])
             else:
-                predictions = self.trains_preds if self.ds_type == "trains" else self.tests_preds
+                predictions = (
+                    self.trains_preds if self.ds_type == "trains" else self.tests_preds
+                )
 
             self.produce_plots(ds[1][:n_samples], predictions)
             self.produce_metrics(ds[1][:n_samples], predictions)
@@ -230,6 +234,23 @@ def permutation_feature_importance(
     n_jobs: int = 16,
     random_state: int = 42,
 ):
+    """
+    Calculate feature importance using permutation importance.
+
+    Parameters
+    ----------
+
+    model: fitted model object
+    val_X (pd.DataFrame): validation data
+    val_y (pd.DataFrame): validation labels
+    n_repeats (int): number of times to repeat the permutation
+    n_jobs (int): number of jobs to run in parallel
+    random_state (int): random seed
+
+    Returns
+    -------
+    pd.DataFrame: dataframe containing feature importances
+    """
     print("Running feature importance check...")
     perm_imp_dict = permutation_importance(
         model,
@@ -244,14 +265,29 @@ def permutation_feature_importance(
 
 
 def plot_forest_feature_importances(
-    model, X_train: pd.DataFrame, n_samples: int = 30, figsize: tuple[float] = None
+    model,
+    X_train: pd.DataFrame,
+    importance_type: str = "weight",
+    n_samples: int = 30,
+    figsize: tuple[float] = None,
 ):
-    importances = model.feature_importances_
-    descending_indices = np.argsort(importances)
+    """
+    Plot feature importances for a random forest model.
 
-    sorted_importances = importances[descending_indices]
-    sorted_labels = X_train.columns[descending_indices]
+    Parameters
+    ----------
+    model: fitted model object
+    X_train (pd.DataFrame): training data
+    n_samples (int): number of features to plot
+    figsize (tuple): figure size
 
+    Returns
+    -------
+    None
+    """
+    sorted_features, sorted_importances = return_top_n_features(
+        model, X_train, importance_type, n_samples
+    )
     # adjust figsize based on number of samples, if not provided
     if not figsize:
         figsize = (10, n_samples * 0.25)
@@ -269,14 +305,48 @@ def plot_forest_feature_importances(
     )
 
     # formatting
-    ax.set_yticks(range(len(importances[:n_samples])))
-    _ = ax.set_yticklabels(sorted_labels[-n_samples:])
+    ax.set_yticks(range(len(sorted_importances[:n_samples])))
+    _ = ax.set_yticklabels(sorted_features[-n_samples:])
     plt.xlabel("Importance")
     plt.ylabel("Feature")
     plt.grid(axis="x", linestyle="-", alpha=0.6)
     # plot minor gridlines
     plt.minorticks_on()
-    plt.grid(axis="x", which="minor", linestyle="-0", alpha=0.2)
+    plt.grid(axis="x", which="minor", linestyle="-", alpha=0.2)
+
+
+def return_top_n_features(
+    model,
+    feature_labels: list[str],
+    importance_type: str = "weight",
+):
+    """
+    Return the N most important features from a tree-based model (either sklearn or XGBoost).
+
+    Parameters
+    ----------
+    model: fitted model object
+    feature_labels (list[str]): training data
+    importance_type (str): type of importance metric to use
+
+    Returns
+    -------
+    tuple: sorted_features, sorted_importances
+    """
+    if isinstance(model, xgb.core.Booster):
+        importances = model.get_score(importance_type=importance_type)
+    elif isinstance(model, xgb.XGBRegressor):
+        importances = model.feature_importances_
+        # create dictionary from importances
+        importances = dict(zip(feature_labels, importances))
+
+    # order dictionary by values and get keys and values in order
+    sorted_items = sorted(importances.items(), key=lambda item: item[1], reverse=False)
+
+    # Extract the keys and values into separate lists
+    sorted_features = [item[0] for item in sorted_items]
+    sorted_importances = [item[1] for item in sorted_items]
+    return sorted_features, sorted_importances
 
 
 # from baselines.py May come in useful
