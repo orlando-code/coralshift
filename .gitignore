@@ -39,3 +39,6 @@ __pycache__/
 
 # ignore graveyard scripts
 **/graveyard/*
+
+# ignore changes to config_test.yaml
+config_test.yaml
