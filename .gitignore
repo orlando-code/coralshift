@@ -41,4 +41,4 @@ __pycache__/
 **/graveyard/*
 
 # ignore changes to config_test.yaml
-config_test.yaml
+/runs/config_files/config_test.yaml
