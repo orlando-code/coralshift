@@ -353,20 +353,19 @@ class FileHandler:
 
 
 def guarantee_existence(path: Path | str) -> Path:
-    """Checks if string is an existing directory path, else creates it
+    """Ensure the directory exists; if not, create it.
 
     Parameter
     ---------
-    path (str)
+    path (str | Path)
 
     Returns
     -------
     Path
-        pathlib.Path object of path
+        pathlib.Path object of the path
     """
     path_obj = Path(path)
-    if not path_obj.exists():
-        path_obj.mkdir(parents=True, exist_ok=True)
+    path_obj.mkdir(parents=True, exist_ok=True)
     return path_obj.resolve()
 
 
@@ -1050,7 +1049,10 @@ def write_pickle(pkl_path: str | Path, info):
 
 
 def rename_nc_with_coords(
-    nc_fp: Path | str, lat_coord_name: str = None, lon_coord_name: str = None, delete_og: bool = True
+    nc_fp: Path | str,
+    lat_coord_name: str = None,
+    lon_coord_name: str = None,
+    delete_og: bool = True,
 ) -> None:
     """
     Renames a NetCDF file with latitude and longitude coordinates.
@@ -1073,11 +1075,19 @@ def rename_nc_with_coords(
     nc_fp = Path(nc_fp)
     nc_xa = xa.open_dataset(nc_fp)
 
-    lat_coord_possibilities = ["lat", "latitude", "y"] if not lat_coord_name else [lat_coord_name]
-    lon_coord_possibilities = ["lon", "longitude", "x"] if not lon_coord_name else [lon_coord_name]
+    lat_coord_possibilities = (
+        ["lat", "latitude", "y"] if not lat_coord_name else [lat_coord_name]
+    )
+    lon_coord_possibilities = (
+        ["lon", "longitude", "x"] if not lon_coord_name else [lon_coord_name]
+    )
 
-    lat_coord = next((coord for coord in lat_coord_possibilities if coord in nc_xa.coords), None)
-    lon_coord = next((coord for coord in lon_coord_possibilities if coord in nc_xa.coords), None)
+    lat_coord = next(
+        (coord for coord in lat_coord_possibilities if coord in nc_xa.coords), None
+    )
+    lon_coord = next(
+        (coord for coord in lon_coord_possibilities if coord in nc_xa.coords), None
+    )
 
     if not lat_coord:
         raise ValueError("Latitude coordinate not found in the dataset.")
@@ -1087,10 +1097,27 @@ def rename_nc_with_coords(
     min_lat, max_lat = nc_xa[lat_coord].values.min(), nc_xa[lat_coord].values.max()
     min_lon, max_lon = nc_xa[lon_coord].values.min(), nc_xa[lon_coord].values.max()
 
-    lats_strs = [f"s{utils.replace_dot_with_dash(str(abs(round(lat, 1))))}" if lat < 0 else f"n{utils.replace_dot_with_dash(str(abs(round(lat, 1))))}" for lat in [min_lat, max_lat]]   # noqa
-    lons_strs = [f"w{utils.replace_dot_with_dash(str(abs(round(lon, 1))))}" if lon < 0 else f"e{utils.replace_dot_with_dash(str(abs(round(lon, 1))))}" for lon in [min_lon, max_lon]]   # noqa
+    lats_strs = [
+        (
+            f"s{utils.replace_dot_with_dash(str(abs(round(lat, 1))))}"
+            if lat < 0
+            else f"n{utils.replace_dot_with_dash(str(abs(round(lat, 1))))}"
+        )
+        for lat in [min_lat, max_lat]
+    ]  # noqa
+    lons_strs = [
+        (
+            f"w{utils.replace_dot_with_dash(str(abs(round(lon, 1))))}"
+            if lon < 0
+            else f"e{utils.replace_dot_with_dash(str(abs(round(lon, 1))))}"
+        )
+        for lon in [min_lon, max_lon]
+    ]  # noqa
 
-    new_fp = nc_fp.parent / f"{nc_fp.stem}_{lats_strs[1]}_{lats_strs[0]}_{lons_strs[0]}_{lons_strs[1]}.nc"
+    new_fp = (
+        nc_fp.parent
+        / f"{nc_fp.stem}_{lats_strs[1]}_{lats_strs[0]}_{lons_strs[0]}_{lons_strs[1]}.nc"
+    )
 
     if new_fp.exists():
         raise FileExistsError(f"File {new_fp} already exists.")
