@@ -15,7 +15,10 @@ import xgboost as xgb
 from coralshift.machine_learning import static_models
 from coralshift.processing import ml_processing
 from coralshift.utils import file_ops
-from coralshift.plotting import visualise_results, spatial_plots
+from graphpy import results as visualise_results
+from graphpy import colours as graphpy_colours
+
+# from coralshift.plotting import visualise_results, spatial_plots
 
 
 class AnalyseResults:
@@ -294,7 +297,7 @@ def plot_forest_feature_importances(
 
     fig, ax = plt.subplots(figsize=figsize)
 
-    cmap = spatial_plots.ColourMapGenerator().get_cmap("seq")(
+    cmap = graphpy_colours.ColourMapGenerator().get_cmap("seq")(
         np.linspace(0, 1, n_samples)
     )
 
