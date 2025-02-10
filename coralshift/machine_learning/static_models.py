@@ -862,7 +862,7 @@ def xgb_search_grid(
     subsample_lims: tuple[float] = (0.1, 1.0),
     colsample_bytree_lims: tuple[float] = (0.1, 0.9),
     learning_rate_lims: tuple[float] = (0.01, 0.4),
-    n_jobs: int = 160,
+    n_jobs: int = [160],
 ) -> dict:
 
     # Number of trees in the ensemble

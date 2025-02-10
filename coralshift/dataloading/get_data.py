@@ -13,7 +13,12 @@ import rasterio
 from rasterio.enums import Resampling
 import xesmf as xe
 from rasterio.enums import MergeAlg
-from pyinterp.backends import xarray as pyxarray
+
+# from pyinterp.backends import xarray as pyxarray
+
+# import threadpoolexecutor
+# from pyinterp import loess, fill
+from concurrent.futures import ThreadPoolExecutor
 
 # from pyinterp.core import fill
 from pyinterp.fill import loess
@@ -65,22 +70,35 @@ def generate_xa_ds_from_shapefile(
     correct_resolutions = find_files_for_resolution(potential_fps, res_str)
     xas = cmipper_file_ops.find_files_for_area(correct_resolutions, lats, lons)
 
-    if len(xas) >= 1:   # if any correct files are found, load the first
-        print(f"Loading {shapefile_id} xarray at {degrees_resolution:.03f} degrees resolution.")
+    if len(xas) >= 1:  # if any correct files are found, load the first
+        print(
+            f"Loading {shapefile_id} xarray at {degrees_resolution:.03f} degrees resolution."
+        )
         print(f"loading from {xas[0]}")
-        return xa.open_dataset(xas[0]).sel(latitude=slice(*lats), longitude=slice(*lons))
+        return xa.open_dataset(xas[0]).sel(
+            latitude=slice(*lats), longitude=slice(*lons)
+        )
     else:
         print(f"Loading {shapefile_id} data from original shapefile: {shapefile_fp}")
 
         # load tabular data into geodf. Don't dask yet to allow filtering by region (if required)
         gdf = daskgpd.read_file(shapefile_fp, npartitions=4)
-        if shapefile_id in ["wri", "WRI_REEF_EXTENT"]:  # this gdf is weirdly bundled into one row
+        if shapefile_id in [
+            "wri",
+            "WRI_REEF_EXTENT",
+        ]:  # this gdf is weirdly bundled into one row
             gdf = gdf.explode()
 
         geometry_filter = sgeometry.box(min(lons), min(lats), max(lons), max(lats))
         # two-filter step (rather than computing entire geodf to start) speeds up and helps with memory
-        filtered_gdf = gdf[gdf.geometry.intersects(geometry_filter)].compute().explode(index_parts=True)  # coarse filter (allowing multipolys)
-        filtered_gdf = filtered_gdf[filtered_gdf.geometry.intersects(geometry_filter)]  # fine filter (all polys)
+        filtered_gdf = (
+            gdf[gdf.geometry.intersects(geometry_filter)]
+            .compute()
+            .explode(index_parts=True)
+        )  # coarse filter (allowing multipolys)
+        filtered_gdf = filtered_gdf[
+            filtered_gdf.geometry.intersects(geometry_filter)
+        ]  # fine filter (all polys)
 
         print(
             f"generating {shapefile_id} raster at {degrees_resolution:.03f} degrees resolution..."
@@ -100,11 +118,13 @@ def generate_xa_ds_from_shapefile(
             resolution=degrees_resolution,
             name=shapefile_id.upper(),
         ).chunk("auto")
-        xa_d.longitude.attrs["units"] = "degrees_east" 
-        xa_d.latitude.attrs["units"] = "degrees_north" 
-        
+        xa_d.longitude.attrs["units"] = "degrees_east"
+        xa_d.latitude.attrs["units"] = "degrees_north"
+
         # generate filepath and save
-        spatial_extent_info = cmipper_utils.lat_lon_string_from_tuples(lats, lons).upper()
+        spatial_extent_info = cmipper_utils.lat_lon_string_from_tuples(
+            lats, lons
+        ).upper()
         xa_d_fp = xa_dir / f"unep_{res_str}_{spatial_extent_info}.nc"
         print(f"saving UNEP raster to {xa_d_fp}...")
         xa_d.to_netcdf(xa_d_fp)
@@ -256,6 +276,7 @@ class ReturnRaster:
     # - reef_check / reef_check_points
 
     """
+
     def __init__(
         self,
         config_info: Config,
@@ -314,16 +335,29 @@ class ReturnRaster:
         if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence", "unep_gdcr"]:
             # TODO: check that there isn't an intersecting one already
             return generate_xa_ds_from_shapefile(
-                shapefile_id="UNEP_GDCR", shapefile_fp=config.gdcr_dir / "01_Data/WCMC008_CoralReef2021_Py_v4_1.shp",   # TODO: this not most recent
-                lats=self.buffered_lats, lons=self.buffered_lons, degrees_resolution=15/3600)   # 15" (gebco resolution)
+                shapefile_id="UNEP_GDCR",
+                shapefile_fp=config.gdcr_dir
+                / "01_Data/WCMC008_CoralReef2021_Py_v4_1.shp",  # TODO: this not most recent
+                lats=self.buffered_lats,
+                lons=self.buffered_lons,
+                degrees_resolution=15 / 3600,
+            )  # 15" (gebco resolution)
         if dataset in ["wri"]:
             return generate_xa_ds_from_shapefile(
-                shapefile_id="WRI_REEF_EXTENT", shapefile_fp=config.wri_dir / "Reefs/reef_500_poly.shp",
-                lats=self.buffered_lats, lons=self.buffered_lons, degrees_resolution=15/3600)   # 15" (gebco resolution)
+                shapefile_id="WRI_REEF_EXTENT",
+                shapefile_fp=config.wri_dir / "Reefs/reef_500_poly.shp",
+                lats=self.buffered_lats,
+                lons=self.buffered_lons,
+                degrees_resolution=15 / 3600,
+            )  # 15" (gebco resolution)
         elif dataset in ["gebco", "bathymetry"]:
-            return bathymetry.generate_gebco_xarray(self.buffered_lats, self.buffered_lons)
+            return bathymetry.generate_gebco_xarray(
+                self.buffered_lats, self.buffered_lons
+            )
         elif dataset in ["gebco_slope", "bathymetry_slope", "slope"]:
-            return bathymetry.generate_gebco_slopes_xarray(self.buffered_lats, self.buffered_lons)
+            return bathymetry.generate_gebco_slopes_xarray(
+                self.buffered_lats, self.buffered_lons
+            )
         elif dataset in ["cmip6", "cmip"]:
             # ensure necessary files downloaded: variables, years, lats, lons, levs
             # TODO: (probably) – split up download and processing, ensuring download for all variables
@@ -347,9 +381,10 @@ class ReturnRaster:
                 # lons=self.buffered_lons,
                 year_range=self.year_range_to_include,
                 levs=self.levs,
-                cmip6_data_dir=Path(
-                    config.cmip6_data_dir
-                    ) / self.cfg.source_id / self.cfg.member_id / "regridded",
+                cmip6_data_dir=Path(config.cmip6_data_dir)
+                / self.cfg.source_id
+                / self.cfg.member_id
+                / "regridded",
             )
             if raster:
                 return raster
@@ -381,7 +416,10 @@ class ReturnRaster:
 
         return rio_absolute_resample(
             # raster.sel(latitude=slice(*LATS), longitude=slice(*LONS)),
-            raster.sel(latitude=slice(*self.buffered_lats), longitude=slice(*self.buffered_lons)),
+            raster.sel(
+                latitude=slice(*self.buffered_lats),
+                longitude=slice(*self.buffered_lons),
+            ),
             lat_resolution=self.resolution,
             lon_resolution=self.resolution,
             lat_range=self.lats,
@@ -411,24 +449,28 @@ class ReturnRaster:
         #         f"Dataset {self.dataset} not recognised as appropriate timeseries."
         #     )
         # return static_ds
-        
+
     def calculate_reef_density(self, resampled_raster):
         """TODO: currently a little messy (hardcoded minimum resolution) since still dealing with rasterising at gebco"""
         # normalise to coral cover
-        lat_res, lon_res = abs(resampled_raster.rio.resolution()[0]), abs(resampled_raster.rio.resolution()[1])
+        lat_res, lon_res = abs(resampled_raster.rio.resolution()[0]), abs(
+            resampled_raster.rio.resolution()[1]
+        )
         # original resolution
         # og_lat_res, og_lon_res = abs(original_ds.rio.resolution()[0]), abs(original_ds.rio.resolution()[1])
-        max_density = (lat_res * lon_res) / (15/3600)**2
+        max_density = (lat_res * lon_res) / (15 / 3600) ** 2
         resampled_raster = resampled_raster / max_density
         # return resampled_raster.clip(min=0, max=1)  # TODO: currently ropey. Inaccuracy introduced by resampling
         return resampled_raster
-    
+
     def return_raster(self, dataset=None, ds=None):
         # order of operations decided to minimise unnecessarily intensive processing while
         # preserving information
-        
+
         processed_raster = spatial_data.process_xa_d(
-            self.get_raw_raster(dataset, ds=ds).astype(np.float32)  # necessary for nan values when resampling (rather than int)
+            self.get_raw_raster(dataset, ds=ds).astype(
+                np.float32
+            )  # necessary for nan values when resampling (rather than int)
         )
         # if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence"]:
         # if dataset == "new":
@@ -456,7 +498,7 @@ class ReturnRaster:
 
         if dataset in ["unep", "unep_wcmc", "gdcr", "unep_coral_presence"]:
             resampled_raster = self.calculate_reef_density(resampled_raster)
-            
+
         return resampled_raster
 
 
@@ -515,12 +557,8 @@ def resample_rasterio(
     Returns:
         The resampled raster as a xarray DataArray.
     """
-    lat_scale_factor = calc_scale_factor(
-        abs(xa_d.rio.resolution()[0]), lat_resolution
-    )
-    lon_scale_factor = calc_scale_factor(
-        abs(xa_d.rio.resolution()[1]), lon_resolution
-    )
+    lat_scale_factor = calc_scale_factor(abs(xa_d.rio.resolution()[0]), lat_resolution)
+    lon_scale_factor = calc_scale_factor(abs(xa_d.rio.resolution()[1]), lon_resolution)
 
     new_width, new_height = scaled_width_height(
         lat_scale_factor, lon_scale_factor, xa_d.rio.width, xa_d.rio.height
@@ -533,17 +571,19 @@ def resample_rasterio(
     # if isinstance(xa_d, xa.DataArray):
     #     xa_d.rio.write_nodata(np.nan, inplace=True)
 
-    return spatial_data.process_xa_d(xa_d.rio.reproject(
-        xa_d.rio.crs,
-        shape=(new_height, new_width),
-        resampling=method,
-    ))
+    return spatial_data.process_xa_d(
+        xa_d.rio.reproject(
+            xa_d.rio.crs,
+            shape=(new_height, new_width),
+            resampling=method,
+        )
+    )
 
 
 def rasterize_geodf(
     geo_df: gpd.geodataframe,
     resolution: float = 1.0,
-    all_touched: bool = False,
+    all_touched: bool = True,
     merge_alg: MergeAlg = MergeAlg.replace,
     crs: str = "4326",
 ) -> np.ndarray:
@@ -562,9 +602,7 @@ def rasterize_geodf(
 
     N.B. some work done in reef_cover.ipynb to replace merge_alg and all_touched
     """
-    xmin, ymin, xmax, ymax, width, height = lat_lon_vals_from_geo_df(
-        geo_df, resolution
-    )
+    xmin, ymin, xmax, ymax, width, height = lat_lon_vals_from_geo_df(geo_df, resolution)
     # Create the transform based on the extent and resolution
     transform = rasterio.transform.from_bounds(xmin, ymin, xmax, ymax, width, height)
     transform.crs = rasterio.crs.CRS.from_epsg(crs)
@@ -573,10 +611,10 @@ def rasterize_geodf(
         [(shape, 1) for shape in geo_df["geometry"]],
         out_shape=(height, width),
         transform=transform,
-        fill=0,     # not nan since integer, and want to have negative target (0)
-        all_touched=all_touched,    # argument to be made that this doesn't best reflect suitability
-        dtype=rasterio.uint16,  # updated since was reaching upper limit of uint8
-        merge_alg=merge_alg,    # ignore overlapping polygons
+        fill=np.nan,  # not nan since integer, and want to have negative target (0)
+        all_touched=all_touched,  # argument to be made that this doesn't best reflect suitability
+        dtype=rasterio.float32,  # updated since was reaching upper limit of uint8
+        merge_alg=merge_alg,  # ignore overlapping polygons
     )
 
 
@@ -688,78 +726,75 @@ def rasterise_points_df(
     return raster
 
 
-def apply_fill_loess(dataset: xa.Dataset, nx=2, ny=2):
+def apply_fill_loess(dataset: xa.Dataset, nx=2, ny=2, max_workers=64):
     """
-    Apply fill.loess to each time step for each variable in the xarray dataset.
+    Apply fill.loess to each time step for each variable in the xarray dataset in parallel.
 
     Args:
         dataset (xarray.Dataset): Input xarray dataset with time series of variables.
         nx (int): Number of pixels to extend in the x-direction.
         ny (int): Number of pixels to extend in the y-direction.
+        max_workers (int): Maximum number of threads to use for parallel processing.
 
     Returns:
         xarray.Dataset: Buffered xarray dataset.
     """
-    # TODO: nested tqdm in notebooks and scripts
-    # Create a copy of the original dataset
-    buffered_dataset = dataset.copy(deep=True)
-    buffered_data_vars = buffered_dataset.data_vars
+    # from pyxarray import pyxarray.Grid2D, loess  # Assuming these are defined elsewhere
+    from pyinterp.backends import xarray as pyxarray
+    from coralshift.utils.utils import (
+        check_var_has_coords,
+    )  # Assuming this function exists
 
-    # print(buffered_dataset.coords)
+    # Copy the original dataset but avoid deep copies unless necessary
+    buffered_dataset = dataset.copy(deep=False)
 
-    print(f"{len(buffered_data_vars)} raster(s) to spatially buffer...")
-    for _, (var_name, var_data) in tqdm(
-        enumerate(buffered_data_vars.items()),
-        desc="Buffering variables",
-        total=len(buffered_data_vars),
-        position=0,
-    ):  # for each variable in the dataset
-        if utils.check_var_has_coords(
-            var_data
-        ):  # if dataset has latitude, longitude, and time coordinates
+    # Helper function to process a single variable at all timesteps
+    def process_variable(var_name, var_data):
+        if check_var_has_coords(var_data):  # Has latitude, longitude, and time
             if isinstance(buffered_dataset.time.values, np.datetime64):
-                # grid = pyxarray.Grid2D(var_data)
-                # filled = loess(grid, nx=nx, ny=ny)
-                # buffered_data_vars[var_name].loc[dict(time=0)] = filled.T
-                print("need multiple time values for now")
-                continue    # TODO: writing when single value of time
-            else:
-                for t in tqdm(
-                    buffered_dataset.time,
-                    desc=f"Processing timesteps of variable '{var_name}'",
-                    leave=False,
-                    position=1,
-                ):  # buffer each timestep
-                    grid = pyxarray.Grid2D(var_data.sel(time=t))
-                    filled = loess(grid, nx=nx, ny=ny)
-                    buffered_data_vars[var_name].loc[dict(time=t)] = filled.T
-        elif utils.check_var_has_coords(
-            var_data, ["latitude", "longitude"]
-        ):  # if dataset has latitude, longitude only
-            grid = pyxarray.Grid2D(
-                var_data.astype("float64"), geodetic=False
-            )  # type required since loess can't handle uint8
+                print(f"Variable '{var_name}' needs multiple time values. Skipping...")
+                return
+
+            for t in buffered_dataset.time:
+                grid = pyxarray.Grid2D(var_data.sel(time=t))
+                filled = loess(grid, nx=nx, ny=ny)
+                buffered_dataset[var_name].loc[dict(time=t)] = filled.T
+
+        elif check_var_has_coords(var_data, ["latitude", "longitude"]):  # Lat/Lon only
+            grid = pyxarray.Grid2D(var_data.astype("float64"), geodetic=False)
             filled = loess(grid, nx=nx, ny=ny)
 
-            # Transpose filled array if necessary: slightly hacky
             if filled.shape != buffered_dataset[var_name].shape:
-                print("Transposing filled array to match the original shape.")
-                filled = np.transpose(filled)
+                if filled.T.shape == buffered_dataset[var_name].shape:
+                    filled = filled.T  # Transpose if needed
+                else:
+                    raise ValueError(
+                        f"Filled array shape {filled.shape} does not match original shape {buffered_dataset[var_name].shape}."
+                    )
 
-            # Check if dimensions match before updating
-            if filled.shape != buffered_dataset[var_name].shape:
-                raise ValueError(
-                    f"""Dimensions of filled array do not match the original data array. Filled shape: {filled.shape},
-                    Original shape: {buffered_dataset[var_name].shape}""")
+            buffered_dataset[var_name].loc[:] = filled
 
-            buffered_dataset.update(
-                {var_name: (sorted(buffered_dataset[var_name].dims), filled)}
+    # List of variables to process
+    variables_to_process = [
+        (var_name, var_data)
+        for var_name, var_data in buffered_dataset.data_vars.items()
+        if check_var_has_coords(var_data, ["latitude", "longitude"])
+        or check_var_has_coords(var_data)
+    ]
+
+    print(f"{len(variables_to_process)} variable(s) to spatially buffer...")
+
+    # Use ThreadPoolExecutor for parallel processing of variables
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        list(
+            tqdm(
+                executor.map(
+                    lambda args: process_variable(*args), variables_to_process
+                ),
+                total=len(variables_to_process),
+                desc="Processing variables",
             )
-        else:
-            print(
-                f"""Variable must have at least 'latitude', and 'longitude' coordinates to be spatially padded.
-                \nVariable '{var_name}' has {var_data.coords}. Skipping..."""
-            )
+        )
 
     return buffered_dataset
 
@@ -834,7 +869,7 @@ def rio_resample_to_other(
     xa_d: xa.DataArray,
     other_xa_d: xa.DataArray,
     resampling_method: Resampling = Resampling.bilinear,
-    project_first: bool = True
+    project_first: bool = True,
 ) -> xa.DataArray:
     """
     Resample a raster to match the resolution of another raster.
@@ -875,8 +910,7 @@ def rio_absolute_resample(
     lat_range: list[float] = None,
     lon_range: list[float] = None,
     resample_method: Resampling = Resampling.bilinear,
-    project_first: bool = True
-
+    project_first: bool = True,
 ):
     if not xa_d.rio.crs:
         xa_d = xa_d.rio.write_crs("EPSG:4326")
@@ -895,7 +929,10 @@ def rio_absolute_resample(
         }
     ).rio.write_crs(xa_d.rio.crs)
     return spatial_data.process_xa_d(
-        rio_resample_to_other(xa_d, common_dataset, resample_method, project_first=project_first))
+        rio_resample_to_other(
+            xa_d, common_dataset, resample_method, project_first=project_first
+        )
+    )
 
 
 def old_resample_xa_d(
@@ -1193,3 +1230,82 @@ def depth_filter(
         df_depth.loc[depth_condition, "within_depth"] = 1
 
     return df_depth
+
+
+# DEPRECATED
+
+# def apply_fill_loess(dataset: xa.Dataset, nx=2, ny=2):
+#     """
+# Apply fill.loess to each time step for each variable in the xarray dataset.
+
+# Args:
+#     dataset (xarray.Dataset): Input xarray dataset with time series of variables.
+#     nx (int): Number of pixels to extend in the x-direction.
+#     ny (int): Number of pixels to extend in the y-direction.
+
+# Returns:
+#     xarray.Dataset: Buffered xarray dataset.
+# """
+# # TODO: nested tqdm in notebooks and scripts
+# # Create a copy of the original dataset
+# buffered_dataset = dataset.copy(deep=True)
+# buffered_data_vars = buffered_dataset.data_vars
+
+# # print(buffered_dataset.coords)
+
+# print(f"{len(buffered_data_vars)} raster(s) to spatially buffer...")
+# for _, (var_name, var_data) in tqdm(
+#     enumerate(buffered_data_vars.items()),
+#     desc="Buffering variables",
+#     total=len(buffered_data_vars),
+#     position=0,
+# ):  # for each variable in the dataset
+#     if utils.check_var_has_coords(
+#         var_data
+#     ):  # if dataset has latitude, longitude, and time coordinates
+#         if isinstance(buffered_dataset.time.values, np.datetime64):
+#             # grid = pyxarray.Grid2D(var_data)
+#             # filled = loess(grid, nx=nx, ny=ny)
+#             # buffered_data_vars[var_name].loc[dict(time=0)] = filled.T
+#             print("need multiple time values for now")
+#             continue  # TODO: writing when single value of time
+#         else:
+#             for t in tqdm(
+#                 buffered_dataset.time,
+#                 desc=f"Processing timesteps of variable '{var_name}'",
+#                 leave=False,
+#                 position=1,
+#             ):  # buffer each timestep
+#                 grid = pyxarray.Grid2D(var_data.sel(time=t))
+#                 filled = loess(grid, nx=nx, ny=ny)
+#                 buffered_data_vars[var_name].loc[dict(time=t)] = filled.T
+#     elif utils.check_var_has_coords(
+#         var_data, ["latitude", "longitude"]
+#     ):  # if dataset has latitude, longitude only
+#         grid = pyxarray.Grid2D(
+#             var_data.astype("float64"), geodetic=False
+#         )  # type required since loess can't handle uint8
+#         filled = loess(grid, nx=nx, ny=ny)
+
+#         # Transpose filled array if necessary: slightly hacky
+#         if filled.shape != buffered_dataset[var_name].shape:
+#             print("Transposing filled array to match the original shape.")
+#             filled = np.transpose(filled)
+
+#         # Check if dimensions match before updating
+#         if filled.shape != buffered_dataset[var_name].shape:
+#             raise ValueError(
+#                 f"""Dimensions of filled array do not match the original data array. Filled shape: {filled.shape},
+#                 Original shape: {buffered_dataset[var_name].shape}"""
+#             )
+
+#         buffered_dataset.update(
+#             {var_name: (sorted(buffered_dataset[var_name].dims), filled)}
+#         )
+#     else:
+#         print(
+#             f"""Variable must have at least 'latitude', and 'longitude' coordinates to be spatially padded.
+#             \nVariable '{var_name}' has {var_data.coords}. Skipping..."""
+#         )
+
+# return buffered_dataset

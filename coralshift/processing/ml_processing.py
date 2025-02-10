@@ -45,17 +45,16 @@ class ProcessMLData:
     def __init__(
         self,
         # config_info: dict = None,
-        config_info,    # dataclass
+        config_info,  # dataclass
     ):
         self.cfg = config_info
 
         # if config_info:
         #     self.__dict__.update(config_info.__dict__)
-            
+
         # assign all values from a dataclass as class attributes
         for key, value in config_info.__dict__.items():
             setattr(self, key, value)
-        
 
     def get_merged_datasets(self):
         dss = []
@@ -91,9 +90,7 @@ class ProcessMLData:
 
     def split_dataset(self, xa_ds):
         df_X, df_y = ds_to_ml_ready(
-            xa_ds,
-            predictand=self.return_predictand(),
-            depth_mask=self.depth_mask
+            xa_ds, predictand=self.return_predictand(), depth_mask=self.depth_mask
         )
         # if elevation not requested, drop (needed to be included to generate the shallow water mask)
         if not ("gebco" in self.datasets or "bathymetry" in self.datasets):
@@ -146,20 +143,18 @@ class ProcessMLData:
             vals = tests
         elif self.split_type == "custom_checkerboard":  # TODO update/standardise this
             X_trains, X_tests = get_specified_ratio_checkerboard_train_test_data(
-                df_X, train_test_ratio=self.train_test_val_frac[1])
+                df_X, train_test_ratio=self.train_test_val_frac[1]
+            )
             y_trains, y_tests = get_specified_ratio_checkerboard_train_test_data(
-                df_y, train_test_ratio=self.train_test_val_frac[1])
+                df_y, train_test_ratio=self.train_test_val_frac[1]
+            )
 
             trains = (X_trains, y_trains)
             tests = (X_tests, y_tests)
             vals = tests
         elif self.split_type == "spatial":
-            X_trains, X_tests = split_train_test_spatial(
-               df_X, self.test_geom
-            )
-            y_trains, y_tests = split_train_test_spatial(
-               df_y, self.test_geom
-            )
+            X_trains, X_tests = split_train_test_spatial(df_X, self.test_geom)
+            y_trains, y_tests = split_train_test_spatial(df_y, self.test_geom)
             trains = (X_trains, y_trains)
             tests = (X_tests, y_tests)
             vals = tests
@@ -173,13 +168,13 @@ class ProcessMLData:
             return MinMaxScaler()
         elif scaler == "standard":
             return StandardScaler()
-        elif scaler == "log":   # functioning weirdly
+        elif scaler == "log":  # functioning weirdly
             return FunctionTransformer(log_transform)
 
     def get_fitted_scaler(self, trains=None, tests=None, vals=None):
         X_scaler = self.initialise_data_scaler(self.X_scaler)
         # fit scaler
-        if (trains and tests and vals) is None: #### TODO: WHY?
+        if (trains and tests and vals) is None:  #### TODO: WHY?
             trains, tests, vals = self.split_dataset()
         print("\tfitting scaler to X data...")
         return X_scaler.fit(trains[0]), (trains, tests, vals)
@@ -240,9 +235,15 @@ class ProcessMLData:
     def get_ds_info(self, trains, tests, vals):
         return {
             "class_balance": {
-                "train_pos_neg_ratio": float(utils.calc_non_zero_ratio(trains[1], predictand=self.predictand)),
-                "test_pos_neg_ratio": float(utils.calc_non_zero_ratio(tests[1], predictand=self.predictand)),
-                "val_pos_neg_ratio": float(utils.calc_non_zero_ratio(vals[1], predictand=self.predictand)),
+                "train_pos_neg_ratio": float(
+                    utils.calc_non_zero_ratio(trains[1], predictand=self.predictand)
+                ),
+                "test_pos_neg_ratio": float(
+                    utils.calc_non_zero_ratio(tests[1], predictand=self.predictand)
+                ),
+                "val_pos_neg_ratio": float(
+                    utils.calc_non_zero_ratio(vals[1], predictand=self.predictand)
+                ),
             },
             # TODO: get actual values here somehow
             # TODO: removed this since not always wanting to include elevation
@@ -268,17 +269,30 @@ class ProcessMLData:
             print("Loading preprocessed data from parquet files...")
             res_str = utils.replace_dot_with_dash(str(round(self.resolution, 3)))
             spatial_extent_info = cmipper_utils.lat_lon_string_from_tuples(
-                self.lats, self.lons).upper()
+                self.lats, self.lons
+            ).upper()
 
             if self.depth_mask:
                 dm = self.depth_mask
-                fp_root = Path(config.ml_ready_dir) / self.split_type / f"{str(min(dm))}_{str(max(dm))}"
+                fp_root = (
+                    Path(config.ml_ready_dir)
+                    / self.split_type
+                    / f"{str(min(dm))}_{str(max(dm))}"
+                )
             else:
                 fp_root = Path(config.ml_ready_dir)
-            tr_X_fp = fp_root / res_str / f"train_X_{res_str}_{spatial_extent_info}.parquet"
-            tr_y_fp = fp_root / res_str / f"train_y_{res_str}_{spatial_extent_info}.parquet"
-            te_X_fp = fp_root / res_str / f"test_X_{res_str}_{spatial_extent_info}.parquet"
-            te_y_fp = fp_root / res_str / f"test_y_{res_str}_{spatial_extent_info}.parquet"
+            tr_X_fp = (
+                fp_root / res_str / f"train_X_{res_str}_{spatial_extent_info}.parquet"
+            )
+            tr_y_fp = (
+                fp_root / res_str / f"train_y_{res_str}_{spatial_extent_info}.parquet"
+            )
+            te_X_fp = (
+                fp_root / res_str / f"test_X_{res_str}_{spatial_extent_info}.parquet"
+            )
+            te_y_fp = (
+                fp_root / res_str / f"test_y_{res_str}_{spatial_extent_info}.parquet"
+            )
 
             # read in train data
             X_trains = pd.read_parquet(tr_X_fp)
@@ -311,7 +325,8 @@ class ProcessMLData:
             trains, tests, vals = self.split_dataset(ds)
         ds_info = self.get_ds_info(trains, tests, vals)
         # scale data
-        return self.scale_data(trains, tests, vals), ds_info
+        return (trains, tests, vals), ds_info
+        # return self.scale_data(trains, tests, vals), ds_info
         # return trains, tests, vals, ds_info
 
 
@@ -354,11 +369,16 @@ def ds_to_ml_ready(
         raise ValueError("Depth variable not found in xarray dataset")
 
     predictors = [
-        pred for pred in xa_ds.variables if pred != predictand and pred not in exclude_list
+        pred
+        for pred in xa_ds.variables
+        if pred != predictand and pred not in exclude_list
     ]
 
     if isinstance(depth_mask, list):
-        xa_masked = xa_ds.where((xa_ds["elevation"] >= depth_mask[0]) & (xa_ds["elevation"] <= depth_mask[1]))
+        xa_masked = xa_ds.where(
+            (xa_ds["elevation"] >= depth_mask[0])
+            & (xa_ds["elevation"] <= depth_mask[1])
+        )
     elif depth_mask == "adaptive":
         xa_masked = adaptive_xarray_depth_mask(
             xa_ds,
@@ -380,7 +400,7 @@ def adaptive_xarray_depth_mask(
     initial_depth_mask_lims=[0, 10],
     predictand="UNEP_GDCR",
     depth_var="elevation",
-    tolerance=0.0001  # Tolerance for detecting significant changes in ratio
+    tolerance=0.0001,  # Tolerance for detecting significant changes in ratio
 ):
     """
     Adaptively mask an xarray dataset based on depth, aiming to maximize the positive/negative ratio.
@@ -388,14 +408,20 @@ def adaptive_xarray_depth_mask(
     lower_limit, upper_limit = initial_depth_mask_lims
     step_size = 10  # Initial step size for decreasing the lower limit
     max_iterations = 1000  # Maximum number of iterations to prevent infinite loops
-    no_change_limit = 20  # Number of iterations to wait before stopping if no significant change
+    no_change_limit = (
+        20  # Number of iterations to wait before stopping if no significant change
+    )
     iteration = 0
     last_ratios = []
 
     while iteration < max_iterations:
         # Create the mask based on current limits
-        elevation_mask = (xa_ds[depth_var] >= lower_limit) & (xa_ds[depth_var] <= upper_limit)
-        masked = xa_ds[predictand].where(elevation_mask, np.nan)    # limit to predictand to save compute
+        elevation_mask = (xa_ds[depth_var] >= lower_limit) & (
+            xa_ds[depth_var] <= upper_limit
+        )
+        masked = xa_ds[predictand].where(
+            elevation_mask, np.nan
+        )  # limit to predictand to save compute
 
         # Calculate the ratio of non-zero, non-NaN values in the predictand
         num_non_zero = np.count_nonzero(~np.isnan(masked.values) & (masked.values != 0))
@@ -411,7 +437,10 @@ def adaptive_xarray_depth_mask(
             last_ratios.pop(0)
 
         # Check if there is no significant change in the ratio
-        if len(last_ratios) == no_change_limit and max(last_ratios) - min(last_ratios) < tolerance:
+        if (
+            len(last_ratios) == no_change_limit
+            and max(last_ratios) - min(last_ratios) < tolerance
+        ):
             # print("No significant change detected, stopping search.")
             return xa_ds.where(elevation_mask, np.nan)
 
@@ -426,24 +455,32 @@ def adaptive_xarray_depth_mask(
 
 
 def calculate_test_cell_buffer(
-    test_cell_size: float = 1,
-    test_train_ratio: float = 0.2
+    test_cell_size: float = 1, test_train_ratio: float = 0.2
 ):
-    return np.sqrt(test_train_ratio/2) * test_cell_size
+    return np.sqrt(test_train_ratio / 2) * test_cell_size
 
 
-def get_checkerboard_train_test_data(df, test_cell_size: float = 1, test_train_ratio: float = 0.2, initialisation: tuple[float] = (0,0)):
+def get_checkerboard_train_test_data(
+    df,
+    test_cell_size: float = 1,
+    test_train_ratio: float = 0.2,
+    initialisation: tuple[float] = (0, 0),
+):
     # calculate necessary buffer for train-test ratio
     buffer = calculate_test_cell_buffer(test_cell_size, test_train_ratio)
 
     # get min and max lat/lon values from df
     extremes = utils.get_multiindex_min_max(df)
-    lat_min, lat_max = extremes['latitude']['min'], extremes['latitude']['max']
-    lon_min, lon_max = extremes['longitude']['min'], extremes['longitude']['max']
+    lat_min, lat_max = extremes["latitude"]["min"], extremes["latitude"]["max"]
+    lon_min, lon_max = extremes["longitude"]["min"], extremes["longitude"]["max"]
 
     # Create a meshgrid of the lat/lon centers
-    lat_centres = np.arange(lat_min-initialisation[0], lat_max+test_cell_size, test_cell_size)
-    lon_centres = np.arange(lon_min-initialisation[1], lon_max+test_cell_size, test_cell_size)
+    lat_centres = np.arange(
+        lat_min - initialisation[0], lat_max + test_cell_size, test_cell_size
+    )
+    lon_centres = np.arange(
+        lon_min - initialisation[1], lon_max + test_cell_size, test_cell_size
+    )
 
     # Create a meshgrid of latitudes and longitudes
     lon_grid, lat_grid = np.meshgrid(lon_centres, lat_centres)
@@ -456,27 +493,37 @@ def get_checkerboard_train_test_data(df, test_cell_size: float = 1, test_train_r
     idx_grid, idy_grid = np.meshgrid(idx_grid, idy_grid)
 
     # Apply the condition to select valid points
-    mask = ((idy_grid % 2 == 0) & (idx_grid % 2 == 1)) | ((idy_grid % 2 != 0) & (idx_grid % 2 != 1))
+    mask = ((idy_grid % 2 == 0) & (idx_grid % 2 == 1)) | (
+        (idy_grid % 2 != 0) & (idx_grid % 2 != 1)
+    )
 
     # Select the latitude and longitude pairs that satisfy the condition
     lat_test_centers = lat_grid[mask]
     lon_test_centers = lon_grid[mask]
     selected_pairs = np.vstack([lon_test_centers, lat_test_centers]).T
 
-    lat_test_regions = np.vstack([lat_test_centers - buffer, lat_test_centers + buffer]).T
-    lon_test_regions = np.vstack([lon_test_centers - buffer, lon_test_centers + buffer]).T
-    
+    lat_test_regions = np.vstack(
+        [lat_test_centers - buffer, lat_test_centers + buffer]
+    ).T
+    lon_test_regions = np.vstack(
+        [lon_test_centers - buffer, lon_test_centers + buffer]
+    ).T
+
     test_mask = np.zeros(len(df), dtype=bool)
 
-    for (lat_min_val, lat_max_val), (lon_min_val, lon_max_val) in tqdm(zip(lat_test_regions, lon_test_regions), total=len(lat_test_regions)):
+    for (lat_min_val, lat_max_val), (lon_min_val, lon_max_val) in tqdm(
+        zip(lat_test_regions, lon_test_regions), total=len(lat_test_regions)
+    ):
         # iteratively apply the test region mask to dataframe
         combined_mask = (
-            (df.index.get_level_values('latitude') >= lat_min_val) & 
-            (df.index.get_level_values('latitude') < lat_max_val) &
-            (df.index.get_level_values('longitude') >= lon_min_val) & 
-            (df.index.get_level_values('longitude') < lon_max_val)
+            (df.index.get_level_values("latitude") >= lat_min_val)
+            & (df.index.get_level_values("latitude") < lat_max_val)
+            & (df.index.get_level_values("longitude") >= lon_min_val)
+            & (df.index.get_level_values("longitude") < lon_max_val)
         )
-        test_mask |= combined_mask  # Add the current region's mask to the overall test mask
+        test_mask |= (
+            combined_mask  # Add the current region's mask to the overall test mask
+        )
 
     test = df[test_mask]
     train = df[~test_mask]
@@ -485,24 +532,29 @@ def get_checkerboard_train_test_data(df, test_cell_size: float = 1, test_train_r
 
 def scan_checkerboard(df, test_cell_size: float = 10, test_train_ratio: float = 0.2):
 
-    lat_shifts = np.arange(0, 2*test_cell_size, 2*buffer) 
-    lon_shifts = np.arange(0, test_cell_size, 2*buffer) 
+    lat_shifts = np.arange(0, 2 * test_cell_size, 2 * buffer)
+    lon_shifts = np.arange(0, test_cell_size, 2 * buffer)
 
     all_tests = []
     for i in lat_shifts:
         for j in lon_shifts:
             # vertical scan
-            _, tests = ml_processing.get_checkerboard_train_test_data(data_df, test_cell_size, test_train_ratio, initialisation=(i,j))
+            _, tests = ml_processing.get_checkerboard_train_test_data(
+                data_df, test_cell_size, test_train_ratio, initialisation=(i, j)
+            )
             # TODO: perform ML here
             all_tests.append(tests)
             tests_df = pd.concat(all_tests, axis=1).mean(axis=1).rename("value")
     return tests_df
 
-def old_get_checkerboard_train_test_data(df, test_cell_size: float = 1, buffer: float = 0):
+
+def old_get_checkerboard_train_test_data(
+    df, test_cell_size: float = 1, buffer: float = 0
+):
     extremes = utils.get_multiindex_min_max(df)
 
-    lat_min, lat_max = extremes['latitude']['min'], extremes['latitude']['max']
-    lon_min, lon_max = extremes['longitude']['min'], extremes['longitude']['max']
+    lat_min, lat_max = extremes["latitude"]["min"], extremes["latitude"]["max"]
+    lon_min, lon_max = extremes["longitude"]["min"], extremes["longitude"]["max"]
 
     lat_centres = np.arange(lat_min, lat_max, test_cell_size)
     lon_centres = np.arange(lon_min, lon_max, test_cell_size)
@@ -521,13 +573,21 @@ def old_get_checkerboard_train_test_data(df, test_cell_size: float = 1, buffer: 
     # buffer = test_cell_size / 2
 
     # get the data within the test cell size around each centre
-    lat_vals = [(lat_centre - buffer, lat_centre + buffer) for lat_centre in check_lat_centres]
-    lon_vals = [(lon_centre - buffer, lon_centre + buffer) for lon_centre in check_lon_centres]
+    lat_vals = [
+        (lat_centre - buffer, lat_centre + buffer) for lat_centre in check_lat_centres
+    ]
+    lon_vals = [
+        (lon_centre - buffer, lon_centre + buffer) for lon_centre in check_lon_centres
+    ]
 
     if isinstance(df, pd.Series):
         df = df.to_frame()
-    test_dfs = [df.sort_index().loc[(slice(*lat_val), slice(*lon_val)), :] for lat_val, lon_val in tqdm(
-        zip(lat_vals, lon_vals), total=len(lat_vals), desc="compiling test data")]
+    test_dfs = [
+        df.sort_index().loc[(slice(*lat_val), slice(*lon_val)), :]
+        for lat_val, lon_val in tqdm(
+            zip(lat_vals, lon_vals), total=len(lat_vals), desc="compiling test data"
+        )
+    ]
     test = pd.concat(test_dfs)
     train = df.drop(test.index)
 
@@ -539,8 +599,7 @@ def old_get_checkerboard_train_test_data(df, test_cell_size: float = 1, buffer: 
 #     train_test_ratio: float = 0.2,
 # ):
 #     # 1 to 1 is 0.5
-#     # need areas of trains to be 
-
+#     # need areas of trains to be
 
 
 # def get_specified_ratio_checkerboard_train_test_data(
@@ -550,29 +609,29 @@ def old_get_checkerboard_train_test_data(df, test_cell_size: float = 1, buffer: 
 #     tolerance: float = 0.05,
 #     max_count: int = 10
 # ):
-    # # TODO: implement direction switch checker with update of buffer change. Put into a general search function.
-    # # TODO: check that this actually adjusts anything
-    # train, test = get_checkerboard_train_test_data(df)
-    # df_pos_neg_ratio = len(test) / (len(test)+len(train))
+# # TODO: implement direction switch checker with update of buffer change. Put into a general search function.
+# # TODO: check that this actually adjusts anything
+# train, test = get_checkerboard_train_test_data(df)
+# df_pos_neg_ratio = len(test) / (len(test)+len(train))
 
-    # counter = 0
-    # buffer = resolution / 2
-    # while abs(df_pos_neg_ratio - train_test_ratio) > tolerance:
-    #     if counter > max_count:
-    #         print(
-    #             f"Ratio {train_test_ratio} not reached in {max_count} iterations. Final ratio: {df_pos_neg_ratio}")
-    #         break
-    #     counter += 1
-    #     if df_pos_neg_ratio > train_test_ratio:
-    #         buffer -= resolution
-    #     else:
-    #         buffer += resolution
+# counter = 0
+# buffer = resolution / 2
+# while abs(df_pos_neg_ratio - train_test_ratio) > tolerance:
+#     if counter > max_count:
+#         print(
+#             f"Ratio {train_test_ratio} not reached in {max_count} iterations. Final ratio: {df_pos_neg_ratio}")
+#         break
+#     counter += 1
+#     if df_pos_neg_ratio > train_test_ratio:
+#         buffer -= resolution
+#     else:
+#         buffer += resolution
 
-    #     train, test = get_checkerboard_train_test_data(df, buffer=buffer)
-    #     df_pos_neg_ratio = len(test) / (len(test)+len(train))
-    #     print('ratio': df_pos_neg_ratio)
-    # print(f"Final ratio test fraction: {df_pos_neg_ratio}")
-    # return train, test
+#     train, test = get_checkerboard_train_test_data(df, buffer=buffer)
+#     df_pos_neg_ratio = len(test) / (len(test)+len(train))
+#     print('ratio': df_pos_neg_ratio)
+# print(f"Final ratio test fraction: {df_pos_neg_ratio}")
+# return train, test
 
 
 def split_train_test_spatial(df: pd.DataFrame, test_geom: list[float]):
@@ -583,11 +642,15 @@ def split_train_test_spatial(df: pd.DataFrame, test_geom: list[float]):
     lon_min, lon_max = test_geom[2], test_geom[3]
 
     inner_df = df[
-        (df.index.get_level_values("longitude") >= lon_min) & (df.index.get_level_values("longitude") <= lon_max)
-        & (df.index.get_level_values("latitude") >= lat_min) & (df.index.get_level_values("latitude") <= lat_max)]
+        (df.index.get_level_values("longitude") >= lon_min)
+        & (df.index.get_level_values("longitude") <= lon_max)
+        & (df.index.get_level_values("latitude") >= lat_min)
+        & (df.index.get_level_values("latitude") <= lat_max)
+    ]
 
     outer_df = df.drop(inner_df.index)  # inplace is false by default
     return outer_df, inner_df
+
 
 # TODO: should this be separated out into multiple functions?
 # def ds_to_ml_ready(

@@ -45,7 +45,12 @@ def spatially_reform_data(df, resolution: float = None):
     if not resolution:
         lat_res_calc = abs(np.diff(df.sort_index().index.get_level_values("latitude")))
         lon_res_calc = abs(np.diff(df.sort_index().index.get_level_values("longitude")))
-        resolution = np.min([np.min(lat_res_calc[lat_res_calc != 0]), np.min(lon_res_calc[lon_res_calc != 0])]).round(5)
+        resolution = np.min(
+            [
+                np.min(lat_res_calc[lat_res_calc != 0]),
+                np.min(lon_res_calc[lon_res_calc != 0]),
+            ]
+        ).round(5)
 
     lat_spacing, lon_spacing = resolution, resolution
 
@@ -60,7 +65,7 @@ def spatially_reform_data(df, resolution: float = None):
         df.index.get_level_values("longitude").max() + lon_spacing,
         lon_spacing,
     )
-    # prepare index from (unrounded) index of 
+    # prepare index from (unrounded) index of
     index = pd.MultiIndex.from_product(
         [latitudes, longitudes], names=["approx_latitude", "approx_longitude"]
     )
@@ -83,6 +88,7 @@ def spatially_reform_data(df, resolution: float = None):
     df.set_index(["latitude", "longitude"], inplace=True)
 
     return df.combine_first(new_df).to_xarray().sortby(["latitude", "longitude"])
+
 
 # def spatially_reform_data(df, resolution: float = None):
 #     """TODO: docstring"""
@@ -1416,7 +1422,7 @@ def process_xa_d(
             [var for var in drop_vars if var in temp_xa_d.variables]
         )
 
-    temp_xa_d = utils.mask_above_threshold(temp_xa_d, threshold=1e10)
+    # temp_xa_d = utils.mask_above_threshold(temp_xa_d, threshold=1e10)
 
     # sort coordinate dimensions in order time (if time present), latitude, longitude
     temp_xa_d = temp_xa_d.sortby(list(temp_xa_d.dims))

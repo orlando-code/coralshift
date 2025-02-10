@@ -176,7 +176,10 @@ def calc_par(
     Returns:
         xa.Dataset: Dataset with PAR values
     """
-    return (rsdo_da * np.exp(kd490_da * bathymetry_da)).to_dataset(name="par")
+    par = rsdo_da * np.exp(kd490_da * bathymetry_da)
+    if isinstance(par, xa.DataArray):
+        return par.to_dataset(name="par")
+    return par
 
 
 def standardize_time(ds: xa.Dataset | xa.DataArray) -> xa.Dataset | xa.DataArray:

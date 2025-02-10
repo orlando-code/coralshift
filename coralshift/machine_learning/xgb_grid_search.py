@@ -169,7 +169,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--data_fp",
-        default="/maps/rt582/coralshift/coralshift/machine_learning/xgb_grid_search.py",
+        default="/maps/rt582/coralshift/data/ml_ready/all_data_0_01.parquet",
         type=str,
         required=True,
         help="File path to the dataset (parquet required).",

@@ -254,11 +254,14 @@ def permutation_feature_importance(
     -------
     pd.DataFrame: dataframe containing feature importances
     """
-    print("Running feature importance check...")
+    print(f"Running feature importance check with {n_repeats} repeat(s)...")
+    X_np = val_X.to_numpy(copy=True)  # Ensure writable NumPy array
+    y_np = val_y.to_numpy(copy=True)  # Ensure writable NumPy array
+
     perm_imp_dict = permutation_importance(
         model,
-        val_X,
-        val_y,
+        X_np,
+        y_np,
         n_repeats=n_repeats,
         random_state=random_state,
         n_jobs=n_jobs,
